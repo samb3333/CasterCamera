@@ -5,8 +5,6 @@ metadata = {
 	defaultKeybind = "F8",
 }
 
--- TODO: getClosestPlayerToScreen, button layout, and yasai suggestions
-
 local function parseBallJSON(str)
 	-- Table to store the parsed data
 	local result = {}
