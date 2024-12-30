@@ -125,6 +125,7 @@ type Arena = {
 			position: Vec3,
 		},
 		players: { ReplayPlayer },
+		score: number,
 	},
 	away: {
 		overview: {
@@ -151,6 +152,7 @@ type Arena = {
 		players: { ReplayPlayer },
 	},
 	players: { ReplayPlayer },
+	score: number,
 }
 
 function createArena(name: string, position: Vec3, rotation: Quat): Arena
@@ -169,6 +171,7 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 				position = nil,
 			},
 			players = {},
+			score = 0,
 		},
 		away = {
 			overview = {
@@ -183,6 +186,7 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 			players = {},
 		},
 		players = {},
+		score = 0,
 	}
 end
 
@@ -429,6 +433,7 @@ local controlsScreen: boolean = false
 local hoveredArena = ""
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
+local boundingBoxDebug: boolean = false
 
 -- Bounding Box start
 
@@ -968,6 +973,7 @@ Controller:
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
+		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
 		Gui.text("Camera Rotation: " .. tostring(camera.rotation:euler()))
@@ -1888,11 +1894,17 @@ function goalScoreCheck()
 		Vec3.new(100, 500, 225),
 		Vec3.new(selectedArena.rotation:euler().z, 0, 0)
 	)
+	if boundingBoxDebug then
+		homeGoalBox:render(0, 1, 0)
+	end
 	local awayGoalBox: BoxType = Box.new(
 		selectedArena.away.goal.position - (selectedArena.rotation:getForwardVector() * 135),
 		Vec3.new(100, 500, 225),
 		Vec3.new(selectedArena.rotation:euler().z, 0, 0)
 	)
+	if boundingBoxDebug then
+		awayGoalBox:render(0, 1, 0)
+	end
 
 	if homeGoalBox:checkPointIntersect(ball.transform.position) then
 		homeGoalEnter = true
@@ -1922,6 +1934,9 @@ end
 function ballInCenterCheck()
 	local centerBox: BoxType =
 		Box.new(selectedArena.position + Vec3.new(0, 0, 40), Vec3.new(50, 50, 75), Vec3.zeroVector)
+	if boundingBoxDebug then
+		centerBox:render(0, 0, 1)
+	end
 
 	if centerBox:checkPointIntersect(ball.transform.position) then
 		ballCenterTime += deltaTime
@@ -1931,6 +1946,30 @@ function ballInCenterCheck()
 		end
 		ballCenterTime = 0
 	end
+end
+
+local saveOverlayInfo = false
+
+function sendOverlayInfo()
+	local overlayInfo = {}
+	local homePlayerIds = {}
+	local awayPlayerIds = {}
+	for _, player in selectedArena.home.players do
+		table.insert(homePlayerIds, player.playerId)
+	end
+	for _, player in selectedArena.away.players do
+		table.insert(awayPlayerIds, player.playerId)
+	end
+	overlayInfo["homePlayerIds"] = homePlayerIds
+	overlayInfo["awayPlayerIds"] = awayPlayerIds
+	overlayInfo["homeColor"] = homeTeamPrimaryColor
+	overlayInfo["awayColor"] = awayTeamPrimaryColor
+	overlayInfo["isFollowing"] = playerFollow
+	if playerFollow then
+		overlayInfo["followedPlayerId"] = currentPlayerId
+	end
+
+	sendMessage(getCameraById("dennssen.casterOverlay"), { alwaysTick = saveOverlayInfo, overlayInfo = overlayInfo })
 end
 
 function tick(dt)
@@ -1986,6 +2025,11 @@ function tick(dt)
 		return
 	end
 
+	if Input.getKeyDown(Input.Key.N) then
+		saveOverlayInfo = not saveOverlayInfo
+		print(`saving is: {saveOverlayInfo}`)
+	end
+
 	toggleSmoothing(true, true)
 	readInput()
 
@@ -1995,4 +2039,5 @@ function tick(dt)
 	particleAffect()
 	goalScoreCheck()
 	ballInCenterCheck()
+	sendOverlayInfo()
 end
