@@ -125,7 +125,6 @@ type Arena = {
 			position: Vec3,
 		},
 		players: { ReplayPlayer },
-		score: number,
 	},
 	away: {
 		overview: {
@@ -152,7 +151,6 @@ type Arena = {
 		players: { ReplayPlayer },
 	},
 	players: { ReplayPlayer },
-	score: number,
 }
 
 function createArena(name: string, position: Vec3, rotation: Quat): Arena
@@ -171,7 +169,6 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 				position = nil,
 			},
 			players = {},
-			score = 0,
 		},
 		away = {
 			overview = {
@@ -186,7 +183,6 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 			players = {},
 		},
 		players = {},
-		score = 0,
 	}
 end
 
@@ -359,6 +355,10 @@ local playerFollow = false
 local currentPlayerName: string? = nil
 local currentPlayerId: number = -1
 local currentPlayerIndex: number = 1
+
+-- Overlay Camera
+local overlayCamera: SpectatorCamera = nil
+local usingOverlay: boolean = false
 
 -- Ball
 local ball: ReplayBall
@@ -620,6 +620,10 @@ end
 
 function main()
 	followPlussCamera = getCameraById("dennssen.followpluss")
+	overlayCamera = getCameraById("dennssen.casterOverlay")
+	if overlayCamera ~= nil then
+		usingOverlay = true
+	end
 end
 
 function onGui()
@@ -1888,6 +1892,34 @@ function goalExitCheck()
 	end
 end
 
+function sendTeamInfo()
+	local teamInfo = {}
+	local homePlayerIds = {}
+	local awayPlayerIds = {}
+	for _, player in selectedArena.home.players do
+		table.insert(homePlayerIds, player.playerId)
+	end
+	for _, player in selectedArena.away.players do
+		table.insert(awayPlayerIds, player.playerId)
+	end
+	teamInfo["homePlayerIds"] = homePlayerIds
+	teamInfo["awayPlayerIds"] = awayPlayerIds
+	teamInfo["homeColor"] = homeTeamPrimaryColor
+	teamInfo["awayColor"] = awayTeamPrimaryColor
+	teamInfo["isFollowing"] = playerFollow
+	if playerFollow then
+		teamInfo["followedPlayerId"] = currentPlayerId
+	end
+	teamInfo["homeGoalEnter"] = homeGoalEnter
+	teamInfo["awayGoalEnter"] = awayGoalEnter
+
+	if not usingOverlay then
+		return
+	end
+
+	sendMessage(overlayCamera, { alwaysTick = true, teamInfo = teamInfo, ballCenterTime = ballCenterTime })
+end
+
 function goalScoreCheck()
 	local homeGoalBox: BoxType = Box.new(
 		selectedArena.home.goal.position + (selectedArena.rotation:getForwardVector() * 135),
@@ -1948,30 +1980,6 @@ function ballInCenterCheck()
 	end
 end
 
-local saveOverlayInfo = false
-
-function sendOverlayInfo()
-	local overlayInfo = {}
-	local homePlayerIds = {}
-	local awayPlayerIds = {}
-	for _, player in selectedArena.home.players do
-		table.insert(homePlayerIds, player.playerId)
-	end
-	for _, player in selectedArena.away.players do
-		table.insert(awayPlayerIds, player.playerId)
-	end
-	overlayInfo["homePlayerIds"] = homePlayerIds
-	overlayInfo["awayPlayerIds"] = awayPlayerIds
-	overlayInfo["homeColor"] = homeTeamPrimaryColor
-	overlayInfo["awayColor"] = awayTeamPrimaryColor
-	overlayInfo["isFollowing"] = playerFollow
-	if playerFollow then
-		overlayInfo["followedPlayerId"] = currentPlayerId
-	end
-
-	sendMessage(getCameraById("dennssen.casterOverlay"), { alwaysTick = saveOverlayInfo, overlayInfo = overlayInfo })
-end
-
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		return
@@ -2025,11 +2033,6 @@ function tick(dt)
 		return
 	end
 
-	if Input.getKeyDown(Input.Key.N) then
-		saveOverlayInfo = not saveOverlayInfo
-		print(`saving is: {saveOverlayInfo}`)
-	end
-
 	toggleSmoothing(true, true)
 	readInput()
 
@@ -2037,7 +2040,9 @@ function tick(dt)
 	rotateCamera()
 
 	particleAffect()
-	goalScoreCheck()
-	ballInCenterCheck()
-	sendOverlayInfo()
+	if ball ~= nil then
+		goalScoreCheck()
+		ballInCenterCheck()
+	end
+	sendTeamInfo()
 end

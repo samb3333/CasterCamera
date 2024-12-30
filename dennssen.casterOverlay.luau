@@ -7,38 +7,87 @@ metadata = {
 
 local saveInterval = 0.5
 local saveTime = 0
-local newOverlayInfo = nil
+local newTeamInfo = nil
+local ballCenterTime = 0
+local requiredBallCenterTimer = 10
 
-function checkForChanges(): boolean
+function checkForTeamInfoChanges(): boolean
 	local saveToConfig = false
-	for key, value in newOverlayInfo do
-		local oldOverlayValue = config.overlayInfo[key]
-		if type(value) == "table" then
-			for tableKey, tableValue in value do
-				local oldOverlayTableValue = oldOverlayValue[tableKey]
-				if oldOverlayTableValue == nil then
-					oldOverlayTableValue = 0
-				end
-				if type(tableValue) == "number" and (tableValue ~= 0 and oldOverlayTableValue ~= 0) then
-					-- round to 2 decimals if value is a number
-					local roundedOldTableValue = math.round(oldOverlayTableValue * 100) / 100
-					local roundedNewTableValue = math.round(tableValue * 100) / 100
-					if roundedOldTableValue ~= roundedNewTableValue then
-						saveToConfig = true
+	if config.teamInfo == nil then
+		saveToConfig = true
+	else
+		for key, value in newTeamInfo do
+			local oldOverlayValue = config.teamInfo[key]
+			if type(value) == "table" then
+				for tableKey, tableValue in value do
+					local oldOverlayTableValue = oldOverlayValue[tableKey]
+					if oldOverlayTableValue == nil then
+						oldOverlayTableValue = 0
 					end
-				else
-					if oldOverlayTableValue ~= tableValue then
-						saveToConfig = true
+					if type(tableValue) == "number" and (tableValue ~= 0 and oldOverlayTableValue ~= 0) then
+						-- round to 2 decimals if value is a number
+						local roundedOldTableValue = math.round(oldOverlayTableValue * 100) / 100
+						local roundedNewTableValue = math.round(tableValue * 100) / 100
+						if roundedOldTableValue ~= roundedNewTableValue then
+							saveToConfig = true
+						end
+					else
+						if oldOverlayTableValue ~= tableValue then
+							saveToConfig = true
+						end
 					end
 				end
-			end
-		else
-			if oldOverlayValue ~= value then
-				saveToConfig = true
+			else
+				if oldOverlayValue ~= value then
+					saveToConfig = true
+				end
 			end
 		end
 	end
+
+	if saveToConfig then
+		config.teamInfo = newTeamInfo
+	end
+
 	return saveToConfig
+end
+
+function checkForGameStarted(): boolean
+	local save = false
+	if ballCenterTime >= requiredBallCenterTimer then
+		config.homeScore = 0
+		config.awayScore = 0
+		ballCenterTime = 0
+		save = true
+	end
+
+	return save
+end
+
+function checkForScoreChange(): boolean
+	local save = false
+
+	if config.homeScore == nil then
+		config.homeScore = 0
+		save = true
+	end
+
+	if config.awayScore == nil then
+		config.awayScore = 0
+		save = true
+	end
+
+	if newTeamInfo.homeGoalEnter and not config.teamInfo.homeGoalEnter then
+		config.homeScore += 1
+		save = true
+	end
+
+	if newTeamInfo.awayGoalEnter and not config.teamInfo.awayGoalEnter then
+		config.awayScore += 1
+		save = true
+	end
+
+	return save
 end
 
 function tick(dt)
@@ -53,15 +102,27 @@ function tick(dt)
 
 	saveTime = 0
 
-	if newOverlayInfo then
-		local saveToConfig = checkForChanges()
+	if newTeamInfo then
+		local saveToConfig
+
+		saveToConfig = checkForGameStarted()
+
+		if not saveToConfig then
+			saveToConfig = checkForScoreChange()
+		else
+			checkForScoreChange()
+		end
+
+		if not saveToConfig then
+			saveToConfig = checkForTeamInfoChanges()
+		else
+			checkForTeamInfoChanges()
+		end
 
 		if not saveToConfig then
 			-- nothing has changed
 			return
 		end
-
-		config.overlayInfo = newOverlayInfo
 		saveConfig()
 	end
 end
@@ -71,7 +132,11 @@ function onMessageReceived(messageTable)
 		alwaysTick = messageTable.alwaysTick
 	end
 
-	if messageTable.overlayInfo then
-		newOverlayInfo = messageTable.overlayInfo
+	if messageTable.teamInfo then
+		newTeamInfo = messageTable.teamInfo
+	end
+
+	if messageTable.ballCenterTime then
+		ballCenterTime = messageTable.ballCenterTime
 	end
 end
