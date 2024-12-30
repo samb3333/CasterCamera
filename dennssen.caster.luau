@@ -1892,8 +1892,8 @@ function goalExitCheck()
 	end
 end
 
-function sendOverlayInfo()
-	local overlayInfo = {}
+function sendTeamInfo()
+	local teamInfo = {}
 	local homePlayerIds = {}
 	local awayPlayerIds = {}
 	for _, player in selectedArena.home.players do
@@ -1902,22 +1902,22 @@ function sendOverlayInfo()
 	for _, player in selectedArena.away.players do
 		table.insert(awayPlayerIds, player.playerId)
 	end
-	overlayInfo["homePlayerIds"] = homePlayerIds
-	overlayInfo["awayPlayerIds"] = awayPlayerIds
-	overlayInfo["homeColor"] = homeTeamPrimaryColor
-	overlayInfo["awayColor"] = awayTeamPrimaryColor
-	overlayInfo["isFollowing"] = playerFollow
+	teamInfo["homePlayerIds"] = homePlayerIds
+	teamInfo["awayPlayerIds"] = awayPlayerIds
+	teamInfo["homeColor"] = homeTeamPrimaryColor
+	teamInfo["awayColor"] = awayTeamPrimaryColor
+	teamInfo["isFollowing"] = playerFollow
 	if playerFollow then
-		overlayInfo["followedPlayerId"] = currentPlayerId
+		teamInfo["followedPlayerId"] = currentPlayerId
 	end
-	overlayInfo["homeGoalEnter"] = homeGoalEnter
-	overlayInfo["awayGoalEnter"] = awayGoalEnter
+	teamInfo["homeGoalEnter"] = homeGoalEnter
+	teamInfo["awayGoalEnter"] = awayGoalEnter
 
 	if not usingOverlay then
 		return
 	end
 
-	sendMessage(overlayCamera, { alwaysTick = true, overlayInfo = overlayInfo, ballCenterTime = ballCenterTime })
+	sendMessage(overlayCamera, { alwaysTick = true, teamInfo = teamInfo, ballCenterTime = ballCenterTime })
 end
 
 function goalScoreCheck()
@@ -2040,7 +2040,9 @@ function tick(dt)
 	rotateCamera()
 
 	particleAffect()
-	goalScoreCheck()
-	ballInCenterCheck()
-	sendOverlayInfo()
+	if ball ~= nil then
+		goalScoreCheck()
+		ballInCenterCheck()
+	end
+	sendTeamInfo()
 end
