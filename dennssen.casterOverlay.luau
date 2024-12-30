@@ -8,6 +8,10 @@ metadata = {
 local saveInterval = 0.5
 local saveTime = 0
 local newOverlayInfo = nil
+local previousHomeGoalEnter = false
+local previousAwayGoalEnter = false
+local ballCenterTime = 0
+local requiredBallCenterTimer = 10
 
 function checkForChanges(): boolean
 	local saveToConfig = false
@@ -54,14 +58,43 @@ function tick(dt)
 	saveTime = 0
 
 	if newOverlayInfo then
-		local saveToConfig = checkForChanges()
+		local saveToConfig
+		if config.overlayInfo == nil then
+			saveToConfig = true
+		else
+			saveToConfig = checkForChanges()
+		end
+
+		if ballCenterTime >= requiredBallCenterTimer then
+			config.homeScore = 0
+			config.awayScore = 0
+			ballCenterTime = 0
+			saveToConfig = true
+		end
 
 		if not saveToConfig then
 			-- nothing has changed
 			return
 		end
 
+		if config.homeScore == nil then
+			config.homeScore = 0
+		end
+		if config.awayScore == nil then
+			config.awayScore = 0
+		end
+
+		if newOverlayInfo.homeGoalEnter and not previousHomeGoalEnter then
+			config.homeScore += 1
+		end
+
+		if newOverlayInfo.awayGoalEnter and not previousAwayGoalEnter then
+			config.awayScore += 1
+		end
+
 		config.overlayInfo = newOverlayInfo
+		previousHomeGoalEnter = newOverlayInfo.homeGoalEnter
+		previousAwayGoalEnter = newOverlayInfo.awayGoalEnter
 		saveConfig()
 	end
 end
@@ -73,5 +106,9 @@ function onMessageReceived(messageTable)
 
 	if messageTable.overlayInfo then
 		newOverlayInfo = messageTable.overlayInfo
+	end
+
+	if messageTable.ballCenterTime then
+		ballCenterTime = messageTable.ballCenterTime
 	end
 end
