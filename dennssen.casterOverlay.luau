@@ -8,12 +8,18 @@ metadata = {
 local saveInterval = 0.5
 local saveTime = 0
 local newTeamInfo = nil
+local newStatsInfo = nil
 local ballCenterTime = 0
 local requiredBallCenterTimer = 10
 local statReset = false
 
 function checkForTeamInfoChanges(): boolean
 	local saveToConfig = false
+
+	if newTeamInfo == nil then
+		return saveToConfig
+	end
+
 	if config.teamInfo == nil then
 		saveToConfig = true
 	else
@@ -148,6 +154,54 @@ function checkForPlayerStats(): boolean
 		save = true
 	end
 
+	if newStatsInfo == nil then
+		return save
+	end
+
+	local isOnHome
+
+	if config.homeTeam[newStatsInfo.playerName] ~= nil then
+		isOnHome = true
+	elseif config.awayTeam[newStatsInfo.playerName] ~= nil then
+		isOnHome = true
+	end
+
+	if isOnHome == nil then
+		return save
+	end
+
+	if newStatsInfo.save then
+		if isOnHome then
+			config.homeTeam[newStatsInfo.playerName].saves += 1
+			save = true
+		else
+			config.awayTeam[newStatsInfo.playerName].saves += 1
+			save = true
+		end
+	end
+
+	if newStatsInfo.goal then
+		if isOnHome then
+			config.homeTeam[newStatsInfo.playerName].goals += 1
+			save = true
+		else
+			config.awayTeam[newStatsInfo.playerName].goals += 1
+			save = true
+		end
+	end
+
+	if newStatsInfo.intercept then
+		if isOnHome then
+			config.homeTeam[newStatsInfo.playerName].intercepts += 1
+			save = true
+		else
+			config.awayTeam[newStatsInfo.playerName].intercepts += 1
+			save = true
+		end
+	end
+
+	newStatsInfo = nil
+
 	return save
 end
 
@@ -182,40 +236,38 @@ function tick(dt)
 
 	saveTime = 0
 
-	if newTeamInfo then
-		local saveToConfig
+	local saveToConfig
 
-		saveToConfig = checkForGameStarted()
+	saveToConfig = checkForGameStarted()
 
-		if not saveToConfig then
-			saveToConfig = checkForScoreChange()
-		else
-			checkForScoreChange()
-		end
-
-		if not saveToConfig then
-			saveToConfig = checkForTeamInfoChanges()
-		else
-			checkForTeamInfoChanges()
-		end
-
-		if not saveToConfig then
-			saveToConfig = checkForPlayerStats()
-		else
-			checkForPlayerStats()
-		end
-
-		if statReset then
-			statReset = false
-			saveToConfig = true
-		end
-
-		if not saveToConfig then
-			-- nothing has changed
-			return
-		end
-		saveConfig()
+	if not saveToConfig then
+		saveToConfig = checkForScoreChange()
+	else
+		checkForScoreChange()
 	end
+
+	if not saveToConfig then
+		saveToConfig = checkForTeamInfoChanges()
+	else
+		checkForTeamInfoChanges()
+	end
+
+	if not saveToConfig then
+		saveToConfig = checkForPlayerStats()
+	else
+		checkForPlayerStats()
+	end
+
+	if statReset then
+		statReset = false
+		saveToConfig = true
+	end
+
+	if not saveToConfig then
+		-- nothing has changed
+		return
+	end
+	saveConfig()
 end
 
 function onMessageReceived(messageTable)
@@ -239,5 +291,9 @@ function onMessageReceived(messageTable)
 	if messageTable.resetInactiveStats then
 		resetInactivePlayerStats()
 		statReset = true
+	end
+
+	if messageTable.statsInfo then
+		newStatsInfo = messageTable.statsInfo
 	end
 end

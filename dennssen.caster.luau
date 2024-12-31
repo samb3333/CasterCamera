@@ -2053,6 +2053,14 @@ function tick(dt)
 	sendOverlayInfo()
 
 	if Input.getKeyDown(Input.Key.N) then
-		sendMessage(overlayCamera, { resetInactiveStats = true })
+		sendMessage(
+			overlayCamera,
+			{ statsInfo = {
+				playerName = "Rigged",
+				save = true,
+				intercept = false,
+				goal = false,
+			} }
+		)
 	end
 end
