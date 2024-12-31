@@ -90,6 +90,65 @@ function checkForScoreChange(): boolean
 	return save
 end
 
+function checkForPlayerStats(): boolean
+	local save = false
+	if config.homeTeam == nil then
+		config.homeTeam = {}
+		save = true
+	end
+	if config.awayTeam == nil then
+		config.awayTeam = {}
+		save = true
+	end
+
+	-- # doesn't work for because it's a dictionary
+	local homeTeamCount = 0
+	for _ in config.homeTeam do
+		homeTeamCount += 1
+	end
+	local awayTeamCount = 0
+	for _ in config.awayTeam do
+		awayTeamCount += 1
+	end
+
+	local homePlayerNamesCount = 0
+	for _ in config.teamInfo.homePlayerNames do
+		homePlayerNamesCount += 1
+	end
+	local awayPlayerNamesCount = 0
+	for _ in config.teamInfo.awayPlayerNames do
+		awayPlayerNamesCount += 1
+	end
+
+	if homeTeamCount ~= homePlayerNamesCount then
+		for _, playerName in config.teamInfo.homePlayerNames do
+			config.homeTeam[playerName] = {
+				saves = 0,
+				goals = 0,
+				intercepts = 0,
+			}
+		end
+		save = true
+	end
+	if awayTeamCount ~= awayPlayerNamesCount then
+		for _, playerName in config.teamInfo.awayPlayerNames do
+			config.awayTeam[playerName] = {
+				saves = 0,
+				goals = 0,
+				intercepts = 0,
+			}
+		end
+		save = true
+	end
+
+	return save
+end
+
+function resetPlayerStats()
+	config.homeTeam = {}
+	config.awayTeam = {}
+end
+
 function tick(dt)
 	if not alwaysTick then
 		return
@@ -117,6 +176,12 @@ function tick(dt)
 			saveToConfig = checkForTeamInfoChanges()
 		else
 			checkForTeamInfoChanges()
+		end
+
+		if not saveToConfig then
+			saveToConfig = checkForPlayerStats()
+		else
+			checkForPlayerStats()
 		end
 
 		if not saveToConfig then

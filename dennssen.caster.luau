@@ -1892,18 +1892,24 @@ function goalExitCheck()
 	end
 end
 
-function sendTeamInfo()
+function sendOverlayInfo()
 	local teamInfo = {}
 	local homePlayerIds = {}
+	local homePlayerNames = {}
 	local awayPlayerIds = {}
+	local awayPlayerNames = {}
 	for _, player in selectedArena.home.players do
 		table.insert(homePlayerIds, player.playerId)
+		table.insert(homePlayerNames, player.playerName)
 	end
 	for _, player in selectedArena.away.players do
 		table.insert(awayPlayerIds, player.playerId)
+		table.insert(awayPlayerNames, player.playerName)
 	end
 	teamInfo["homePlayerIds"] = homePlayerIds
+	teamInfo["homePlayerNames"] = homePlayerNames
 	teamInfo["awayPlayerIds"] = awayPlayerIds
+	teamInfo["awayPlayerNames"] = awayPlayerNames
 	teamInfo["homeColor"] = homeTeamPrimaryColor
 	teamInfo["awayColor"] = awayTeamPrimaryColor
 	teamInfo["isFollowing"] = playerFollow
@@ -2044,5 +2050,5 @@ function tick(dt)
 		goalScoreCheck()
 		ballInCenterCheck()
 	end
-	sendTeamInfo()
+	sendOverlayInfo()
 end
