@@ -2051,4 +2051,8 @@ function tick(dt)
 		ballInCenterCheck()
 	end
 	sendOverlayInfo()
+
+	if Input.getKeyDown(Input.Key.N) then
+		sendMessage(overlayCamera, { resetInactiveStats = true })
+	end
 end

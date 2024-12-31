@@ -10,6 +10,7 @@ local saveTime = 0
 local newTeamInfo = nil
 local ballCenterTime = 0
 local requiredBallCenterTimer = 10
+local statReset = false
 
 function checkForTeamInfoChanges(): boolean
 	local saveToConfig = false
@@ -101,27 +102,29 @@ function checkForPlayerStats(): boolean
 		save = true
 	end
 
-	-- # doesn't work for because it's a dictionary
-	local homeTeamCount = 0
-	for _ in config.homeTeam do
-		homeTeamCount += 1
-	end
-	local awayTeamCount = 0
-	for _ in config.awayTeam do
-		awayTeamCount += 1
+	local newHomePlayer = false
+	local newAwayPlayer = false
+
+	for _, playerName in config.teamInfo.homePlayerNames do
+		if config.homeTeam[playerName] == nil then
+			newHomePlayer = true
+			break
+		end
 	end
 
-	local homePlayerNamesCount = 0
-	for _ in config.teamInfo.homePlayerNames do
-		homePlayerNamesCount += 1
-	end
-	local awayPlayerNamesCount = 0
-	for _ in config.teamInfo.awayPlayerNames do
-		awayPlayerNamesCount += 1
+	for _, playerName in config.teamInfo.awayPlayerNames do
+		if config.awayTeam[playerName] == nil then
+			newAwayPlayer = true
+			break
+		end
 	end
 
-	if homeTeamCount ~= homePlayerNamesCount then
+	if newHomePlayer then
 		for _, playerName in config.teamInfo.homePlayerNames do
+			if config.homeTeam[playerName] ~= nil then
+				continue
+			end
+
 			config.homeTeam[playerName] = {
 				saves = 0,
 				goals = 0,
@@ -130,8 +133,12 @@ function checkForPlayerStats(): boolean
 		end
 		save = true
 	end
-	if awayTeamCount ~= awayPlayerNamesCount then
+	if newAwayPlayer then
 		for _, playerName in config.teamInfo.awayPlayerNames do
+			if config.awayTeam[playerName] ~= nil then
+				continue
+			end
+
 			config.awayTeam[playerName] = {
 				saves = 0,
 				goals = 0,
@@ -147,6 +154,20 @@ end
 function resetPlayerStats()
 	config.homeTeam = {}
 	config.awayTeam = {}
+end
+
+function resetInactivePlayerStats()
+	for playerName, playerStats in config.homeTeam do
+		if config.teamInfo.homePlayerNames[playerName] == nil then
+			config.homeTeam[playerName] = nil
+		end
+	end
+
+	for playerName, playerStats in config.awayTeam do
+		if config.teamInfo.awayPlayerNames[playerName] == nil then
+			config.awayTeam[playerName] = nil
+		end
+	end
 end
 
 function tick(dt)
@@ -184,6 +205,11 @@ function tick(dt)
 			checkForPlayerStats()
 		end
 
+		if statReset then
+			statReset = false
+			saveToConfig = true
+		end
+
 		if not saveToConfig then
 			-- nothing has changed
 			return
@@ -203,5 +229,15 @@ function onMessageReceived(messageTable)
 
 	if messageTable.ballCenterTime then
 		ballCenterTime = messageTable.ballCenterTime
+	end
+
+	if messageTable.resetAllStats then
+		resetPlayerStats()
+		statReset = true
+	end
+
+	if messageTable.resetInactiveStats then
+		resetInactivePlayerStats()
+		statReset = true
 	end
 end
