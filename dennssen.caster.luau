@@ -1971,7 +1971,7 @@ function sendOverlayInfo()
 end
 
 function goalPotentialScoreCheck(homeGoalBox: BoxType, awayGoalBox: BoxType)
-	if isSafeTime then
+	if isSafeTime or lastPlayerWithBall == nil then
 		homeGoalPotentialEnter = false
 		awayGoalPotentialEnter = false
 		previousHomeGoalPotentialEnter = homeGoalPotentialEnter
@@ -2037,12 +2037,13 @@ function goalPotentialScoreCheck(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		end
 	elseif not homeGoalPotentialEnter and previousHomeGoalPotentialEnter then
 		if ballToHomeGoalDist <= 600 then
-			if findPlayerInTable(selectedArena.home.players, lastPlayerWithBall) then
-				statPlayer = lastPlayerWithBall
-				print(`{lastPlayerWithBall.playerName} saves`)
+			local goalie = getClosestPlayerToBall()
+			if goalie and findPlayerInTable(selectedArena.home.players, goalie) then
+				statPlayer = goalie
+				print(`{goalie.playerName} saves`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
-						playerName = lastPlayerWithBall.playerName,
+						playerName = goalie.playerName,
 						goal = false,
 						save = true,
 						intercept = false,
@@ -2058,12 +2059,13 @@ function goalPotentialScoreCheck(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		end
 	elseif not awayGoalPotentialEnter and previousAwayGoalPotentialEnter then
 		if ballToAwayGoalDist <= 600 then
-			if findPlayerInTable(selectedArena.away.players, lastPlayerWithBall) then
-				statPlayer = lastPlayerWithBall
-				print(`{lastPlayerWithBall.playerName} saves`)
+			local goalie = getClosestPlayerToBall(27.5)
+			if goalie and findPlayerInTable(selectedArena.away.players, goalie) then
+				statPlayer = goalie
+				print(`{goalie.playerName} saves`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
-						playerName = lastPlayerWithBall.playerName,
+						playerName = goalie.playerName,
 						goal = false,
 						save = true,
 						intercept = false,
