@@ -327,6 +327,16 @@ local vibrance = config.vibrance
 local particlesTable = {}
 local particleSimSpeed = config.particleSimSpeed
 
+-- Stats
+local lastPlayerWithBall: ReplayPlayer = nil
+local isSafeTime: boolean = false
+local homeGoalPotentialEnter: boolean = false
+local previousHomeGoalPotentialEnter: boolean = false
+local awayGoalPotentialEnter: boolean = false
+local previousAwayGoalPotentialEnter: boolean = false
+
+local statPlayer: ReplayPlayer? = nil
+
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
 
@@ -596,6 +606,10 @@ function Box:render(r: number, g: number, b: number): ()
 end
 
 function Box:checkPointIntersect(point: Vec3): boolean
+	if point == nil then
+		return false
+	end
+
 	local zeroPoint: Vec3 = self.vertexLocations[1]
 	local fullPoint: Vec3 = self.vertexLocations[8]
 	local centerPoint: Vec3 = (zeroPoint + fullPoint) / 2
@@ -978,6 +992,13 @@ Controller:
 
 	if Gui.treeNode("Debug") then
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
+		if Gui.button("Reset All Stats") then
+			sendMessage(overlayCamera, { resetAllStats = true })
+		end
+		Gui.sameLine()
+		if Gui.button("Reset Inactive Stats") then
+			sendMessage(overlayCamera, { resetInactiveStats = true })
+		end
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
 		Gui.text("Camera Rotation: " .. tostring(camera.rotation:euler()))
@@ -1144,14 +1165,29 @@ function getClosestArenaBall(targetPosition: Vec3, frameData: ReplayFrame)
 	return clostestBall
 end
 
-function getClosestPlayerToBall(): ReplayPlayer?
+-- Remember: ball radius is 17.5, use an extra 10 for player contact
+function getClosestPlayerToBall(maximumDistance: number?): ReplayPlayer?
 	local players = selectedArena.players
-	local closestPlayerDistance = math.huge
+	local closestPlayerDistance = maximumDistance or math.huge
 	local closestPlayer: ReplayPlayer = nil
+
 	for _, player in players do
-		local distance = getDist(ball.transform.position, player.root.position)
-		if distance < closestPlayerDistance then
-			closestPlayerDistance = distance
+		local root = player.root
+		local headPosition = player.head.position
+		local leftHandPosition = calculateRotatedOffset(player.leftHand.position, root.rotation:euler().z)
+			+ root.position
+		local rightHandPosition = calculateRotatedOffset(player.rightHand.position, root.rotation:euler().z)
+			+ root.position
+
+		local rootDistance = getDist(ball.transform.position, root.position)
+		local headDistance = getDist(ball.transform.position, headPosition)
+		local leftHandDistance = getDist(ball.transform.position, leftHandPosition)
+		local rightHandDistance = getDist(ball.transform.position, rightHandPosition)
+
+		local minimumDistance = math.min(rootDistance, headDistance, leftHandDistance, rightHandDistance)
+
+		if minimumDistance < closestPlayerDistance then
+			closestPlayerDistance = minimumDistance
 			closestPlayer = player
 		end
 	end
@@ -1861,17 +1897,24 @@ function goalExitCheck()
 	else
 		isHomeGoal = false
 	end
-
-	local ballDistance = getDist(selectedArena.position, ball.transform.position)
-	local midfieldDistance
+	local ballPosition = ball.transform.position
+	local midfieldPosition
 
 	if isHomeGoal then
-		midfieldDistance = getDist(selectedArena.position, selectedArena.home.midfield.position)
+		midfieldPosition = selectedArena.home.midfield.position
 	else
-		midfieldDistance = getDist(selectedArena.position, selectedArena.away.midfield.position)
+		midfieldPosition = selectedArena.away.midfield.position
 	end
 
-	if ballDistance <= midfieldDistance then -- ball has crossed midfield
+	local baseAxis = Vec3.new(1, 0, 0)
+	local crossingAxis = selectedArena.rotation:rotateVector(baseAxis)
+
+	local relativePosition = ballPosition - midfieldPosition
+	local projection = Vec3.dot(relativePosition, crossingAxis)
+
+	if (isHomeGoal and projection < 0) or (not isHomeGoal and projection > 0) then
+		print("ball passed midfield")
+		isSafeTime = false
 		if isHomeGoal then
 			homeGoalEnter = false
 		else
@@ -1883,6 +1926,7 @@ function goalExitCheck()
 	midfieldTimePassed += deltaTime
 
 	if midfieldTimePassed >= midfieldMaxTime then
+		isSafeTime = false
 		if isHomeGoal then
 			homeGoalEnter = false
 		else
@@ -1926,6 +1970,113 @@ function sendOverlayInfo()
 	sendMessage(overlayCamera, { alwaysTick = true, teamInfo = teamInfo, ballCenterTime = ballCenterTime })
 end
 
+function goalPotentialScoreCheck(homeGoalBox: BoxType, awayGoalBox: BoxType)
+	if isSafeTime then
+		homeGoalPotentialEnter = false
+		awayGoalPotentialEnter = false
+		previousHomeGoalPotentialEnter = homeGoalPotentialEnter
+		previousAwayGoalPotentialEnter = awayGoalPotentialEnter
+		return
+	end
+
+	local ballToHomeGoalDist = getDist(ball.transform.position, homeGoalBox.position)
+	local ballToAwayGoalDist = getDist(ball.transform.position, awayGoalBox.position)
+	local ballHomePotentialPosition = ball.transform.position + (ball.velocity:normalize() * ballToHomeGoalDist)
+	local ballAwayPotentialPosition = ball.transform.position + (ball.velocity:normalize() * ballToAwayGoalDist)
+
+	local homeHit = camera:castRay(ball.transform.position, ballHomePotentialPosition)
+	local awayHit = camera:castRay(ball.transform.position, ballAwayPotentialPosition)
+
+	if ballToHomeGoalDist < ballToAwayGoalDist then
+		World.drawLine(ball.transform.position, ballHomePotentialPosition, 0, 1, 0, 10, 0)
+	else
+		World.drawLine(ball.transform.position, ballAwayPotentialPosition, 0, 1, 0, 10, 0)
+	end
+
+	if homeHit.successful then
+		local velocityDotNormal = ball.velocity:dot(homeHit.normal)
+		local reflectedVelocityNormalized = (ball.velocity - (homeHit.normal * (2 * velocityDotNormal))):normalize()
+		local distanceLeft = getDist(homeHit.position, homeGoalBox.position)
+
+		ballHomePotentialPosition = homeHit.position + (reflectedVelocityNormalized * distanceLeft)
+		if ballToHomeGoalDist < ballToAwayGoalDist then
+			World.drawLine(homeHit.position, ballHomePotentialPosition, 1, 0, 0, 10, 0)
+		end
+	end
+
+	if awayHit.successful then
+		local velocityDotNormal = ball.velocity:dot(awayHit.normal)
+		local reflectedVelocityNormalized = (ball.velocity - (awayHit.normal * (2 * velocityDotNormal))):normalize()
+		local distanceLeft = getDist(awayHit.position, awayGoalBox.position)
+
+		ballAwayPotentialPosition = awayHit.position + (reflectedVelocityNormalized * distanceLeft)
+		if ballToHomeGoalDist > ballToAwayGoalDist then
+			World.drawLine(homeHit.position, ballAwayPotentialPosition, 1, 0, 0, 10, 0)
+		end
+	end
+
+	if
+		homeGoalBox:checkPointIntersect(ballHomePotentialPosition) or homeGoalBox:checkPointIntersect(homeHit.position)
+	then
+		homeGoalPotentialEnter = true
+	else
+		homeGoalPotentialEnter = false
+	end
+
+	if
+		awayGoalBox:checkPointIntersect(ballAwayPotentialPosition) or awayGoalBox:checkPointIntersect(awayHit.position)
+	then
+		awayGoalPotentialEnter = true
+	else
+		awayGoalPotentialEnter = false
+	end
+
+	if homeGoalPotentialEnter and not previousHomeGoalPotentialEnter then
+		if findPlayerInTable(selectedArena.away.players, lastPlayerWithBall) then
+			statPlayer = lastPlayerWithBall
+		end
+	elseif not homeGoalPotentialEnter and previousHomeGoalPotentialEnter then
+		if ballToHomeGoalDist <= 600 then
+			if findPlayerInTable(selectedArena.home.players, lastPlayerWithBall) then
+				statPlayer = lastPlayerWithBall
+				print(`{lastPlayerWithBall.playerName} saves`)
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = lastPlayerWithBall.playerName,
+						goal = false,
+						save = true,
+						intercept = false,
+					},
+				})
+			end
+		end
+	end
+
+	if awayGoalPotentialEnter and not previousAwayGoalPotentialEnter then
+		if findPlayerInTable(selectedArena.home.players, lastPlayerWithBall) then
+			statPlayer = lastPlayerWithBall
+		end
+	elseif not awayGoalPotentialEnter and previousAwayGoalPotentialEnter then
+		if ballToAwayGoalDist <= 600 then
+			if findPlayerInTable(selectedArena.away.players, lastPlayerWithBall) then
+				statPlayer = lastPlayerWithBall
+				print(`{lastPlayerWithBall.playerName} saves`)
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = lastPlayerWithBall.playerName,
+						goal = false,
+						save = true,
+						intercept = false,
+					},
+				})
+			end
+		end
+	end
+
+	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
+	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
+end
+
 function goalScoreCheck()
 	local homeGoalBox: BoxType = Box.new(
 		selectedArena.home.goal.position + (selectedArena.rotation:getForwardVector() * 135),
@@ -1944,6 +2095,8 @@ function goalScoreCheck()
 		awayGoalBox:render(0, 1, 0)
 	end
 
+	goalPotentialScoreCheck(homeGoalBox, awayGoalBox)
+
 	if homeGoalBox:checkPointIntersect(ball.transform.position) then
 		homeGoalEnter = true
 	end
@@ -1954,13 +2107,36 @@ function goalScoreCheck()
 
 	-- the ball has newely scored
 	if homeGoalEnter and not previousHomeGoalEnter then
+		isSafeTime = true
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 		midfieldTimePassed = 0
+		if statPlayer then
+			print(`{statPlayer.playerName} shot`)
+			sendMessage(overlayCamera, {
+				statsInfo = {
+					playerName = statPlayer.playerName,
+					goal = true,
+					save = false,
+					intercept = false,
+				},
+			})
+		end
 	end
 
 	if awayGoalEnter and not previousAwayGoalEnter then
+		isSafeTime = true
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
 		midfieldTimePassed = 0
+		if statPlayer then
+			sendMessage(overlayCamera, {
+				statsInfo = {
+					playerName = statPlayer.playerName,
+					goal = true,
+					save = false,
+					intercept = false,
+				},
+			})
+		end
 	end
 
 	goalExitCheck()
@@ -1986,18 +2162,18 @@ function ballInCenterCheck()
 	end
 end
 
-function tick(dt)
-	if not camera.isActive and not camera.isFollowed then
-		return
+function checkForPlayerBallContact()
+	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(27.5)
+	if contactPlayer ~= nil then
+		if lastPlayerWithBall ~= nil and contactPlayer.playerId == lastPlayerWithBall.playerId then
+			return
+		end
+		lastPlayerWithBall = contactPlayer
+		print(lastPlayerWithBall.playerName)
 	end
+end
 
-	deltaTime = dt
-	camera.fieldOfView = cameraFOV
-
-	gameData = getReplayFrameFromIndex(readLocation)
-	ball = getClosestArenaBall(selectedArena.position, gameData)
-	teamLists()
-
+function getTeamColors()
 	if #gameData.players > 0 and #selectedArena.home.players > 0 then
 		local firstPlayer = selectedArena.home.players[1]
 		local playerJson = firstPlayer:toJson()
@@ -2013,6 +2189,21 @@ function tick(dt)
 	else
 		awayTeamPrimaryColor = homeTeamDefaultColor
 	end
+end
+
+function tick(dt)
+	if not camera.isActive and not camera.isFollowed then
+		return
+	end
+
+	deltaTime = dt
+	camera.fieldOfView = cameraFOV
+
+	gameData = getReplayFrameFromIndex(readLocation)
+	ball = getClosestArenaBall(selectedArena.position, gameData)
+	teamLists()
+
+	getTeamColors()
 
 	if Input.getKeyDown(one) then
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
@@ -2035,7 +2226,14 @@ function tick(dt)
 		followPlayer()
 		readOtherInputs()
 		particleAffect()
-		goalScoreCheck()
+		if ball ~= nil then
+			checkForPlayerBallContact()
+			goalScoreCheck()
+			ballInCenterCheck()
+		else
+			warn("can't find ball")
+		end
+		sendOverlayInfo()
 		return
 	end
 
@@ -2047,20 +2245,11 @@ function tick(dt)
 
 	particleAffect()
 	if ball ~= nil then
+		checkForPlayerBallContact()
 		goalScoreCheck()
 		ballInCenterCheck()
+	else
+		warn("can't find ball")
 	end
 	sendOverlayInfo()
-
-	if Input.getKeyDown(Input.Key.N) then
-		sendMessage(
-			overlayCamera,
-			{ statsInfo = {
-				playerName = "Rigged",
-				save = true,
-				intercept = false,
-				goal = false,
-			} }
-		)
-	end
 end

@@ -163,7 +163,7 @@ function checkForPlayerStats(): boolean
 	if config.homeTeam[newStatsInfo.playerName] ~= nil then
 		isOnHome = true
 	elseif config.awayTeam[newStatsInfo.playerName] ~= nil then
-		isOnHome = true
+		isOnHome = false
 	end
 
 	if isOnHome == nil then
@@ -212,13 +212,13 @@ end
 
 function resetInactivePlayerStats()
 	for playerName, playerStats in config.homeTeam do
-		if config.teamInfo.homePlayerNames[playerName] == nil then
+		if table.find(config.teamInfo.homePlayerNames, tostring(playerName)) == nil then
 			config.homeTeam[playerName] = nil
 		end
 	end
 
 	for playerName, playerStats in config.awayTeam do
-		if config.teamInfo.awayPlayerNames[playerName] == nil then
+		if table.find(config.teamInfo.awayPlayerNames, tostring(playerName)) == nil then
 			config.awayTeam[playerName] = nil
 		end
 	end
