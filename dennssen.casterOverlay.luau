@@ -61,7 +61,7 @@ end
 
 function checkForGameStarted(): boolean
 	local save = false
-	if ballCenterTime >= requiredBallCenterTimer then
+	if (ballCenterTime >= requiredBallCenterTimer) and (config.homeScore ~= 0 or config.awayScore ~= 0) then
 		config.homeScore = 0
 		config.awayScore = 0
 		ballCenterTime = 0
@@ -134,7 +134,7 @@ function checkForPlayerStats(): boolean
 			config.homeTeam[playerName] = {
 				saves = 0,
 				goals = 0,
-				intercepts = 0,
+				steals = 0,
 			}
 		end
 		save = true
@@ -148,7 +148,7 @@ function checkForPlayerStats(): boolean
 			config.awayTeam[playerName] = {
 				saves = 0,
 				goals = 0,
-				steal = 0,
+				steals = 0,
 			}
 		end
 		save = true
@@ -190,12 +190,12 @@ function checkForPlayerStats(): boolean
 		end
 	end
 
-	if newStatsInfo.intercept then
+	if newStatsInfo.steal then
 		if isOnHome then
-			config.homeTeam[newStatsInfo.playerName].intercepts += 1
+			config.homeTeam[newStatsInfo.playerName].steals += 1
 			save = true
 		else
-			config.awayTeam[newStatsInfo.playerName].intercepts += 1
+			config.awayTeam[newStatsInfo.playerName].steals += 1
 			save = true
 		end
 	end

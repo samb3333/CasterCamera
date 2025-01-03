@@ -328,15 +328,21 @@ local particlesTable = {}
 local particleSimSpeed = config.particleSimSpeed
 
 -- Stats
-local lastPlayerWithBall: ReplayPlayer = nil
+local lastPlayerWithBall: ReplayPlayer? = nil
+local previousLastPlayerWithBall: ReplayPlayer? = nil
 local isSafeTime: boolean = false
 local homeGoalPotentialEnter: boolean = false
 local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
 local previousAwayGoalPotentialEnter: boolean = false
 
+local requiredStealTime = 5
+local stealTime = 0
+
+local consideringSteal: boolean = false
+
 local goalPlayer: ReplayPlayer? = nil
-local stealPlayer: ReplayPlayer? = nil
+local stealPlayer: ReplayPlayer = nil
 
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
@@ -1887,6 +1893,25 @@ function followPlayer()
 	sendMessage(followPlussCamera, message)
 end
 
+function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
+	local sameTeam = false
+	if
+		findPlayerInTable(selectedArena.home.players, player1)
+		and findPlayerInTable(selectedArena.home.players, player2)
+	then
+		sameTeam = true
+	end
+
+	if
+		findPlayerInTable(selectedArena.away.players, player1)
+		and findPlayerInTable(selectedArena.away.players, player2)
+	then
+		sameTeam = true
+	end
+
+	return sameTeam
+end
+
 function goalExitCheck()
 	if not homeGoalEnter and not awayGoalEnter then
 		return
@@ -1971,6 +1996,22 @@ function sendOverlayInfo()
 	sendMessage(overlayCamera, { alwaysTick = true, teamInfo = teamInfo, ballCenterTime = ballCenterTime })
 end
 
+function resetPlayersWithBall()
+	lastPlayerWithBall = nil
+	previousLastPlayerWithBall = nil
+end
+
+function checkForPlayerBallContact(): ReplayPlayer?
+	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(30)
+	if contactPlayer ~= nil then
+		if lastPlayerWithBall ~= nil and contactPlayer.playerId == lastPlayerWithBall.playerId then
+			return lastPlayerWithBall
+		end
+		return contactPlayer
+	end
+	return lastPlayerWithBall
+end
+
 function checkForGoalPotential(): boolean
 	local successfulPotential = false
 	lastPlayerWithBall = checkForPlayerBallContact()
@@ -1997,13 +2038,22 @@ function checkForGoalPotential(): boolean
 end
 
 function checkForSave(homeDist: number, awayDist: number): boolean
+	local goalie = getClosestPlayerToBall(60)
+
 	local successfulSave = false
 	if not homeGoalPotentialEnter and previousHomeGoalPotentialEnter then
 		if homeDist <= 600 then
-			local goalie = getClosestPlayerToBall()
 			if goalie and findPlayerInTable(selectedArena.home.players, goalie) then
 				successfulSave = true
-				print(`{goalie.playerName} saves`)
+
+				if consideringSteal then
+					consideringSteal = false
+					stealTime = 0
+				end
+
+				resetPlayersWithBall()
+
+				print(`Save from {goalie.playerName}`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
 						playerName = goalie.playerName,
@@ -2018,10 +2068,17 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 
 	if not awayGoalPotentialEnter and previousAwayGoalPotentialEnter then
 		if awayDist <= 600 then
-			local goalie = getClosestPlayerToBall(27.5)
 			if goalie and findPlayerInTable(selectedArena.away.players, goalie) then
 				successfulSave = true
-				print(`{goalie.playerName} saves`)
+
+				if consideringSteal then
+					consideringSteal = false
+					stealTime = 0
+				end
+
+				resetPlayersWithBall()
+
+				print(`Save from {goalie.playerName}`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
 						playerName = goalie.playerName,
@@ -2037,7 +2094,63 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 	return successfulSave
 end
 
-function checkForSteal() end
+function checkForSteal(): boolean
+	lastPlayerWithBall = checkForPlayerBallContact()
+
+	if lastPlayerWithBall == nil then
+		return false
+	end
+
+	if previousLastPlayerWithBall ~= nil then
+		if lastPlayerWithBall.playerId == previousLastPlayerWithBall.playerId and not consideringSteal then
+			return false -- no change in possession
+		end
+
+		if not consideringSteal then
+			local teamChange = false
+
+			if not playersAreOnSameTeam(previousLastPlayerWithBall, lastPlayerWithBall) then -- change in team possession
+				teamChange = true
+				stealPlayer = lastPlayerWithBall
+				consideringSteal = true
+				print(`Considering that {stealPlayer.playerName} just stole`)
+			end
+
+			previousLastPlayerWithBall = lastPlayerWithBall
+			return teamChange
+		else
+			local teamKeep = false
+
+			if playersAreOnSameTeam(stealPlayer, lastPlayerWithBall) then
+				stealTime += deltaTime
+			else
+				stealTime = 0
+				consideringSteal = false
+			end
+
+			if stealTime >= requiredStealTime then
+				print(`Counting as successful steal from {stealPlayer.playerName}`)
+				stealTime = 0
+				consideringSteal = false
+				teamKeep = true
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = stealPlayer.playerName,
+						save = false,
+						goal = false,
+						steal = true,
+					},
+				})
+			end
+
+			previousLastPlayerWithBall = lastPlayerWithBall
+			return teamKeep
+		end
+	else
+		previousLastPlayerWithBall = lastPlayerWithBall
+		return false
+	end
+end
 
 function earlyStatChangeReturn(ballExit: boolean)
 	if ballExit then
@@ -2050,7 +2163,7 @@ function earlyStatChangeReturn(ballExit: boolean)
 end
 
 function goalPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
-	if isSafeTime or lastPlayerWithBall == nil then
+	if isSafeTime then
 		earlyStatChangeReturn(true)
 		return
 	end
@@ -2117,6 +2230,11 @@ function goalPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		return
 	end
 
+	if checkForSteal() then
+		earlyStatChangeReturn(false)
+		return
+	end
+
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
 	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
 end
@@ -2155,13 +2273,23 @@ function goalScoreCheck()
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 		midfieldTimePassed = 0
 		if goalPlayer then
-			print(`{goalPlayer.playerName} shot`)
+			local steal = false
+
+			if consideringSteal and findPlayerInTable(selectedArena.away.players, stealPlayer) then
+				print(`Counting as successful steal from {stealPlayer.playerName}`)
+				steal = true
+				stealTime = 0
+				consideringSteal = false
+			end
+			resetPlayersWithBall()
+
+			print(`Goal from {goalPlayer.playerName}`)
 			sendMessage(overlayCamera, {
 				statsInfo = {
 					playerName = goalPlayer.playerName,
 					goal = true,
 					save = false,
-					steal = false,
+					steal = steal,
 				},
 			})
 		end
@@ -2172,13 +2300,23 @@ function goalScoreCheck()
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
 		midfieldTimePassed = 0
 		if goalPlayer then
-			print(`{goalPlayer.playerName} shot`)
+			local steal = false
+
+			if consideringSteal and findPlayerInTable(selectedArena.home.players, stealPlayer) then
+				print(`Counting as successful steal from {stealPlayer.playerName}`)
+				steal = true
+				stealTime = 0
+				consideringSteal = false
+			end
+			resetPlayersWithBall()
+
+			print(`Goal from {goalPlayer.playerName}`)
 			sendMessage(overlayCamera, {
 				statsInfo = {
 					playerName = goalPlayer.playerName,
 					goal = true,
 					save = false,
-					steal = false,
+					steal = steal,
 				},
 			})
 		end
@@ -2201,23 +2339,11 @@ function ballInCenterCheck()
 		ballCenterTime += deltaTime
 	else
 		if ballCenterTime > requiredBallCenterTime then
+			resetPlayersWithBall()
 			GameStartEffect()
 		end
 		ballCenterTime = 0
 	end
-end
-
-function checkForPlayerBallContact(): ReplayPlayer
-	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(27.5)
-	if contactPlayer ~= nil then
-		if lastPlayerWithBall ~= nil and contactPlayer.playerId == lastPlayerWithBall.playerId then
-			return lastPlayerWithBall
-		end
-		print(lastPlayerWithBall.playerName)
-		return contactPlayer
-	end
-
-	return lastPlayerWithBall
 end
 
 function getTeamColors()
