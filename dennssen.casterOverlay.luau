@@ -148,7 +148,7 @@ function checkForPlayerStats(): boolean
 			config.awayTeam[playerName] = {
 				saves = 0,
 				goals = 0,
-				intercepts = 0,
+				steal = 0,
 			}
 		end
 		save = true

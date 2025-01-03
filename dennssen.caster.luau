@@ -335,7 +335,8 @@ local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
 local previousAwayGoalPotentialEnter: boolean = false
 
-local statPlayer: ReplayPlayer? = nil
+local goalPlayer: ReplayPlayer? = nil
+local stealPlayer: ReplayPlayer? = nil
 
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
@@ -1970,12 +1971,87 @@ function sendOverlayInfo()
 	sendMessage(overlayCamera, { alwaysTick = true, teamInfo = teamInfo, ballCenterTime = ballCenterTime })
 end
 
-function goalPotentialScoreCheck(homeGoalBox: BoxType, awayGoalBox: BoxType)
-	if isSafeTime or lastPlayerWithBall == nil then
+function checkForGoalPotential(): boolean
+	local successfulPotential = false
+	lastPlayerWithBall = checkForPlayerBallContact()
+
+	if lastPlayerWithBall == nil then
+		return successfulPotential
+	end
+
+	if homeGoalPotentialEnter and not previousHomeGoalPotentialEnter then
+		if findPlayerInTable(selectedArena.away.players, lastPlayerWithBall) then
+			goalPlayer = lastPlayerWithBall
+			successfulPotential = true
+		end
+	end
+
+	if awayGoalPotentialEnter and not previousAwayGoalPotentialEnter then
+		if findPlayerInTable(selectedArena.home.players, lastPlayerWithBall) then
+			goalPlayer = lastPlayerWithBall
+			successfulPotential = true
+		end
+	end
+
+	return successfulPotential
+end
+
+function checkForSave(homeDist: number, awayDist: number): boolean
+	local successfulSave = false
+	if not homeGoalPotentialEnter and previousHomeGoalPotentialEnter then
+		if homeDist <= 600 then
+			local goalie = getClosestPlayerToBall()
+			if goalie and findPlayerInTable(selectedArena.home.players, goalie) then
+				successfulSave = true
+				print(`{goalie.playerName} saves`)
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = goalie.playerName,
+						goal = false,
+						save = true,
+						steal = false,
+					},
+				})
+			end
+		end
+	end
+
+	if not awayGoalPotentialEnter and previousAwayGoalPotentialEnter then
+		if awayDist <= 600 then
+			local goalie = getClosestPlayerToBall(27.5)
+			if goalie and findPlayerInTable(selectedArena.away.players, goalie) then
+				successfulSave = true
+				print(`{goalie.playerName} saves`)
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = goalie.playerName,
+						goal = false,
+						save = true,
+						steal = false,
+					},
+				})
+			end
+		end
+	end
+
+	return successfulSave
+end
+
+function checkForSteal() end
+
+function earlyStatChangeReturn(ballExit: boolean)
+	if ballExit then
 		homeGoalPotentialEnter = false
 		awayGoalPotentialEnter = false
-		previousHomeGoalPotentialEnter = homeGoalPotentialEnter
-		previousAwayGoalPotentialEnter = awayGoalPotentialEnter
+	end
+
+	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
+	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
+end
+
+function goalPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
+	if isSafeTime or lastPlayerWithBall == nil then
+		earlyStatChangeReturn(true)
 		return
 	end
 
@@ -2031,48 +2107,14 @@ function goalPotentialScoreCheck(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		awayGoalPotentialEnter = false
 	end
 
-	if homeGoalPotentialEnter and not previousHomeGoalPotentialEnter then
-		if findPlayerInTable(selectedArena.away.players, lastPlayerWithBall) then
-			statPlayer = lastPlayerWithBall
-		end
-	elseif not homeGoalPotentialEnter and previousHomeGoalPotentialEnter then
-		if ballToHomeGoalDist <= 600 then
-			local goalie = getClosestPlayerToBall()
-			if goalie and findPlayerInTable(selectedArena.home.players, goalie) then
-				statPlayer = goalie
-				print(`{goalie.playerName} saves`)
-				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = goalie.playerName,
-						goal = false,
-						save = true,
-						intercept = false,
-					},
-				})
-			end
-		end
+	if checkForGoalPotential() then
+		earlyStatChangeReturn(false)
+		return
 	end
 
-	if awayGoalPotentialEnter and not previousAwayGoalPotentialEnter then
-		if findPlayerInTable(selectedArena.home.players, lastPlayerWithBall) then
-			statPlayer = lastPlayerWithBall
-		end
-	elseif not awayGoalPotentialEnter and previousAwayGoalPotentialEnter then
-		if ballToAwayGoalDist <= 600 then
-			local goalie = getClosestPlayerToBall(27.5)
-			if goalie and findPlayerInTable(selectedArena.away.players, goalie) then
-				statPlayer = goalie
-				print(`{goalie.playerName} saves`)
-				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = goalie.playerName,
-						goal = false,
-						save = true,
-						intercept = false,
-					},
-				})
-			end
-		end
+	if checkForSave(ballToHomeGoalDist, ballToAwayGoalDist) then
+		earlyStatChangeReturn(false)
+		return
 	end
 
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
@@ -2097,7 +2139,7 @@ function goalScoreCheck()
 		awayGoalBox:render(0, 1, 0)
 	end
 
-	goalPotentialScoreCheck(homeGoalBox, awayGoalBox)
+	goalPotentialStatChange(homeGoalBox, awayGoalBox)
 
 	if homeGoalBox:checkPointIntersect(ball.transform.position) then
 		homeGoalEnter = true
@@ -2112,14 +2154,14 @@ function goalScoreCheck()
 		isSafeTime = true
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 		midfieldTimePassed = 0
-		if statPlayer then
-			print(`{statPlayer.playerName} shot`)
+		if goalPlayer then
+			print(`{goalPlayer.playerName} shot`)
 			sendMessage(overlayCamera, {
 				statsInfo = {
-					playerName = statPlayer.playerName,
+					playerName = goalPlayer.playerName,
 					goal = true,
 					save = false,
-					intercept = false,
+					steal = false,
 				},
 			})
 		end
@@ -2129,13 +2171,14 @@ function goalScoreCheck()
 		isSafeTime = true
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
 		midfieldTimePassed = 0
-		if statPlayer then
+		if goalPlayer then
+			print(`{goalPlayer.playerName} shot`)
 			sendMessage(overlayCamera, {
 				statsInfo = {
-					playerName = statPlayer.playerName,
+					playerName = goalPlayer.playerName,
 					goal = true,
 					save = false,
-					intercept = false,
+					steal = false,
 				},
 			})
 		end
@@ -2164,15 +2207,17 @@ function ballInCenterCheck()
 	end
 end
 
-function checkForPlayerBallContact()
+function checkForPlayerBallContact(): ReplayPlayer
 	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(27.5)
 	if contactPlayer ~= nil then
 		if lastPlayerWithBall ~= nil and contactPlayer.playerId == lastPlayerWithBall.playerId then
-			return
+			return lastPlayerWithBall
 		end
-		lastPlayerWithBall = contactPlayer
 		print(lastPlayerWithBall.playerName)
+		return contactPlayer
 	end
+
+	return lastPlayerWithBall
 end
 
 function getTeamColors()
@@ -2229,7 +2274,6 @@ function tick(dt)
 		readOtherInputs()
 		particleAffect()
 		if ball ~= nil then
-			checkForPlayerBallContact()
 			goalScoreCheck()
 			ballInCenterCheck()
 		else
@@ -2247,7 +2291,6 @@ function tick(dt)
 
 	particleAffect()
 	if ball ~= nil then
-		checkForPlayerBallContact()
 		goalScoreCheck()
 		ballInCenterCheck()
 	else
