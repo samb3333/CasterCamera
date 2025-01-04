@@ -341,6 +341,10 @@ local stealTime = 0
 
 local consideringSteal: boolean = false
 
+local maximumTimeSincePass: number = 5
+local timeSincePass: number = 0
+
+local assistPlayer: ReplayPlayer? = nil
 local goalPlayer: ReplayPlayer? = nil
 local stealPlayer: ReplayPlayer = nil
 
@@ -2012,9 +2016,33 @@ function checkForPlayerBallContact(): ReplayPlayer?
 	return lastPlayerWithBall
 end
 
+function checkForAssist()
+	if lastPlayerWithBall == nil or previousLastPlayerWithBall == nil then
+		return
+	end
+
+	if
+		playersAreOnSameTeam(lastPlayerWithBall, previousLastPlayerWithBall)
+		and lastPlayerWithBall.playerId ~= previousLastPlayerWithBall.playerId
+	then
+		assistPlayer = previousLastPlayerWithBall
+		timeSincePass = 0
+		print(`logging pass from {previousLastPlayerWithBall.playerName} for the next 5 seconds`)
+	elseif not playersAreOnSameTeam(lastPlayerWithBall, previousLastPlayerWithBall) then
+		assistPlayer = nil
+	end
+
+	if assistPlayer then
+		timeSincePass += deltaTime
+		if timeSincePass >= maximumTimeSincePass then
+			timeSincePass = 0
+			assistPlayer = nil
+		end
+	end
+end
+
 function checkForGoalPotential(): boolean
 	local successfulPotential = false
-	lastPlayerWithBall = checkForPlayerBallContact()
 
 	if lastPlayerWithBall == nil then
 		return successfulPotential
@@ -2060,6 +2088,7 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 						goal = false,
 						save = true,
 						steal = false,
+						assist = false,
 					},
 				})
 			end
@@ -2085,6 +2114,7 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 						goal = false,
 						save = true,
 						steal = false,
+						assist = false,
 					},
 				})
 			end
@@ -2095,8 +2125,6 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 end
 
 function checkForSteal(): boolean
-	lastPlayerWithBall = checkForPlayerBallContact()
-
 	if lastPlayerWithBall == nil then
 		return false
 	end
@@ -2116,7 +2144,6 @@ function checkForSteal(): boolean
 				print(`Considering that {stealPlayer.playerName} just stole`)
 			end
 
-			previousLastPlayerWithBall = lastPlayerWithBall
 			return teamChange
 		else
 			local teamKeep = false
@@ -2139,15 +2166,14 @@ function checkForSteal(): boolean
 						save = false,
 						goal = false,
 						steal = true,
+						assist = false,
 					},
 				})
 			end
 
-			previousLastPlayerWithBall = lastPlayerWithBall
 			return teamKeep
 		end
 	else
-		previousLastPlayerWithBall = lastPlayerWithBall
 		return false
 	end
 end
@@ -2158,11 +2184,12 @@ function earlyStatChangeReturn(ballExit: boolean)
 		awayGoalPotentialEnter = false
 	end
 
+	previousLastPlayerWithBall = lastPlayerWithBall
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
 	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
 end
 
-function goalPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
+function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 	if isSafeTime then
 		earlyStatChangeReturn(true)
 		return
@@ -2220,6 +2247,10 @@ function goalPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		awayGoalPotentialEnter = false
 	end
 
+	lastPlayerWithBall = checkForPlayerBallContact()
+
+	checkForAssist()
+
 	if checkForGoalPotential() then
 		earlyStatChangeReturn(false)
 		return
@@ -2235,6 +2266,7 @@ function goalPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		return
 	end
 
+	previousLastPlayerWithBall = lastPlayerWithBall
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
 	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
 end
@@ -2257,7 +2289,7 @@ function goalScoreCheck()
 		awayGoalBox:render(0, 1, 0)
 	end
 
-	goalPotentialStatChange(homeGoalBox, awayGoalBox)
+	checkPotentialStatChange(homeGoalBox, awayGoalBox)
 
 	if homeGoalBox:checkPointIntersect(ball.transform.position) then
 		homeGoalEnter = true
@@ -2273,11 +2305,17 @@ function goalScoreCheck()
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 		midfieldTimePassed = 0
 		if goalPlayer then
-			local steal = false
-
 			if consideringSteal and findPlayerInTable(selectedArena.away.players, stealPlayer) then
 				print(`Counting as successful steal from {stealPlayer.playerName}`)
-				steal = true
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = stealPlayer.playerName,
+						goal = false,
+						save = false,
+						steal = true,
+						assist = false,
+					},
+				})
 				stealTime = 0
 				consideringSteal = false
 			end
@@ -2289,9 +2327,22 @@ function goalScoreCheck()
 					playerName = goalPlayer.playerName,
 					goal = true,
 					save = false,
-					steal = steal,
+					steal = false,
+					assist = false,
 				},
 			})
+			if assistPlayer then
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = assistPlayer.playerName,
+						goal = false,
+						save = false,
+						steal = false,
+						assist = true,
+					},
+				})
+				assistPlayer = nil
+			end
 		end
 	end
 
@@ -2300,11 +2351,17 @@ function goalScoreCheck()
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
 		midfieldTimePassed = 0
 		if goalPlayer then
-			local steal = false
-
 			if consideringSteal and findPlayerInTable(selectedArena.home.players, stealPlayer) then
 				print(`Counting as successful steal from {stealPlayer.playerName}`)
-				steal = true
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = stealPlayer.playerName,
+						goal = false,
+						save = false,
+						steal = true,
+						assist = false,
+					},
+				})
 				stealTime = 0
 				consideringSteal = false
 			end
@@ -2316,9 +2373,22 @@ function goalScoreCheck()
 					playerName = goalPlayer.playerName,
 					goal = true,
 					save = false,
-					steal = steal,
+					steal = false,
+					assist = false,
 				},
 			})
+			if assistPlayer then
+				sendMessage(overlayCamera, {
+					statsInfo = {
+						playerName = assistPlayer.playerName,
+						goal = false,
+						save = false,
+						steal = false,
+						assist = true,
+					},
+				})
+				assistPlayer = nil
+			end
 		end
 	end
 

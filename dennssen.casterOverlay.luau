@@ -8,7 +8,7 @@ metadata = {
 local saveInterval = 0.5
 local saveTime = 0
 local newTeamInfo = nil
-local newStatsInfo = nil
+local newStatsQueue = {}
 local ballCenterTime = 0
 local requiredBallCenterTimer = 10
 local statReset = false
@@ -57,6 +57,35 @@ function checkForTeamInfoChanges(): boolean
 	end
 
 	return saveToConfig
+end
+
+function addStatsInfoToQueue(newStatsInfo)
+	local queueIndex = nil
+	for i, statsInfo in newStatsQueue do
+		if newStatsInfo.playerName == statsInfo.playerName then -- player is already in queue
+			queueIndex = i
+		end
+	end
+
+	if queueIndex ~= nil then
+		if newStatsInfo.goal then
+			newStatsQueue[queueIndex].goal = true
+		end
+
+		if newStatsInfo.save then
+			newStatsQueue[queueIndex].save = true
+		end
+
+		if newStatsInfo.steal then
+			newStatsQueue[queueIndex].steal = true
+		end
+
+		if newStatsInfo.assist then
+			newStatsQueue[queueIndex].assist = true
+		end
+	else
+		table.insert(newStatsQueue, newStatsInfo)
+	end
 end
 
 function checkForGameStarted(): boolean
@@ -125,6 +154,26 @@ function checkForPlayerStats(): boolean
 		end
 	end
 
+	for playerName, playerStats in config.homeTeam do
+		if table.find(config.teamInfo.homePlayerNames, tostring(playerName)) == nil then
+			local combinedStats = playerStats.goals + playerStats.saves + playerStats.steals
+			if combinedStats == 0 then
+				config.homeTeam[playerName] = nil
+				save = true
+			end
+		end
+	end
+
+	for playerName, playerStats in config.awayTeam do
+		if table.find(config.teamInfo.awayPlayerNames, tostring(playerName)) == nil then
+			local combinedStats = playerStats.goals + playerStats.saves + playerStats.steals
+			if combinedStats == 0 then
+				config.awayTeam[playerName] = nil
+				save = true
+			end
+		end
+	end
+
 	if newHomePlayer then
 		for _, playerName in config.teamInfo.homePlayerNames do
 			if config.homeTeam[playerName] ~= nil then
@@ -135,6 +184,7 @@ function checkForPlayerStats(): boolean
 				saves = 0,
 				goals = 0,
 				steals = 0,
+				assists = 0,
 			}
 		end
 		save = true
@@ -149,58 +199,67 @@ function checkForPlayerStats(): boolean
 				saves = 0,
 				goals = 0,
 				steals = 0,
+				assists = 0,
 			}
 		end
 		save = true
 	end
 
-	if newStatsInfo == nil then
+	if #newStatsQueue == 0 then
 		return save
 	end
 
-	local isOnHome
+	for _, newStatsInfo in newStatsQueue do
+		local isOnHome = nil
 
-	if config.homeTeam[newStatsInfo.playerName] ~= nil then
-		isOnHome = true
-	elseif config.awayTeam[newStatsInfo.playerName] ~= nil then
-		isOnHome = false
-	end
+		if config.homeTeam[newStatsInfo.playerName] ~= nil then
+			isOnHome = true
+		elseif config.awayTeam[newStatsInfo.playerName] ~= nil then
+			isOnHome = false
+		end
 
-	if isOnHome == nil then
-		return save
-	end
+		if isOnHome == nil then
+			return save
+		end
 
-	if newStatsInfo.save then
-		if isOnHome then
-			config.homeTeam[newStatsInfo.playerName].saves += 1
+		if newStatsInfo.save then
+			if isOnHome then
+				config.homeTeam[newStatsInfo.playerName].saves += 1
+			else
+				config.awayTeam[newStatsInfo.playerName].saves += 1
+			end
 			save = true
-		else
-			config.awayTeam[newStatsInfo.playerName].saves += 1
+		end
+
+		if newStatsInfo.goal then
+			if isOnHome then
+				config.homeTeam[newStatsInfo.playerName].goals += 1
+			else
+				config.awayTeam[newStatsInfo.playerName].goals += 1
+			end
+			save = true
+		end
+
+		if newStatsInfo.steal then
+			if isOnHome then
+				config.homeTeam[newStatsInfo.playerName].steals += 1
+			else
+				config.awayTeam[newStatsInfo.playerName].steals += 1
+			end
+			save = true
+		end
+
+		if newStatsInfo.assist then
+			if isOnHome then
+				config.homeTeam[newStatsInfo.playerName].assists += 1
+			else
+				config.awayTeam[newStatsInfo.playerName].assists += 1
+			end
 			save = true
 		end
 	end
 
-	if newStatsInfo.goal then
-		if isOnHome then
-			config.homeTeam[newStatsInfo.playerName].goals += 1
-			save = true
-		else
-			config.awayTeam[newStatsInfo.playerName].goals += 1
-			save = true
-		end
-	end
-
-	if newStatsInfo.steal then
-		if isOnHome then
-			config.homeTeam[newStatsInfo.playerName].steals += 1
-			save = true
-		else
-			config.awayTeam[newStatsInfo.playerName].steals += 1
-			save = true
-		end
-	end
-
-	newStatsInfo = nil
+	newStatsQueue = {}
 
 	return save
 end
@@ -294,6 +353,6 @@ function onMessageReceived(messageTable)
 	end
 
 	if messageTable.statsInfo then
-		newStatsInfo = messageTable.statsInfo
+		addStatsInfoToQueue(messageTable.statsInfo)
 	end
 end
