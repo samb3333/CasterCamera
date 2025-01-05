@@ -7,24 +7,24 @@ metadata = {
 
 local saveInterval = 0.5
 local saveTime = 0
-local newTeamInfo = nil
+local newArenaInfo = nil
 local newStatsQueue = {}
 local ballCenterTime = 0
 local requiredBallCenterTimer = 10
 local statReset = false
 
-function checkForTeamInfoChanges(): boolean
+function checkForArenaInfoChanges(): boolean
 	local saveToConfig = false
 
-	if newTeamInfo == nil then
+	if newArenaInfo == nil then
 		return saveToConfig
 	end
 
-	if config.teamInfo == nil then
+	if config.arenaInfo == nil then
 		saveToConfig = true
 	else
-		for key, value in newTeamInfo do
-			local oldOverlayValue = config.teamInfo[key]
+		for key, value in newArenaInfo do
+			local oldOverlayValue = config.arenaInfo[key]
 			if type(value) == "table" then
 				for tableKey, tableValue in value do
 					local oldOverlayTableValue = oldOverlayValue[tableKey]
@@ -53,7 +53,7 @@ function checkForTeamInfoChanges(): boolean
 	end
 
 	if saveToConfig then
-		config.teamInfo = newTeamInfo
+		config.arenaInfo = newArenaInfo
 	end
 
 	return saveToConfig
@@ -113,12 +113,12 @@ function checkForScoreChange(): boolean
 		save = true
 	end
 
-	if newTeamInfo.homeGoalEnter and not config.teamInfo.homeGoalEnter then
+	if newArenaInfo.homeGoalEnter and not config.arenaInfo.homeGoalEnter then
 		config.homeScore += 1
 		save = true
 	end
 
-	if newTeamInfo.awayGoalEnter and not config.teamInfo.awayGoalEnter then
+	if newArenaInfo.awayGoalEnter and not config.arenaInfo.awayGoalEnter then
 		config.awayScore += 1
 		save = true
 	end
@@ -140,14 +140,14 @@ function checkForPlayerStats(): boolean
 	local newHomePlayer = false
 	local newAwayPlayer = false
 
-	for _, playerName in config.teamInfo.homePlayerNames do
+	for _, playerName in config.arenaInfo.homePlayerNames do
 		if config.homeTeam[playerName] == nil then
 			newHomePlayer = true
 			break
 		end
 	end
 
-	for _, playerName in config.teamInfo.awayPlayerNames do
+	for _, playerName in config.arenaInfo.awayPlayerNames do
 		if config.awayTeam[playerName] == nil then
 			newAwayPlayer = true
 			break
@@ -155,7 +155,7 @@ function checkForPlayerStats(): boolean
 	end
 
 	for playerName, playerStats in config.homeTeam do
-		if table.find(config.teamInfo.homePlayerNames, tostring(playerName)) == nil then
+		if table.find(config.arenaInfo.homePlayerNames, tostring(playerName)) == nil then
 			local combinedStats = playerStats.goals + playerStats.saves + playerStats.steals
 			if combinedStats == 0 then
 				config.homeTeam[playerName] = nil
@@ -165,7 +165,7 @@ function checkForPlayerStats(): boolean
 	end
 
 	for playerName, playerStats in config.awayTeam do
-		if table.find(config.teamInfo.awayPlayerNames, tostring(playerName)) == nil then
+		if table.find(config.arenaInfo.awayPlayerNames, tostring(playerName)) == nil then
 			local combinedStats = playerStats.goals + playerStats.saves + playerStats.steals
 			if combinedStats == 0 then
 				config.awayTeam[playerName] = nil
@@ -175,7 +175,7 @@ function checkForPlayerStats(): boolean
 	end
 
 	if newHomePlayer then
-		for _, playerName in config.teamInfo.homePlayerNames do
+		for _, playerName in config.arenaInfo.homePlayerNames do
 			if config.homeTeam[playerName] ~= nil then
 				continue
 			end
@@ -190,7 +190,7 @@ function checkForPlayerStats(): boolean
 		save = true
 	end
 	if newAwayPlayer then
-		for _, playerName in config.teamInfo.awayPlayerNames do
+		for _, playerName in config.arenaInfo.awayPlayerNames do
 			if config.awayTeam[playerName] ~= nil then
 				continue
 			end
@@ -271,13 +271,13 @@ end
 
 function resetInactivePlayerStats()
 	for playerName, playerStats in config.homeTeam do
-		if table.find(config.teamInfo.homePlayerNames, tostring(playerName)) == nil then
+		if table.find(config.arenaInfo.homePlayerNames, tostring(playerName)) == nil then
 			config.homeTeam[playerName] = nil
 		end
 	end
 
 	for playerName, playerStats in config.awayTeam do
-		if table.find(config.teamInfo.awayPlayerNames, tostring(playerName)) == nil then
+		if table.find(config.arenaInfo.awayPlayerNames, tostring(playerName)) == nil then
 			config.awayTeam[playerName] = nil
 		end
 	end
@@ -306,9 +306,9 @@ function tick(dt)
 	end
 
 	if not saveToConfig then
-		saveToConfig = checkForTeamInfoChanges()
+		saveToConfig = checkForArenaInfoChanges()
 	else
-		checkForTeamInfoChanges()
+		checkForArenaInfoChanges()
 	end
 
 	if not saveToConfig then
@@ -334,8 +334,8 @@ function onMessageReceived(messageTable)
 		alwaysTick = messageTable.alwaysTick
 	end
 
-	if messageTable.teamInfo then
-		newTeamInfo = messageTable.teamInfo
+	if messageTable.arenaInfo then
+		newArenaInfo = messageTable.arenaInfo
 	end
 
 	if messageTable.ballCenterTime then

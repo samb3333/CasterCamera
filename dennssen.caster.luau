@@ -645,7 +645,7 @@ end
 
 function main()
 	followPlussCamera = getCameraById("dennssen.followpluss")
-	overlayCamera = getCameraById("dennssen.casterOverlay")
+	overlayCamera = getCameraById("dennssen.overlayInfo")
 	if overlayCamera ~= nil then
 		usingOverlay = true
 	end
@@ -1967,7 +1967,7 @@ function goalExitCheck()
 end
 
 function sendOverlayInfo()
-	local teamInfo = {}
+	local arenaInfo = {}
 	local homePlayerIds = {}
 	local homePlayerNames = {}
 	local awayPlayerIds = {}
@@ -1980,24 +1980,24 @@ function sendOverlayInfo()
 		table.insert(awayPlayerIds, player.playerId)
 		table.insert(awayPlayerNames, player.playerName)
 	end
-	teamInfo["homePlayerIds"] = homePlayerIds
-	teamInfo["homePlayerNames"] = homePlayerNames
-	teamInfo["awayPlayerIds"] = awayPlayerIds
-	teamInfo["awayPlayerNames"] = awayPlayerNames
-	teamInfo["homeColor"] = homeTeamPrimaryColor
-	teamInfo["awayColor"] = awayTeamPrimaryColor
-	teamInfo["isFollowing"] = playerFollow
+	arenaInfo["homePlayerIds"] = homePlayerIds
+	arenaInfo["homePlayerNames"] = homePlayerNames
+	arenaInfo["awayPlayerIds"] = awayPlayerIds
+	arenaInfo["awayPlayerNames"] = awayPlayerNames
+	arenaInfo["homeColor"] = homeTeamPrimaryColor
+	arenaInfo["awayColor"] = awayTeamPrimaryColor
+	arenaInfo["isFollowing"] = playerFollow
 	if playerFollow then
-		teamInfo["followedPlayerId"] = currentPlayerId
+		arenaInfo["followedPlayerId"] = currentPlayerId
 	end
-	teamInfo["homeGoalEnter"] = homeGoalEnter
-	teamInfo["awayGoalEnter"] = awayGoalEnter
+	arenaInfo["homeGoalEnter"] = homeGoalEnter
+	arenaInfo["awayGoalEnter"] = awayGoalEnter
 
 	if not usingOverlay then
 		return
 	end
 
-	sendMessage(overlayCamera, { alwaysTick = true, teamInfo = teamInfo, ballCenterTime = ballCenterTime })
+	sendMessage(overlayCamera, { alwaysTick = true, arenaInfo = arenaInfo, ballCenterTime = ballCenterTime })
 end
 
 function resetPlayersWithBall()
