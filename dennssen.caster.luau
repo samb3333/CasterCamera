@@ -466,26 +466,13 @@ export type BoxType = {
 	traditionalRotation: Quat,
 	vertexLocations: { Vec3 },
 
-	__tostring: (self: BoxType) -> string,
-	basicBox: () -> BoxType,
 	new: (inputPosition: Vec3, inputSize: Vec3, inputRotation: Vec3) -> BoxType,
-	generate: (boxStr: string) -> BoxType,
-	setPosition: (self: BoxType, inputPosition: Vec3) -> (),
-	setSize: (self: BoxType, inputPosition: Vec3) -> (),
-	setRotation: (self: BoxType, inputPosition: Vec3) -> (),
-	setRotationDeg: (self: BoxType, inputRotation: Vec3) -> (),
-	getPosition: (self: BoxType) -> Vec3,
-	getSize: (self: BoxType) -> Vec3,
-	getRotation: (self: BoxType) -> Vec3,
-	getRotationDeg: (self: BoxType) -> Vec3,
 	generatePoints: (self: BoxType) -> (),
 	getRotationMatrix: (self: BoxType, roll: number, pitch: number, yaw: number) -> { { number } },
 	multiplyMatrices: (self: BoxType, matrix1: { { number } }, matrix2: { { number } }) -> { { number } },
 	applyRotationMatrix: (self: BoxType, vec: Vec3, matrix: { { number } }) -> Vec3,
 	render: (self: BoxType, r: number, g: number, b: number) -> (),
-	renderBasic: (self: BoxType, r: number, g: number, b: number) -> (),
 	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
-	getSaveString: (self: BoxType) -> string,
 }
 
 local Box: BoxType = {} :: BoxType
@@ -503,19 +490,6 @@ function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Vec3): Box
 	self.vertexLocations = {}
 	self:generatePoints()
 	return self
-end
-
-function Box:setRotation(inputRotation: Vec3): ()
-	self.rotation = inputRotation
-	self:generatePoints()
-end
-
-function Box:setRotationDeg(inputRotation: Vec3): ()
-	inputRotation.x = (inputRotation.x * math.pi) / 180
-	inputRotation.y = (inputRotation.y * math.pi) / 180
-	inputRotation.z = (inputRotation.z * math.pi) / 180
-	self.rotation = inputRotation
-	self:generatePoints()
 end
 
 function Box:generatePoints(): ()
