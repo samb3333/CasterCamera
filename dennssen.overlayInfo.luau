@@ -1,5 +1,5 @@
 metadata = {
-	name = "OverlayIndo",
+	name = "Overlay Info",
 	description = "TBD",
 	author = "Dennssen",
 	defaultKeybind = "",

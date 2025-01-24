@@ -1,5 +1,5 @@
 metadata = {
-	name = "Spectator",
+	name = "Caster",
 	description = "TBD",
 	author = "Dennssen",
 	defaultKeybind = "F8",
@@ -34,6 +34,9 @@ function calculateRotatedOffset(position, angleDegrees)
 end
 
 local deltaTime: number = 0
+
+local defaultPosition = Vec3.new(0, -3000, -27700)
+local defaultRotation = Quat.fromEuler(0, 0, 90)
 
 local TeamIndex = {
 	NoTeam = -1,
@@ -1027,9 +1030,15 @@ end
 
 function onTransitionBegin(transitionInfo: Transition)
 	toggleSmoothing(false, false)
-	camera.position = transitionInfo.startPosition
-	camera.rotation = transitionInfo.startRotation
-	rotEuler = transitionInfo.startRotation:euler()
+	if transitionInfo.startPosition:length() <= 0.01 then
+		camera.position = defaultPosition
+		camera.rotation = defaultRotation
+		rotEuler = defaultRotation:euler()
+	else
+		camera.position = transitionInfo.startPosition
+		camera.rotation = transitionInfo.startRotation
+		rotEuler = transitionInfo.startRotation:euler()
+	end
 	rotEuler.x = 0
 	camera.rotationSmoothing = 0.02
 	camera.hideNearestHead = false
