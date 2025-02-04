@@ -2,7 +2,7 @@ metadata = {
 	name = "Caster",
 	description = "TBD",
 	author = "Dennssen",
-	defaultKeybind = "F8",
+	defaultKeybind = "",
 }
 
 local function parseBallJSON(str)
@@ -66,15 +66,6 @@ type MessageValues = {
 	autoGoalCam: boolean?,
 	ballGoalMode: number?,
 	goalMode: number?,
-}
-
-local GoalMode = {
-	YourGoal = 1,
-	BothGoals = 2,
-}
-local BallGoalMode = {
-	EnemyGoal = 1,
-	BothGoals = 2,
 }
 
 type Color = {
@@ -281,14 +272,14 @@ local function initializeConfig()
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
 		homeTeamDefaultColor = {
-			r = 1,
-			g = 0.1,
-			b = 0.1,
-		},
-		awayTeamDefaultColor = {
 			r = 0,
 			g = 0.5,
 			b = 0.5,
+		},
+		awayTeamDefaultColor = {
+			r = 1,
+			g = 0.1,
+			b = 0.1,
 		},
 	}
 
@@ -351,6 +342,10 @@ local assistPlayer: ReplayPlayer? = nil
 local goalPlayer: ReplayPlayer? = nil
 local stealPlayer: ReplayPlayer = nil
 
+local lastGoalPlayerName = ""
+local lastAssistPlayerName = ""
+local startTimestamp = nil
+
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
 
@@ -371,6 +366,8 @@ local speedGears = {
 	15,
 	25,
 }
+local speedMultiplierHoldBuffer = false
+local speedGearMultiplier = 1
 local turnVelocity: Vec2 = Vec2.zeroVector
 
 -- Follow Camera
@@ -1029,6 +1026,7 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 end
 
 function onTransitionBegin(transitionInfo: Transition)
+	transitionInfo.length = 0
 	toggleSmoothing(false, false)
 	if transitionInfo.startPosition:length() <= 0.01 then
 		camera.position = defaultPosition
@@ -1580,12 +1578,29 @@ function readOtherInputs()
 	end
 
 	if Input.getKeyDown(leftShiftInput) or Input.getKeyDown(rightShoulder) then
+		if speedIndex == #speedGears - 1 then
+			speedMultiplierHoldBuffer = true
+		end
 		speedIndex += 1
 	end
 	if Input.getKeyDown(leftControlInput) or Input.getKeyDown(leftShoulder) then
 		speedIndex -= 1
 	end
 	speedIndex = math.clamp(speedIndex, 1, #speedGears)
+
+	if speedMultiplierHoldBuffer and (Input.getKeyUp(leftShiftInput) or Input.getKeyUp(rightShoulder)) then
+		speedMultiplierHoldBuffer = false
+	end
+
+	if
+		(Input.getKey(leftShiftInput) or Input.getKey(rightShoulder))
+		and speedIndex == #speedGears
+		and not speedMultiplierHoldBuffer
+	then
+		speedGearMultiplier = 2
+	else
+		speedGearMultiplier = 1
+	end
 
 	if
 		(Input.getKeyDown(numPadOne) or Input.getKeyDown(five))
@@ -1781,7 +1796,7 @@ function moveCamera()
 	local rightDirection = camera.rotation:getRightVector()
 	local upDirection = camera.rotation:getUpVector()
 
-	local speedMultiplier = speedGears[speedIndex]
+	local speedMultiplier = speedGears[speedIndex] * speedGearMultiplier
 
 	local forwardMovement = forwardDirection * Vertical * speedMultiplier * 100 * deltaTime
 	local sidewaysMovement = rightDirection * Horizontal * speedMultiplier * 100 * deltaTime
@@ -1859,12 +1874,12 @@ function teamLists()
 end
 
 -- Custom function to extract the primary color
-function extractPrimaryColor(json): Color
+function extractPrimaryColor(json)
 	local r = json:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)')
 	local g = json:match('"primary"%s*:%s*{.-"g"%s*:%s*(%d+)')
 	local b = json:match('"primary"%s*:%s*{.-"b"%s*:%s*(%d+)')
 
-	return { r = (r / 255), g = (g / 255), b = (b / 255) }
+	return { r = tostring(r / 255), g = tostring(g / 255), b = tostring(b / 255) }
 end
 
 function followPlayer()
@@ -1970,11 +1985,19 @@ function sendOverlayInfo()
 	arenaInfo["homeColor"] = homeTeamPrimaryColor
 	arenaInfo["awayColor"] = awayTeamPrimaryColor
 	arenaInfo["isFollowing"] = playerFollow
-	if playerFollow then
-		arenaInfo["followedPlayerId"] = currentPlayerId
-	end
+	arenaInfo["followedPlayerName"] = currentPlayerName
 	arenaInfo["homeGoalEnter"] = homeGoalEnter
 	arenaInfo["awayGoalEnter"] = awayGoalEnter
+	arenaInfo["isSafeTime"] = isSafeTime
+	if lastGoalPlayerName ~= nil and lastGoalPlayerName ~= "" then
+		arenaInfo["lastGoalInfo"] = {
+			shooter = lastGoalPlayerName,
+			assister = lastAssistPlayerName,
+		}
+	end
+	if startTimestamp ~= nil then
+		arenaInfo["startTimestamp"] = startTimestamp
+	end
 
 	if not usingOverlay then
 		return
@@ -2314,6 +2337,7 @@ function goalScoreCheck()
 					assist = false,
 				},
 			})
+			lastGoalPlayerName = goalPlayer.playerName
 			if assistPlayer then
 				sendMessage(overlayCamera, {
 					statsInfo = {
@@ -2324,7 +2348,10 @@ function goalScoreCheck()
 						assist = true,
 					},
 				})
+				lastAssistPlayerName = assistPlayer.playerName
 				assistPlayer = nil
+			else
+				lastAssistPlayerName = ""
 			end
 		end
 	end
@@ -2394,6 +2421,7 @@ function ballInCenterCheck()
 		if ballCenterTime > requiredBallCenterTime then
 			resetPlayersWithBall()
 			GameStartEffect()
+			startTimestamp = gameData.time.ticks
 		end
 		ballCenterTime = 0
 	end
@@ -2405,7 +2433,11 @@ function getTeamColors()
 		local playerJson = firstPlayer:toJson()
 		homeTeamPrimaryColor = extractPrimaryColor(playerJson)
 	else
-		homeTeamPrimaryColor = awayTeamDefaultColor
+		homeTeamPrimaryColor = {
+			r = tostring(math.round(homeTeamDefaultColor.r * 100) / 100),
+			g = tostring(math.round(homeTeamDefaultColor.g * 100) / 100),
+			b = tostring(math.round(homeTeamDefaultColor.b * 100) / 100),
+		}
 	end
 
 	if #gameData.players > 0 and #selectedArena.away.players > 0 then
@@ -2413,7 +2445,11 @@ function getTeamColors()
 		local playerJson = firstPlayer:toJson()
 		awayTeamPrimaryColor = extractPrimaryColor(playerJson)
 	else
-		awayTeamPrimaryColor = homeTeamDefaultColor
+		awayTeamPrimaryColor = {
+			r = tostring(math.round(awayTeamDefaultColor.r * 100) / 100),
+			g = tostring(math.round(awayTeamDefaultColor.g * 100) / 100),
+			b = tostring(math.round(awayTeamDefaultColor.b * 100) / 100),
+		}
 	end
 end
 

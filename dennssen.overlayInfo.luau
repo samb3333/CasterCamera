@@ -21,27 +21,24 @@ function checkForArenaInfoChanges(): boolean
 	end
 
 	if config.arenaInfo == nil then
+		newArenaInfo["lastGoalInfo"] = {
+			shooter = "",
+			assister = "",
+		}
 		saveToConfig = true
 	else
+		for key, value in config.arenaInfo do -- info that hasn't been sendt should keep it's old info
+			if newArenaInfo[key] == nil then
+				newArenaInfo[key] = value
+			end
+		end
+
 		for key, value in newArenaInfo do
 			local oldOverlayValue = config.arenaInfo[key]
 			if type(value) == "table" then
 				for tableKey, tableValue in value do
-					local oldOverlayTableValue = oldOverlayValue[tableKey]
-					if oldOverlayTableValue == nil then
-						oldOverlayTableValue = 0
-					end
-					if type(tableValue) == "number" and (tableValue ~= 0 and oldOverlayTableValue ~= 0) then
-						-- round to 2 decimals if value is a number
-						local roundedOldTableValue = math.round(oldOverlayTableValue * 100) / 100
-						local roundedNewTableValue = math.round(tableValue * 100) / 100
-						if roundedOldTableValue ~= roundedNewTableValue then
-							saveToConfig = true
-						end
-					else
-						if oldOverlayTableValue ~= tableValue then
-							saveToConfig = true
-						end
+					if oldOverlayValue[tableKey] ~= tableValue then
+						saveToConfig = true
 					end
 				end
 			else
