@@ -182,7 +182,7 @@ end
 
 -- goal
 local goalPositionOffset = 3150
-local goalHeightOffset = Vec3.new(0, 0, -40)
+local goalHeightOffset = Vec3.new(0, 0, -50)
 local homeGoalRotationOffset = Vec3.new(0, 0, 180)
 local awayGoalRotationOffset = Vec3.new(0, 0, 0)
 
@@ -205,13 +205,13 @@ local arenaFloorOffset = -350
 local arenaRoofOffset = 1150
 
 local arenas: { [any]: Arena } = {
-	plazaStadium = createArena("Plaza Stadium", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
+	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
 	plazaEast = createArena("Plaza East", Vec3.new(-4425, 18550, -29650), Quat.fromEuler(0, 0, 90)),
 	plazaWest = createArena("Plaza West", Vec3.new(4425, 18550, -29650), Quat.fromEuler(0, 0, -90)),
-	arenaPrime = createArena("Arena Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
-	theDungeon = createArena("The Dungeon", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
-	complexEast = createArena("Complex East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
-	complexWest = createArena("Complex West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
+	stadiumPrime = createArena("Stadium Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
+	theBunker = createArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
+	fieldhouseEast = createArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
+	fieldhouseWest = createArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
 }
 
 for _, arena in pairs(arenas) do
@@ -782,22 +782,22 @@ Controller:
 		Gui.sameLine()
 
 		if Gui.button(" 5 ") then
-			selectedArena = arenas.complexWest
+			selectedArena = arenas.fieldhouseWest
 			selectedArena.home.players = {}
 			selectedArena.away.players = {}
 		end
 		if Gui.isItemHovered() then
-			hoveredArena = "Complex West"
+			hoveredArena = "Fieldhouse West"
 			isHovered = true
 		end
 
 		if Gui.button("1") then
-			selectedArena = arenas.plazaStadium
+			selectedArena = arenas.gatewayArena
 			selectedArena.home.players = {}
 			selectedArena.away.players = {}
 		end
 		if Gui.isItemHovered() then
-			hoveredArena = "Plaza Stadium"
+			hoveredArena = "Gateway Arena"
 			isHovered = true
 		end
 
@@ -812,12 +812,12 @@ Controller:
 		Gui.sameLine()
 
 		if Gui.button("4") then
-			selectedArena = arenas.arenaPrime
+			selectedArena = arenas.stadiumPrime
 			selectedArena.home.players = {}
 			selectedArena.away.players = {}
 		end
 		if Gui.isItemHovered() then
-			hoveredArena = "Arena Prime"
+			hoveredArena = "Stadium Prime"
 			isHovered = true
 		end
 
@@ -832,12 +832,12 @@ Controller:
 		Gui.sameLine()
 
 		if Gui.button("7") then
-			selectedArena = arenas.theDungeon
+			selectedArena = arenas.theBunker
 			selectedArena.home.players = {}
 			selectedArena.away.players = {}
 		end
 		if Gui.isItemHovered() then
-			hoveredArena = "The Dungeon"
+			hoveredArena = "The Bunker"
 			isHovered = true
 		end
 
@@ -867,12 +867,12 @@ Controller:
 		Gui.sameLine()
 
 		if Gui.button(" 6 ") then
-			selectedArena = arenas.complexEast
+			selectedArena = arenas.fieldhouseEast
 			selectedArena.home.players = {}
 			selectedArena.away.players = {}
 		end
 		if Gui.isItemHovered() then
-			hoveredArena = "Complex East"
+			hoveredArena = "Fieldhouse East"
 			isHovered = true
 		end
 
