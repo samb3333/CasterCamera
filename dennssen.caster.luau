@@ -2469,8 +2469,6 @@ function tick(dt)
 		if ball ~= nil then
 			goalScoreCheck()
 			ballInCenterCheck()
-		else
-			warn("can't find ball")
 		end
 		sendOverlayInfo()
 		return
@@ -2486,8 +2484,6 @@ function tick(dt)
 	if ball ~= nil then
 		goalScoreCheck()
 		ballInCenterCheck()
-	else
-		warn("can't find ball")
 	end
 	sendOverlayInfo()
 end
