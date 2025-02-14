@@ -306,7 +306,7 @@ end
 
 initializeConfig()
 
-local selectedArena: Arena = arenas.plazaStadium
+local selectedArena: Arena = arenas.gatewayArena
 
 -- Particles
 local homeGoalEnter: boolean = false
@@ -748,6 +748,12 @@ Controller:
 	Gui.newLine()
 	Gui.separatorText("Camera")
 	Gui.indent()
+
+	if Gui.button("Get Closest Arena") then
+		selectedArena = getClosestArena(camera.position)
+		selectedArena.home.players = {}
+		selectedArena.away.players = {}
+	end
 
 	if Gui.collapsingHeader(`Selected Arena: {selectedArena.name}###ArenaHeader`) then
 		local isHovered = false
@@ -1941,7 +1947,6 @@ function goalExitCheck()
 	local projection = Vec3.dot(relativePosition, crossingAxis)
 
 	if (isHomeGoal and projection < 0) or (not isHomeGoal and projection > 0) then
-		print("ball passed midfield")
 		isSafeTime = false
 		if isHomeGoal then
 			homeGoalEnter = false
@@ -1966,21 +1971,15 @@ end
 
 function sendOverlayInfo()
 	local arenaInfo = {}
-	local homePlayerIds = {}
 	local homePlayerNames = {}
-	local awayPlayerIds = {}
 	local awayPlayerNames = {}
 	for _, player in selectedArena.home.players do
-		table.insert(homePlayerIds, player.playerId)
 		table.insert(homePlayerNames, player.playerName)
 	end
 	for _, player in selectedArena.away.players do
-		table.insert(awayPlayerIds, player.playerId)
 		table.insert(awayPlayerNames, player.playerName)
 	end
-	arenaInfo["homePlayerIds"] = homePlayerIds
 	arenaInfo["homePlayerNames"] = homePlayerNames
-	arenaInfo["awayPlayerIds"] = awayPlayerIds
 	arenaInfo["awayPlayerNames"] = awayPlayerNames
 	arenaInfo["homeColor"] = homeTeamPrimaryColor
 	arenaInfo["awayColor"] = awayTeamPrimaryColor
@@ -2033,7 +2032,6 @@ function checkForAssist()
 	then
 		assistPlayer = previousLastPlayerWithBall
 		timeSincePass = 0
-		print(`logging pass from {previousLastPlayerWithBall.playerName} for the next 5 seconds`)
 	elseif not playersAreOnSameTeam(lastPlayerWithBall, previousLastPlayerWithBall) then
 		assistPlayer = nil
 	end
@@ -2087,7 +2085,6 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 
 				resetPlayersWithBall()
 
-				print(`Save from {goalie.playerName}`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
 						playerName = goalie.playerName,
@@ -2113,7 +2110,6 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 
 				resetPlayersWithBall()
 
-				print(`Save from {goalie.playerName}`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
 						playerName = goalie.playerName,
@@ -2147,7 +2143,6 @@ function checkForSteal(): boolean
 				teamChange = true
 				stealPlayer = lastPlayerWithBall
 				consideringSteal = true
-				print(`Considering that {stealPlayer.playerName} just stole`)
 			end
 
 			return teamChange
@@ -2162,7 +2157,6 @@ function checkForSteal(): boolean
 			end
 
 			if stealTime >= requiredStealTime then
-				print(`Counting as successful steal from {stealPlayer.playerName}`)
 				stealTime = 0
 				consideringSteal = false
 				teamKeep = true
@@ -2209,21 +2203,12 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 	local homeHit = camera:castRay(ball.transform.position, ballHomePotentialPosition)
 	local awayHit = camera:castRay(ball.transform.position, ballAwayPotentialPosition)
 
-	if ballToHomeGoalDist < ballToAwayGoalDist then
-		World.drawLine(ball.transform.position, ballHomePotentialPosition, 0, 1, 0, 10, 0)
-	else
-		World.drawLine(ball.transform.position, ballAwayPotentialPosition, 0, 1, 0, 10, 0)
-	end
-
 	if homeHit.successful then
 		local velocityDotNormal = ball.velocity:dot(homeHit.normal)
 		local reflectedVelocityNormalized = (ball.velocity - (homeHit.normal * (2 * velocityDotNormal))):normalize()
 		local distanceLeft = getDist(homeHit.position, homeGoalBox.position)
 
 		ballHomePotentialPosition = homeHit.position + (reflectedVelocityNormalized * distanceLeft)
-		if ballToHomeGoalDist < ballToAwayGoalDist then
-			World.drawLine(homeHit.position, ballHomePotentialPosition, 1, 0, 0, 10, 0)
-		end
 	end
 
 	if awayHit.successful then
@@ -2232,9 +2217,6 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		local distanceLeft = getDist(awayHit.position, awayGoalBox.position)
 
 		ballAwayPotentialPosition = awayHit.position + (reflectedVelocityNormalized * distanceLeft)
-		if ballToHomeGoalDist > ballToAwayGoalDist then
-			World.drawLine(homeHit.position, ballAwayPotentialPosition, 1, 0, 0, 10, 0)
-		end
 	end
 
 	if
@@ -2312,7 +2294,6 @@ function goalScoreCheck()
 		midfieldTimePassed = 0
 		if goalPlayer then
 			if consideringSteal and findPlayerInTable(selectedArena.away.players, stealPlayer) then
-				print(`Counting as successful steal from {stealPlayer.playerName}`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
 						playerName = stealPlayer.playerName,
@@ -2327,7 +2308,6 @@ function goalScoreCheck()
 			end
 			resetPlayersWithBall()
 
-			print(`Goal from {goalPlayer.playerName}`)
 			sendMessage(overlayCamera, {
 				statsInfo = {
 					playerName = goalPlayer.playerName,
@@ -2362,7 +2342,6 @@ function goalScoreCheck()
 		midfieldTimePassed = 0
 		if goalPlayer then
 			if consideringSteal and findPlayerInTable(selectedArena.home.players, stealPlayer) then
-				print(`Counting as successful steal from {stealPlayer.playerName}`)
 				sendMessage(overlayCamera, {
 					statsInfo = {
 						playerName = stealPlayer.playerName,
@@ -2377,7 +2356,6 @@ function goalScoreCheck()
 			end
 			resetPlayersWithBall()
 
-			print(`Goal from {goalPlayer.playerName}`)
 			sendMessage(overlayCamera, {
 				statsInfo = {
 					playerName = goalPlayer.playerName,

@@ -5,7 +5,7 @@ metadata = {
 	defaultKeybind = "",
 }
 
-local saveInterval = 0.5
+local saveInterval = 0.75
 local saveTime = 0
 local newArenaInfo = nil
 local newStatsQueue = {}
