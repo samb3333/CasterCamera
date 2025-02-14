@@ -680,8 +680,8 @@ Keyboard:
 		
 	In All modes:
 		5/NumPadOne - Left Overview
-		6/NumPadeltaTimewo - Mid Overview
-		7/NumPadeltaTimehree - Right Overview
+		6/NumPadTwo - Mid Overview
+		7/NumPadThree - Right Overview
 
 		^^The Overviews Side is based on which side the ball is on^^
 	]])
