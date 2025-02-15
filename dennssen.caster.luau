@@ -1232,12 +1232,12 @@ function getClosestPlayerToLineOfSight(): ReplayPlayer?
 end
 
 function getPlayer()
-	playerFollow = true
-
 	if followPlussCamera == nil then
 		warn("Failed to switch to POV: 'Follow Pluss Camera' is missing.")
 		return
 	end
+
+	playerFollow = true
 
 	local tryGetPlayer: ReplayPlayer?
 
@@ -1261,14 +1261,14 @@ function getPlayer()
 	else
 		currentPlayerIndex = playerIndex
 	end
+	followPlayer()
 end
 
 function stopFollow()
-	cameraMode = CameraMode.HeadRotation
-	followPlayer()
 	playerFollow = false
 	camera:followCamera(nil)
-	rotEuler = camera.rotation:euler()
+	camera.position = followPlussCamera:getSmoothedPosition()
+	rotEuler = followPlussCamera:getSmoothedRotation():euler()
 	rotEuler.x = 0
 	currentPlayerName = nil
 	camera.fieldOfView = 100
@@ -1679,25 +1679,29 @@ function readOtherInputs()
 
 	if not Input.getKey(dPadLeft) then
 		if Input.getKeyDown(vInput) or Input.getKeyDown(topFaceButton) then
-			if not currentPlayerName or cameraMode == CameraMode.HeadRotation then
+			if not currentPlayerName then
 				cameraMode = CameraMode.HeadRotation
 				getPlayer()
 			else
 				cameraMode = CameraMode.HeadRotation
+				followPlayer()
 			end
 		end
 
 		if Input.getKeyDown(cInput) or Input.getKeyDown(rightFaceButton) then
-			if not currentPlayerName or cameraMode == CameraMode.FirstPerson then
+			if not currentPlayerName then
 				cameraMode = CameraMode.FirstPerson
 				getPlayer()
 			else
 				cameraMode = CameraMode.FirstPerson
+				followPlayer()
 			end
 		end
 
 		if Input.getKeyDown(leftFaceButton) or Input.getKeyDown(zInput) then
-			stopFollow()
+			if playerFollow then
+				stopFollow()
+			end
 		end
 	end
 
@@ -1901,7 +1905,6 @@ function extractPrimaryColor(json)
 end
 
 function followPlayer()
-	camera:followCamera(followPlussCamera)
 	local message: MessageValues = {
 		readLocation = readLocation,
 		targetPlayerId = currentPlayerId,
@@ -1911,6 +1914,7 @@ function followPlayer()
 		cameraEulerOffset = tostring(Vec3.zeroVector),
 	}
 	sendMessage(followPlussCamera, message)
+	camera:followCamera(followPlussCamera)
 end
 
 function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
@@ -2475,7 +2479,6 @@ function tick(dt)
 
 	if playerFollow then
 		World.clear()
-		followPlayer()
 		readOtherInputs()
 		particleAffect()
 		if ball ~= nil then
