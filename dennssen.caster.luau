@@ -1714,6 +1714,7 @@ function readOtherInputs()
 		end
 		currentPlayerName = selectedArena.players[currentPlayerIndex].playerName
 		currentPlayerId = selectedArena.players[currentPlayerIndex].playerId
+		followPlayer()
 	end
 	if playerFollow and (Input.getKeyDown(rightShoulder) or Input.getKeyDown(dInput)) then
 		currentPlayerIndex += 1
@@ -1722,6 +1723,7 @@ function readOtherInputs()
 		end
 		currentPlayerName = selectedArena.players[currentPlayerIndex].playerName
 		currentPlayerId = selectedArena.players[currentPlayerIndex].playerId
+		followPlayer()
 	end
 end
 
