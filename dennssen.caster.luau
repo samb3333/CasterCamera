@@ -1681,7 +1681,7 @@ function readOtherInputs()
 
 	if not Input.getKey(dPadLeft) then
 		if Input.getKeyDown(vInput) or Input.getKeyDown(topFaceButton) then
-			if not currentPlayerName then
+			if not currentPlayerName or cameraMode == CameraMode.HeadRotation then
 				cameraMode = CameraMode.HeadRotation
 				getPlayer()
 			else
@@ -1691,7 +1691,7 @@ function readOtherInputs()
 		end
 
 		if Input.getKeyDown(cInput) or Input.getKeyDown(rightFaceButton) then
-			if not currentPlayerName then
+			if not currentPlayerName or cameraMode == CameraMode.FirstPerson then
 				cameraMode = CameraMode.FirstPerson
 				getPlayer()
 			else
