@@ -1,3 +1,4 @@
+local version: string = "1.0.1"
 metadata = {
 	name = "Caster",
 	description = "TBD",
@@ -982,6 +983,7 @@ Controller:
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
+		Gui.text(`Version: {version}`)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
 		if Gui.button("Reset All Stats") then
 			sendMessage(overlayCamera, { resetAllStats = true })
