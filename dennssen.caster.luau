@@ -1067,6 +1067,14 @@ function getDist(point1: Vec3, point2: Vec3): number
 	return math.sqrt(x + y + z)
 end
 
+function isBetweenVector(n: Vec3, min: Vec3, max: Vec3, up: Vec3): boolean
+	local nHeight = n:dot(up)
+	local minHeight = min:dot(up)
+	local maxHeight = max:dot(up)
+
+	return nHeight >= minHeight and nHeight <= maxHeight
+end
+
 function isBetween(n: number, min: number, max: number): boolean
 	if n > min and n < max then
 		return true
@@ -1113,7 +1121,14 @@ function getClosestArena(targetPosition: Vec3): Arena -- Remove this function wh
 		local distance = getDist(targetPosition, arena.position)
 		-- because some arenas are directly above others
 		-- we limit the arenas to those where the player is between the arenas floor and roof position
-		if not isBetween(targetPosition.z, arena.position.z + arenaFloorOffset, arena.position.z + arenaRoofOffset) then
+		if
+			not isBetweenVector(
+				targetPosition,
+				arena.position + (arena.rotation:getUpVector() * arenaFloorOffset),
+				arena.position + (arena.rotation:getUpVector() * arenaRoofOffset),
+				arena.rotation:getUpVector()
+			)
+		then
 			continue
 		end
 		if distance < closestArenaDistance then
