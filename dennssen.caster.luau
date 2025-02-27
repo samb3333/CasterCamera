@@ -1,4 +1,4 @@
-local version: string = "1.0.1"
+local version: string = "1.0.2"
 metadata = {
 	name = "Caster",
 	description = "TBD",
