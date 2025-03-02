@@ -53,6 +53,8 @@ local CameraMode = {
 
 type MessageValues = {
 	readLocation: number?,
+	showNameTags: boolean?,
+	muteSelf: boolean?,
 	targetPlayerName: string?,
 	targetPlayerId: number?,
 	positionSmoothing: number?,
@@ -1931,6 +1933,13 @@ function followPlayer()
 		autoBall = false,
 		autoGoalCam = false,
 		cameraEulerOffset = tostring(Vec3.zeroVector),
+		cameraPositionOffset = tostring(Vec3.zeroVector),
+		showNameTags = true,
+		muteSelf = false,
+		cameraFOV = 130,
+		positionSmoothing = 0.1,
+		radius = 20,
+		threshold = 5,
 	}
 	sendMessage(followPlussCamera, message)
 	camera:followCamera(followPlussCamera)
