@@ -1,4 +1,4 @@
-local version: string = "1.0.2"
+local version: string = "1.0.3"
 metadata = {
 	name = "Caster",
 	description = "TBD",
@@ -54,6 +54,7 @@ local CameraMode = {
 type MessageValues = {
 	readLocation: number?,
 	showNameTags: boolean?,
+	isLeftHanded: boolean?,
 	muteSelf: boolean?,
 	targetPlayerName: string?,
 	targetPlayerId: number?,
@@ -64,6 +65,10 @@ type MessageValues = {
 	threshold: number?,
 	cameraPositionOffset: string?,
 	cameraEulerOffset: string?,
+	gestureControls: boolean?,
+	forwardGestureMode: number?,
+	upGestureMode: number?,
+	backwardsGestureMode: number?,
 	autoBall: boolean?,
 	autoBallThreshold: number?,
 	autoGoalCam: boolean?,
@@ -1928,18 +1933,19 @@ end
 function followPlayer()
 	local message: MessageValues = {
 		readLocation = readLocation,
-		targetPlayerId = currentPlayerId,
-		cameraMode = cameraMode,
-		autoBall = false,
-		autoGoalCam = false,
-		cameraEulerOffset = tostring(Vec3.zeroVector),
-		cameraPositionOffset = tostring(Vec3.zeroVector),
 		showNameTags = true,
 		muteSelf = false,
-		cameraFOV = 130,
+		targetPlayerId = currentPlayerId,
 		positionSmoothing = 0.1,
+		cameraFOV = 130,
+		cameraMode = cameraMode,
 		radius = 20,
 		threshold = 5,
+		cameraPositionOffset = tostring(Vec3.zeroVector),
+		cameraEulerOffset = tostring(Vec3.zeroVector),
+		gestureControls = false,
+		autoBall = false,
+		autoGoalCam = false,
 	}
 	sendMessage(followPlussCamera, message)
 	camera:followCamera(followPlussCamera)
