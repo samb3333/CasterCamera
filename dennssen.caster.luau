@@ -17,23 +17,6 @@ local function parseBallJSON(str)
 	return result
 end
 
-function calculateRotatedOffset(position, angleDegrees)
-	-- Convert angle from degrees to radians
-	local angleRadians = -math.rad(angleDegrees)
-
-	-- Extract original x, y, z from the offset
-	local x = position.x
-	local y = position.y
-	local z = position.z -- z stays the same since we're rotating around Z-axis
-
-	-- Apply 3D rotation around Z-axis
-	local newX = x * math.cos(angleRadians) + y * math.sin(angleRadians)
-	local newY = -x * math.sin(angleRadians) + y * math.cos(angleRadians)
-
-	-- Return the new rotated offset (with the same Z component)
-	return Vec3.new(newX, newY, z)
-end
-
 local deltaTime: number = 0
 
 local defaultPosition = Vec3.new(0, -3000, -27700)
@@ -108,20 +91,20 @@ type Arena = {
 		overview: {
 			middle: {
 				position: Vec3,
-				rotation: Vec3,
+				rotation: Quat,
 			},
 			right: {
 				position: Vec3,
-				rotation: Vec3,
+				rotation: Quat,
 			},
 			left: {
 				position: Vec3,
-				rotation: Vec3,
+				rotation: Quat,
 			},
 		},
 		goal: {
 			position: Vec3,
-			rotation: Vec3,
+			rotation: Quat,
 		},
 		midfield: {
 			position: Vec3,
@@ -132,20 +115,20 @@ type Arena = {
 		overview: {
 			middle: {
 				position: Vec3,
-				rotation: Vec3,
+				rotation: Quat,
 			},
 			right: {
 				position: Vec3,
-				rotation: Vec3,
+				rotation: Quat,
 			},
 			left: {
 				position: Vec3,
-				rotation: Vec3,
+				rotation: Quat,
 			},
 		},
 		goal: {
 			position: Vec3,
-			rotation: Vec3,
+			rotation: Quat,
 		},
 		midfield: {
 			position: Vec3,
@@ -191,16 +174,16 @@ end
 -- goal
 local goalPositionOffset = 3150
 local goalHeightOffset = Vec3.new(0, 0, -50)
-local homeGoalRotationOffset = Vec3.new(0, 0, 180)
-local awayGoalRotationOffset = Vec3.new(0, 0, 0)
+local homeGoalRotationOffset = Quat.fromEuler(0, 0, 180)
+local awayGoalRotationOffset = Quat.fromEuler(0, 0, 0)
 
 --arena
 local middleOverviewOffset = Vec3.new(1000, 0, 1000)
-local middleOverviewRotationOffset = Vec3.new(0, -35, 0)
+local middleOverviewRotationOffset = Quat.fromEuler(0, 35, 0)
 local rightOverviewOffset = Vec3.new(1300, 2200, 950)
-local rightOverviewRotationOffset = Vec3.new(0, -20, -60)
+local rightOverviewRotationOffset = Quat.fromEuler(0, 20, -60)
 local leftOverviewOffset = Vec3.new(1300, -2200, 950)
-local leftOverviewRotationOffset = Vec3.new(0, -20, 60)
+local leftOverviewRotationOffset = Quat.fromEuler(0, 20, 60)
 
 local midfieldOffset = 840
 local midfieldMaxTime = 20
@@ -231,39 +214,44 @@ local arenas: { [any]: Arena } = {
 
 for _, arena in pairs(arenas) do
 	arena.home.overview.middle = {
-		position = arena.position + calculateRotatedOffset(middleOverviewOffset, arena.rotation:euler().z),
-		rotation = middleOverviewRotationOffset + arena.rotation:euler(),
+		position = arena.position + arena.rotation:rotateVector(middleOverviewOffset),
+		rotation = (arena.rotation * middleOverviewRotationOffset),
 	}
+
 	arena.away.overview.middle = {
-		position = arena.position + calculateRotatedOffset(middleOverviewOffset, arena.rotation:euler().z + 180),
-		rotation = middleOverviewRotationOffset + arena.rotation:euler() + Vec3.new(0, 0, 180),
+		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(middleOverviewOffset),
+		rotation = (arena.rotation * middleOverviewRotationOffset * Quat.fromEuler(0, 0, 180)),
 	}
 
 	arena.home.overview.right = {
-		position = arena.position + calculateRotatedOffset(rightOverviewOffset, arena.rotation:euler().z),
-		rotation = rightOverviewRotationOffset + arena.rotation:euler(),
+		position = arena.position + arena.rotation:rotateVector(rightOverviewOffset),
+		rotation = (arena.rotation * rightOverviewRotationOffset),
 	}
 	arena.away.overview.right = {
-		position = arena.position + calculateRotatedOffset(rightOverviewOffset, arena.rotation:euler().z + 180),
-		rotation = rightOverviewRotationOffset + arena.rotation:euler() + Vec3.new(0, 0, 180),
+		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(rightOverviewOffset),
+		rotation = (arena.rotation * rightOverviewRotationOffset * Quat.fromEuler(0, 0, 180)),
 	}
 
 	arena.home.overview.left = {
-		position = arena.position + calculateRotatedOffset(leftOverviewOffset, arena.rotation:euler().z),
-		rotation = leftOverviewRotationOffset + arena.rotation:euler(),
+		position = arena.position + arena.rotation:rotateVector(leftOverviewOffset),
+		rotation = (arena.rotation * leftOverviewRotationOffset),
 	}
 	arena.away.overview.left = {
-		position = arena.position + calculateRotatedOffset(leftOverviewOffset, arena.rotation:euler().z + 180),
-		rotation = leftOverviewRotationOffset + arena.rotation:euler() + Vec3.new(0, 0, 180),
+		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(leftOverviewOffset),
+		rotation = (arena.rotation * leftOverviewRotationOffset * Quat.fromEuler(0, 0, 180)),
 	}
 
 	arena.home.goal = {
-		position = arena.position + goalHeightOffset + arena.rotation:getForwardVector() * goalPositionOffset,
-		rotation = arena.rotation:euler() + homeGoalRotationOffset,
+		position = arena.position
+			+ arena.rotation:rotateVector(goalHeightOffset)
+			+ arena.rotation:getForwardVector() * goalPositionOffset,
+		rotation = arena.rotation * homeGoalRotationOffset,
 	}
 	arena.away.goal = {
-		position = arena.position + goalHeightOffset + arena.rotation:getForwardVector() * -goalPositionOffset,
-		rotation = arena.rotation:euler() + awayGoalRotationOffset,
+		position = arena.position
+			+ arena.rotation:rotateVector(goalHeightOffset)
+			+ arena.rotation:getForwardVector() * -goalPositionOffset,
+		rotation = arena.rotation * awayGoalRotationOffset,
 	}
 
 	arena.home.midfield = {
@@ -466,22 +454,29 @@ local rightJoystick = Input.Gamepad.RightThumbstick
 
 -- Gui
 local controlsScreen: boolean = false
-local hoveredArena = ""
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
 
 -- Bounding Box start
 
-export type BoxType = {
+type BoxType = {
 	__index: BoxType,
 	position: Vec3,
 	size: Vec3,
 	rotation: Vec3,
-	traditionalRotation: Quat,
 	vertexLocations: { Vec3 },
 
+	__tostring: (self: BoxType) -> string,
 	new: (inputPosition: Vec3, inputSize: Vec3, inputRotation: Vec3) -> BoxType,
+	setPosition: (self: BoxType, inputPosition: Vec3) -> (),
+	setSize: (self: BoxType, inputPosition: Vec3) -> (),
+	setRotation: (self: BoxType, inputPosition: Vec3) -> (),
+	setRotationDeg: (self: BoxType, inputRotation: Vec3) -> (),
+	getPosition: (self: BoxType) -> Vec3,
+	getSize: (self: BoxType) -> Vec3,
+	getRotation: (self: BoxType) -> Vec3,
+	getRotationDeg: (self: BoxType) -> Vec3,
 	generatePoints: (self: BoxType) -> (),
 	getRotationMatrix: (self: BoxType, roll: number, pitch: number, yaw: number) -> { { number } },
 	multiplyMatrices: (self: BoxType, matrix1: { { number } }, matrix2: { { number } }) -> { { number } },
@@ -499,17 +494,58 @@ function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Vec3): Box
 	self.position = inputPosition
 	self.size = inputSize
 	self.rotation = Vec3.new(math.rad(inputRotation.x), math.rad(inputRotation.y), math.rad(inputRotation.z))
-	self.traditionalRotation =
-		Quat.fromEuler(math.deg(self.rotation.z), math.deg(self.rotation.y), math.deg(self.rotation.x))
 
 	self.vertexLocations = {}
 	self:generatePoints()
 	return self
 end
 
+function Box:setPosition(inputPosition: Vec3): ()
+	self.position = inputPosition
+	self:generatePoints()
+end
+
+function Box:setSize(inputSize: Vec3): ()
+	self.size = inputSize
+	self:generatePoints()
+end
+
+function Box:setRotation(inputRotation: Vec3): ()
+	self.rotation = inputRotation
+	self:generatePoints()
+end
+
+function Box:setRotationDeg(inputRotation: Vec3): ()
+	inputRotation.x = (inputRotation.x * math.pi) / 180
+	inputRotation.y = (inputRotation.y * math.pi) / 180
+	inputRotation.z = (inputRotation.z * math.pi) / 180
+	self.rotation = inputRotation
+	self:generatePoints()
+end
+
+function Box:getPosition(): Vec3
+	return Vec3.new(self.position.x, self.position.y, self.position.z)
+end
+
+function Box:getSize(): Vec3
+	return Vec3.new(self.size.x, self.size.y, self.size.z)
+end
+
+function Box:getRotation(): Vec3
+	return Vec3.new(self.rotation.x, self.rotation.y, self.rotation.z)
+end
+
+function Box:getRotationDeg(): Vec3
+	return Vec3.new(
+		(self.rotation.x * 180) / math.pi,
+		(self.rotation.y * 180) / math.pi,
+		(self.rotation.z * 180) / math.pi
+	)
+end
+
 function Box:generatePoints(): ()
-	local shift: { x: number, y: number, z: number } = { x = self.size.x / 2, y = self.size.y / 2, z = self.size.z / 2 }
-	local newVertexLocations: { Vec3 } = {
+	local shift = { x = self.size.x / 2, y = self.size.y / 2, z = self.size.z / 2 }
+	local newVertexLocations = {
 		Vec3.new(shift.x, shift.y, shift.z),
 		Vec3.new(shift.x, shift.y, -shift.z),
 		Vec3.new(shift.x, -shift.y, shift.z),
@@ -520,15 +556,17 @@ function Box:generatePoints(): ()
 		Vec3.new(-shift.x, -shift.y, -shift.z),
 	}
 
-	local rotationMatrix: { { number } } = self:getRotationMatrix(self.rotation.x, self.rotation.y, self.rotation.z)
+	local rotationQuat = Quat.fromEuler(math.deg(self.rotation.x), math.deg(self.rotation.y), math.deg(self.rotation.z))
 
-	for i: number in newVertexLocations do
-		newVertexLocations[i] = self:applyRotationMatrix(newVertexLocations[i], rotationMatrix)
+	for i = 1, #newVertexLocations do
+		newVertexLocations[i] = rotationQuat:rotateVector(newVertexLocations[i])
 	end
-	for i: number in newVertexLocations do
-		newVertexLocations[i].x += self.position.x
-		newVertexLocations[i].y += self.position.y
-		newVertexLocations[i].z += self.position.z
+
+	-- Translate the vertices by the box position.
+	for i = 1, #newVertexLocations do
+		newVertexLocations[i].x = newVertexLocations[i].x + self.position.x
+		newVertexLocations[i].y = newVertexLocations[i].y + self.position.y
+		newVertexLocations[i].z = newVertexLocations[i].z + self.position.z
 	end
 
 	self.vertexLocations = newVertexLocations
@@ -556,8 +594,8 @@ function Box:getRotationMatrix(roll: number, pitch: number, yaw: number): { { nu
 		{ 0, 0, 1 },
 	}
 
-	local combinedMatrix: { { number } } = self:multiplyMatrices(yawMatrix, pitchMatrix)
-	combinedMatrix = self:multiplyMatrices(combinedMatrix, rollMatrix)
+	local combinedMatrix = self:multiplyMatrices(rollMatrix, pitchMatrix)
+	combinedMatrix = self:multiplyMatrices(combinedMatrix, yawMatrix)
 
 	return combinedMatrix
 end
@@ -599,10 +637,15 @@ function Box:render(r: number, g: number, b: number): ()
 		{ start = self.vertexLocations[6], finish = self.vertexLocations[8] },
 	}
 
-	World.drawPoint(self.position, r, g, b, 3, 0)
+	World.drawPoint(self.position, 0.2, 3, 0.2, 5, 0)
 	for i: number, line: { start: Vec3, finish: Vec3 } in lines do
-		World.drawLine(line.start, line.finish, r, g, b, 2, 0)
+		World.drawLine(line.start, line.finish, r, g, b, 4, 0)
 	end
+
+	local rotationQuat = Quat.fromEuler(math.deg(self.rotation.x), math.deg(self.rotation.y), math.deg(self.rotation.z))
+	World.drawLine(self.position, self.position + rotationQuat:getForwardVector() * 100, 1, 0, 0, 10, 0)
+	World.drawLine(self.position, self.position + rotationQuat:getUpVector() * 100, 0, 1, 0, 10, 0)
+	World.drawLine(self.position, self.position + rotationQuat:getRightVector() * 100, 0, 0, 1, 10, 0)
 end
 
 function Box:checkPointIntersect(point: Vec3): boolean
@@ -1090,10 +1133,8 @@ function getClosestPlayerToBall(maximumDistance: number?): ReplayPlayer?
 	for _, player in players do
 		local root = player.root
 		local headPosition = player.head.position
-		local leftHandPosition = calculateRotatedOffset(player.leftHand.position, root.rotation:euler().z)
-			+ root.position
-		local rightHandPosition = calculateRotatedOffset(player.rightHand.position, root.rotation:euler().z)
-			+ root.position
+		local leftHandPosition = root.rotation:rotateVector(player.leftHand.position) + root.position
+		local rightHandPosition = root.rotation:rotateVector(player.rightHand.position) + root.position
 
 		local rootDistance = getDist(ball.transform.position, root.position)
 		local headDistance = getDist(ball.transform.position, headPosition)
@@ -1536,10 +1577,10 @@ function readOtherInputs()
 		toggleSmoothing(false, false)
 		if ballIsOnHomeSide() then
 			camera.position = selectedArena.home.overview.left.position
-			rotEuler = selectedArena.home.overview.left.rotation
+			setGlobalCameraRotation(selectedArena.home.overview.left.rotation)
 		else
 			camera.position = selectedArena.away.overview.left.position
-			rotEuler = selectedArena.away.overview.left.rotation
+			setGlobalCameraRotation(selectedArena.away.overview.left.rotation)
 		end
 	end
 	if
@@ -1552,10 +1593,10 @@ function readOtherInputs()
 		toggleSmoothing(false, false)
 		if ballIsOnHomeSide() then
 			camera.position = selectedArena.home.overview.middle.position
-			rotEuler = selectedArena.home.overview.middle.rotation
+			setGlobalCameraRotation(selectedArena.home.overview.middle.rotation)
 		else
 			camera.position = selectedArena.away.overview.middle.position
-			rotEuler = selectedArena.away.overview.middle.rotation
+			setGlobalCameraRotation(selectedArena.away.overview.middle.rotation)
 		end
 	end
 	if
@@ -1568,10 +1609,10 @@ function readOtherInputs()
 		toggleSmoothing(false, false)
 		if ballIsOnHomeSide() then
 			camera.position = selectedArena.home.overview.right.position
-			rotEuler = selectedArena.home.overview.right.rotation
+			setGlobalCameraRotation(selectedArena.home.overview.right.rotation)
 		else
 			camera.position = selectedArena.away.overview.right.position
-			rotEuler = selectedArena.away.overview.right.rotation
+			setGlobalCameraRotation(selectedArena.away.overview.right.rotation)
 		end
 	end
 
@@ -1733,6 +1774,12 @@ function moveCamera()
 	local upwardsMovement = upDirection * Up * speedMultiplier * 50 * deltaTime
 
 	camera.position += (forwardMovement + sidewaysMovement + upwardsMovement)
+end
+
+function setGlobalCameraRotation(globalRotation)
+	camera.rotation = globalRotation
+	local localRotation = gravity.upRotation:inverse() * globalRotation
+	rotEuler = localRotation:euler()
 end
 
 local rotDelta: Vec3 = Vec3.zeroVector
@@ -2195,7 +2242,7 @@ function goalScoreCheck()
 	local homeGoalBox: BoxType = Box.new(
 		selectedArena.home.goal.position + (selectedArena.rotation:getForwardVector() * 135),
 		Vec3.new(100, 500, 225),
-		Vec3.new(selectedArena.rotation:euler().z, 0, 0)
+		selectedArena.home.goal.rotation:euler()
 	)
 	if boundingBoxDebug then
 		homeGoalBox:render(0, 1, 0)
@@ -2203,7 +2250,7 @@ function goalScoreCheck()
 	local awayGoalBox: BoxType = Box.new(
 		selectedArena.away.goal.position - (selectedArena.rotation:getForwardVector() * 135),
 		Vec3.new(100, 500, 225),
-		Vec3.new(selectedArena.rotation:euler().z, 0, 0)
+		selectedArena.away.goal.rotation:euler()
 	)
 	if boundingBoxDebug then
 		awayGoalBox:render(0, 1, 0)
@@ -2319,8 +2366,11 @@ function goalScoreCheck()
 end
 
 function ballInCenterCheck()
-	local centerBox: BoxType =
-		Box.new(selectedArena.position + Vec3.new(0, 0, 40), Vec3.new(50, 50, 75), Vec3.zeroVector)
+	local centerBox: BoxType = Box.new(
+		selectedArena.position + selectedArena.rotation:rotateVector(Vec3.new(0, 0, 40)),
+		Vec3.new(50, 50, 75),
+		selectedArena.rotation:euler()
+	)
 	if boundingBoxDebug then
 		centerBox:render(0, 0, 1)
 	end
