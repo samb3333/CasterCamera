@@ -220,6 +220,13 @@ local arenas: { [any]: Arena } = {
 	theBunker = createArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
 	fieldhouseEast = createArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
 	fieldhouseWest = createArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
+	driftplex1 = createArena("Driftplex 01", Vec3.new(12799.231, 13600.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplex2 = createArena("Driftplex 02", Vec3.new(17475.770, 13600.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex3 = createArena("Driftplex 03", Vec3.new(12799.231, 6400.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplex4 = createArena("Driftplex 04", Vec3.new(17475.770, 6400.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex5 = createArena("Driftplex 05", Vec3.new(17475.770, 23200.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex6 = createArena("Driftplex 06", Vec3.new(12799.231, 23200.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplexLab = createArena("Driftplex Lab", Vec3.new(15137.500, 29200.000, -26218.920), Quat.fromEuler(0, 30, 0)),
 }
 
 for _, arena in pairs(arenas) do
@@ -763,138 +770,13 @@ Controller:
 		selectedArena.away.players = {}
 	end
 
-	if Gui.collapsingHeader(`Selected Arena: {selectedArena.name}###ArenaHeader`) then
-		local isHovered = false
-		Gui.text(hoveredArena)
-
-		Gui.indent()
-
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-
-		if Gui.button(" 2 ") then
-			selectedArena = arenas.plazaWest
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
+	if Gui.beginCombo("Selected Arena", selectedArena.name) then
+		for _, arena in arenas do
+			if Gui.selectable(arena.name, arena.name == selectedArena.name) then
+				selectedArena = arena
+			end
 		end
-		if Gui.isItemHovered() then
-			hoveredArena = "Plaza West"
-			isHovered = true
-		end
-
-		Gui.sameLine()
-
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-
-		if Gui.button(" 5 ") then
-			selectedArena = arenas.fieldhouseWest
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
-		end
-		if Gui.isItemHovered() then
-			hoveredArena = "Fieldhouse West"
-			isHovered = true
-		end
-
-		if Gui.button("1") then
-			selectedArena = arenas.gatewayArena
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
-		end
-		if Gui.isItemHovered() then
-			hoveredArena = "Gateway Arena"
-			isHovered = true
-		end
-
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-
-		if Gui.button("4") then
-			selectedArena = arenas.stadiumPrime
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
-		end
-		if Gui.isItemHovered() then
-			hoveredArena = "Stadium Prime"
-			isHovered = true
-		end
-
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-
-		if Gui.button("7") then
-			selectedArena = arenas.theBunker
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
-		end
-		if Gui.isItemHovered() then
-			hoveredArena = "The Bunker"
-			isHovered = true
-		end
-
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-
-		if Gui.button(" 3 ") then
-			selectedArena = arenas.plazaEast
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
-		end
-		if Gui.isItemHovered() then
-			hoveredArena = "Plaza East"
-			isHovered = true
-		end
-
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-		Gui.spacing()
-		Gui.sameLine()
-
-		if Gui.button(" 6 ") then
-			selectedArena = arenas.fieldhouseEast
-			selectedArena.home.players = {}
-			selectedArena.away.players = {}
-		end
-		if Gui.isItemHovered() then
-			hoveredArena = "Fieldhouse East"
-			isHovered = true
-		end
-
-		if not isHovered then
-			hoveredArena = ""
-		end
-
-		Gui.unindent()
+		Gui.endCombo()
 	end
 	Gui.newLine()
 
