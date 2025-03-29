@@ -769,9 +769,9 @@ Controller:
 		Right Bumper - Right Player Cycle
 	
 	In All modes:
-		Dpad Up + Left Face Button - Left Overview
-		Dpad Up + Top Face Button - Mid Overview
-		Dpad Up + Right Face Button - Right Overview
+		Dpad Left + Left Face Button - Left Overview
+		Dpad Left + Top Face Button - Mid Overview
+		Dpad Left + Right Face Button - Right Overview
 
 		^^The Overviews Side is based on which side the ball is on^^
 	]])
@@ -980,6 +980,7 @@ function onTransitionBegin(transitionInfo: Transition)
 	rotEuler.x = 0
 	camera.rotationSmoothing = 0.02
 	camera.hideNearestHead = false
+	camera.showNameTags = true
 end
 
 function getReplayFrameFromIndex(replayIndex)
