@@ -179,11 +179,11 @@ local awayGoalRotationOffset = Quat.fromEuler(0, 0, 0)
 
 --arena
 local middleOverviewOffset = Vec3.new(1000, 0, 1000)
-local middleOverviewRotationOffset = Quat.fromEuler(0, 35, 0)
+local middleOverviewRotationOffset = Quat.fromEuler(0, -35, 0)
 local rightOverviewOffset = Vec3.new(1300, 2200, 950)
-local rightOverviewRotationOffset = Quat.fromEuler(0, 20, -60)
+local rightOverviewRotationOffset = Quat.fromEuler(0, -20, -60)
 local leftOverviewOffset = Vec3.new(1300, -2200, 950)
-local leftOverviewRotationOffset = Quat.fromEuler(0, 20, 60)
+local leftOverviewRotationOffset = Quat.fromEuler(0, -20, 60)
 
 local midfieldOffset = 840
 local midfieldMaxTime = 20
@@ -220,7 +220,7 @@ for _, arena in pairs(arenas) do
 
 	arena.away.overview.middle = {
 		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(middleOverviewOffset),
-		rotation = (arena.rotation * middleOverviewRotationOffset * Quat.fromEuler(0, 0, 180)),
+		rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * middleOverviewRotationOffset),
 	}
 
 	arena.home.overview.right = {
@@ -229,7 +229,7 @@ for _, arena in pairs(arenas) do
 	}
 	arena.away.overview.right = {
 		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(rightOverviewOffset),
-		rotation = (arena.rotation * rightOverviewRotationOffset * Quat.fromEuler(0, 0, 180)),
+		rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * rightOverviewRotationOffset),
 	}
 
 	arena.home.overview.left = {
@@ -238,7 +238,7 @@ for _, arena in pairs(arenas) do
 	}
 	arena.away.overview.left = {
 		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(leftOverviewOffset),
-		rotation = (arena.rotation * leftOverviewRotationOffset * Quat.fromEuler(0, 0, 180)),
+		rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * leftOverviewRotationOffset),
 	}
 
 	arena.home.goal = {
