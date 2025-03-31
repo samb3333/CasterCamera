@@ -2428,6 +2428,18 @@ function tick(dt)
 
 	getTeamColors()
 
+	if Input.getKeyDown(one) then
+		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
+	end
+
+	if Input.getKeyDown(two) then
+		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
+	end
+
+	if Input.getKeyDown(three) then
+		GameStartEffect()
+	end
+
 	if #gameData.players < 1 and playerFollow then
 		stopFollow()
 	end
