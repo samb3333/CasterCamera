@@ -1172,8 +1172,6 @@ function getPlayer()
 		return
 	end
 
-	playerFollow = true
-
 	local tryGetPlayer: ReplayPlayer?
 
 	if getBallVariant == GetBallVariant.PlayerBallDistance then
@@ -1186,12 +1184,10 @@ function getPlayer()
 		currentPlayerName = tryGetPlayer.playerName
 		currentPlayerId = tryGetPlayer.playerId
 	else
-		playerFollow = false
 		return
 	end
 	local playerIndex = findPlayerInTable(selectedArena.players, tryGetPlayer)
 	if playerIndex == nil then
-		playerFollow = false
 		return
 	else
 		currentPlayerIndex = playerIndex
@@ -1848,6 +1844,7 @@ function extractPrimaryColor(json)
 end
 
 function followPlayer()
+	playerFollow = true
 	local message: MessageValues = {
 		readLocation = readLocation,
 		showNameTags = true,
