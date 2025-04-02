@@ -6,6 +6,8 @@ metadata = {
 	defaultKeybind = "",
 }
 
+-- Note: Arenas need boxes around them to make sure players that are in other arenas/practice areas don't get set to the team of an arena
+
 local function parseBallJSON(str)
 	-- Table to store the parsed data
 	local result = {}
@@ -333,21 +335,11 @@ local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
 local previousAwayGoalPotentialEnter: boolean = false
 
-local requiredStealTime = 5
-local stealTime = 0
-
-local consideringSteal: boolean = false
-
 local maximumTimeSincePass: number = 5
 local timeSincePass: number = 0
 
 local assistPlayer: ReplayPlayer? = nil
 local goalPlayer: ReplayPlayer? = nil
-local stealPlayer: ReplayPlayer = nil
-
-local lastGoalPlayerName = ""
-local lastAssistPlayerName = ""
-local startTimestamp = nil
 
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
@@ -376,7 +368,7 @@ local turnVelocity: Vec2 = Vec2.zeroVector
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
 local playerFollow = false
-local currentPlayerName: string? = nil
+local currentPlayerName: string = ""
 local currentPlayerId: number = -1
 local currentPlayerIndex: number = 1
 
@@ -676,6 +668,9 @@ function Box:checkPointIntersect(point: Vec3): boolean
 end
 
 function main()
+	camera.position = defaultPosition
+	camera.rotation = defaultRotation
+	rotEuler = defaultRotation:euler()
 	followPlussCamera = getCameraById("dennssen.followpluss")
 	overlayCamera = getCameraById("dennssen.overlayInfo")
 	if overlayCamera ~= nil then
@@ -966,17 +961,9 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 end
 
 function onTransitionBegin(transitionInfo: Transition)
-	transitionInfo.length = 0
-	toggleSmoothing(false, false)
-	if transitionInfo.startPosition:length() <= 0.01 then
-		camera.position = defaultPosition
-		camera.rotation = defaultRotation
-		rotEuler = defaultRotation:euler()
-	else
-		camera.position = transitionInfo.startPosition
-		camera.rotation = transitionInfo.startRotation
-		rotEuler = transitionInfo.startRotation:euler()
-	end
+	camera.position = transitionInfo.startPosition
+	camera.rotation = transitionInfo.startRotation
+	rotEuler = transitionInfo.startRotation:euler()
 	rotEuler.x = 0
 	camera.rotationSmoothing = 0.02
 	camera.hideNearestHead = false
@@ -1218,7 +1205,7 @@ function stopFollow()
 	camera.position = followPlussCamera:getSmoothedPosition()
 	rotEuler = followPlussCamera:getSmoothedRotation():euler()
 	rotEuler.x = 0
-	currentPlayerName = nil
+	currentPlayerName = ""
 	camera.fieldOfView = 100
 	camera.hideNearestHead = false
 end
@@ -1949,8 +1936,11 @@ function goalExitCheck()
 	end
 end
 
-function sendOverlayInfo()
-	local arenaInfo = {}
+function sendArenaInfo()
+	if not usingOverlay then
+		return
+	end
+
 	local homePlayerNames = {}
 	local awayPlayerNames = {}
 	for _, player in selectedArena.home.players do
@@ -1959,30 +1949,41 @@ function sendOverlayInfo()
 	for _, player in selectedArena.away.players do
 		table.insert(awayPlayerNames, player.playerName)
 	end
-	arenaInfo["homePlayerNames"] = homePlayerNames
-	arenaInfo["awayPlayerNames"] = awayPlayerNames
-	arenaInfo["homeColor"] = homeTeamPrimaryColor
-	arenaInfo["awayColor"] = awayTeamPrimaryColor
-	arenaInfo["isFollowing"] = playerFollow
-	arenaInfo["followedPlayerName"] = currentPlayerName
-	arenaInfo["homeGoalEnter"] = homeGoalEnter
-	arenaInfo["awayGoalEnter"] = awayGoalEnter
-	arenaInfo["isSafeTime"] = isSafeTime
-	if lastGoalPlayerName ~= nil and lastGoalPlayerName ~= "" then
-		arenaInfo["lastGoalInfo"] = {
-			shooter = lastGoalPlayerName,
-			assister = lastAssistPlayerName,
-		}
-	end
-	if startTimestamp ~= nil then
-		arenaInfo["startTimestamp"] = startTimestamp
-	end
 
-	if not usingOverlay then
-		return
-	end
+	sendMessage(overlayCamera, {
+		info = "players",
+		value = {
+			team = "home",
+			players = homePlayerNames,
+		},
+	})
+	sendMessage(overlayCamera, {
+		info = "players",
+		value = {
+			team = "away",
+			players = awayPlayerNames,
+		},
+	})
 
-	sendMessage(overlayCamera, { alwaysTick = true, arenaInfo = arenaInfo, ballCenterTime = ballCenterTime })
+	sendMessage(overlayCamera, {
+		info = "color",
+		value = {
+			team = "home",
+			color = homeTeamPrimaryColor,
+		},
+	})
+	sendMessage(overlayCamera, {
+		info = "color",
+		value = {
+			team = "away",
+			color = awayTeamPrimaryColor,
+		},
+	})
+
+	sendMessage(overlayCamera, {
+		info = "followedPlayer",
+		value = currentPlayerName,
+	})
 end
 
 function resetPlayersWithBall()
@@ -2058,20 +2059,14 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 			if goalie and findPlayerInTable(selectedArena.home.players, goalie) then
 				successfulSave = true
 
-				if consideringSteal then
-					consideringSteal = false
-					stealTime = 0
-				end
-
 				resetPlayersWithBall()
 
 				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = goalie.playerName,
-						goal = false,
-						save = true,
-						steal = false,
-						assist = false,
+					info = "stats",
+					value = {
+						team = "home",
+						stat = "saves",
+						player = goalie.playerName,
 					},
 				})
 			end
@@ -2083,20 +2078,14 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 			if goalie and findPlayerInTable(selectedArena.away.players, goalie) then
 				successfulSave = true
 
-				if consideringSteal then
-					consideringSteal = false
-					stealTime = 0
-				end
-
 				resetPlayersWithBall()
 
 				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = goalie.playerName,
-						goal = false,
-						save = true,
-						steal = false,
-						assist = false,
+					info = "stats",
+					value = {
+						team = "away",
+						stat = "saves",
+						player = goalie.playerName,
 					},
 				})
 			end
@@ -2104,58 +2093,6 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 	end
 
 	return successfulSave
-end
-
-function checkForSteal(): boolean
-	if lastPlayerWithBall == nil then
-		return false
-	end
-
-	if previousLastPlayerWithBall ~= nil then
-		if lastPlayerWithBall.playerId == previousLastPlayerWithBall.playerId and not consideringSteal then
-			return false -- no change in possession
-		end
-
-		if not consideringSteal then
-			local teamChange = false
-
-			if not playersAreOnSameTeam(previousLastPlayerWithBall, lastPlayerWithBall) then -- change in team possession
-				teamChange = true
-				stealPlayer = lastPlayerWithBall
-				consideringSteal = true
-			end
-
-			return teamChange
-		else
-			local teamKeep = false
-
-			if playersAreOnSameTeam(stealPlayer, lastPlayerWithBall) then
-				stealTime += deltaTime
-			else
-				stealTime = 0
-				consideringSteal = false
-			end
-
-			if stealTime >= requiredStealTime then
-				stealTime = 0
-				consideringSteal = false
-				teamKeep = true
-				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = stealPlayer.playerName,
-						save = false,
-						goal = false,
-						steal = true,
-						assist = false,
-					},
-				})
-			end
-
-			return teamKeep
-		end
-	else
-		return false
-	end
 end
 
 function earlyStatChangeReturn(ballExit: boolean)
@@ -2229,11 +2166,6 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		return
 	end
 
-	if checkForSteal() then
-		earlyStatChangeReturn(false)
-		return
-	end
-
 	previousLastPlayerWithBall = lastPlayerWithBall
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
 	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
@@ -2272,46 +2204,37 @@ function goalScoreCheck()
 		isSafeTime = true
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 		midfieldTimePassed = 0
+
+		sendMessage(overlayCamera, {
+			info = "score",
+			value = {
+				team = "away",
+			},
+		})
+
 		if goalPlayer then
-			if consideringSteal and findPlayerInTable(selectedArena.away.players, stealPlayer) then
-				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = stealPlayer.playerName,
-						goal = false,
-						save = false,
-						steal = true,
-						assist = false,
-					},
-				})
-				stealTime = 0
-				consideringSteal = false
-			end
 			resetPlayersWithBall()
 
 			sendMessage(overlayCamera, {
-				statsInfo = {
-					playerName = goalPlayer.playerName,
-					goal = true,
-					save = false,
-					steal = false,
-					assist = false,
+				info = "stats",
+				value = {
+					team = "away",
+					stat = "goals",
+					player = goalPlayer.playerName,
 				},
 			})
-			lastGoalPlayerName = goalPlayer.playerName
+
 			if assistPlayer then
 				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = assistPlayer.playerName,
-						goal = false,
-						save = false,
-						steal = false,
-						assist = true,
+					info = "stats",
+					value = {
+						team = "away",
+						stat = "assists",
+						player = assistPlayer.playerName,
 					},
 				})
-				lastAssistPlayerName = assistPlayer.playerName
+
 				assistPlayer = nil
-			else
-				lastAssistPlayerName = ""
 			end
 		end
 	end
@@ -2320,39 +2243,32 @@ function goalScoreCheck()
 		isSafeTime = true
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
 		midfieldTimePassed = 0
+
+		sendMessage(overlayCamera, {
+			info = "score",
+			value = {
+				team = "home",
+			},
+		})
+
 		if goalPlayer then
-			if consideringSteal and findPlayerInTable(selectedArena.home.players, stealPlayer) then
-				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = stealPlayer.playerName,
-						goal = false,
-						save = false,
-						steal = true,
-						assist = false,
-					},
-				})
-				stealTime = 0
-				consideringSteal = false
-			end
 			resetPlayersWithBall()
 
 			sendMessage(overlayCamera, {
-				statsInfo = {
-					playerName = goalPlayer.playerName,
-					goal = true,
-					save = false,
-					steal = false,
-					assist = false,
+				info = "stats",
+				value = {
+					team = "home",
+					stat = "goals",
+					player = goalPlayer.playerName,
 				},
 			})
 			if assistPlayer then
 				sendMessage(overlayCamera, {
-					statsInfo = {
-						playerName = assistPlayer.playerName,
-						goal = false,
-						save = false,
-						steal = false,
-						assist = true,
+					info = "stats",
+					value = {
+						team = "home",
+						stat = "assists",
+						player = assistPlayer.playerName,
 					},
 				})
 				assistPlayer = nil
@@ -2382,7 +2298,12 @@ function ballInCenterCheck()
 		if ballCenterTime > requiredBallCenterTime then
 			resetPlayersWithBall()
 			GameStartEffect()
-			startTimestamp = gameData.time.ticks
+			local startTimestamp = os.date("%H:%M:%S", os.time())
+			print(startTimestamp)
+			sendMessage(overlayCamera, {
+				info = "startTime",
+				value = startTimestamp,
+			})
 		end
 		ballCenterTime = 0
 	end
@@ -2452,7 +2373,7 @@ function tick(dt)
 			goalScoreCheck()
 			ballInCenterCheck()
 		end
-		sendOverlayInfo()
+		sendArenaInfo()
 		return
 	end
 
@@ -2467,5 +2388,5 @@ function tick(dt)
 		goalScoreCheck()
 		ballInCenterCheck()
 	end
-	sendOverlayInfo()
+	sendArenaInfo()
 end
