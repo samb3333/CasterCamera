@@ -640,6 +640,8 @@ local eight = Input.Key.Eight
 local nine = Input.Key.Nine
 local zero = Input.Key.Zero
 local leftAlt = Input.Key.LeftAlt
+local enter = Input.Key.Enter
+local backspace = Input.Key.BackSpace
 
 --  Mouse
 local rightMouseButton = Input.Key.RightMouseButton
@@ -1533,6 +1535,18 @@ function readOtherInputs()
 
 	if speedMultiplierHoldBuffer and (Input.getKeyUp(leftShiftInput) or Input.getKeyUp(rightShoulder)) then
 		speedMultiplierHoldBuffer = false
+	end
+
+	if Input.getKeyDown(enter) then
+		selectedArena = getClosestArena(camera.position)
+		selectedArena.home.players = {}
+		selectedArena.away.players = {}
+	end
+
+	if Input.getKeyDown(backspace) then
+		sendMessage(overlayCamera, {
+			info = "clearStats",
+		})
 	end
 
 	if

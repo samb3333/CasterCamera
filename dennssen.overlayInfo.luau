@@ -134,5 +134,8 @@ function onMessageReceived(messageTable: { info: string, value: any })
 			}
 		end
 		currentConfig.statsInfo[value.team][value.player][value.stat] += 1
+	elseif info == "clearStats" then
+		currentConfig.statsInfo.home = {}
+		currentConfig.statsInfo.away = {}
 	end
 end
