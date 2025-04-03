@@ -413,9 +413,6 @@ local midfieldTimePassed: number = 0
 local requiredBallCenterTime: number = 10
 local ballCenterTime: number = 0
 
-local arenaFloorOffset = -350
-local arenaRoofOffset = 1150
-
 local boxPositionOffset = Vec3.new(0, 0, 425)
 local boxSize = Vec3.new(6600, 4900, 1440)
 
@@ -1051,14 +1048,7 @@ function getClosestArena(targetPosition: Vec3): Arena -- Remove this function wh
 		local distance = getDist(targetPosition, arena.position)
 		-- because some arenas are directly above others
 		-- we limit the arenas to those where the player is between the arenas floor and roof position
-		if
-			not isBetweenVector(
-				targetPosition,
-				arena.position + (arena.rotation:getUpVector() * arenaFloorOffset),
-				arena.position + (arena.rotation:getUpVector() * arenaRoofOffset),
-				arena.rotation:getUpVector()
-			)
-		then
+		if not selectedArena.box:checkPointIntersect(targetPosition) then
 			continue
 		end
 		if distance < closestArenaDistance then
@@ -1104,13 +1094,7 @@ function getClosestArenaBall(targetPosition: Vec3, frameData: ReplayFrame)
 		local ball = balls[i]
 		-- because some arenas are directly above others
 		-- we limit the balls to those where the ball is between the arenas floor and roof position
-		if
-			not isBetween(
-				ball.transform.position.z,
-				selectedArena.position.z + arenaFloorOffset,
-				selectedArena.position.z + arenaRoofOffset
-			)
-		then
+		if not selectedArena.box:checkPointIntersect(ball.transform.position) then
 			continue
 		end
 		local distance = getDist(targetPosition, ball.transform.position)
