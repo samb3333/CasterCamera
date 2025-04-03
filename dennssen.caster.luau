@@ -416,8 +416,8 @@ local ballCenterTime: number = 0
 local arenaFloorOffset = -350
 local arenaRoofOffset = 1150
 
-local boxPositionOffset = Vec3.new(0, 0, 500)
-local boxSize = Vec3.new(2000, 1000, 500)
+local boxPositionOffset = Vec3.new(0, 0, 425)
+local boxSize = Vec3.new(6600, 4900, 1440)
 
 local arenas: { [any]: Arena } = {
 	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
@@ -437,7 +437,8 @@ local arenas: { [any]: Arena } = {
 }
 
 for _, arena in pairs(arenas) do
-	arena.box = Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffset), boxSize, arena.rotation)
+	arena.box =
+		Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffset), boxSize, arena.rotation:euler())
 
 	arena.home.overview.middle = {
 		position = arena.position + arena.rotation:rotateVector(middleOverviewOffset),
@@ -1823,6 +1824,10 @@ function teamLists()
 			continue
 		end
 
+		if not selectedArena.box:checkPointIntersect(player.root.position) then
+			continue
+		end
+
 		if player.teamIndex == TeamIndex.homeTeam then
 			table.insert(tempHome, player)
 		elseif player.teamIndex == TeamIndex.awayTeam then
@@ -2371,13 +2376,6 @@ function tick(dt)
 		stopFollow()
 	end
 
-	if boundingBoxDebug then
-		print("here")
-		for _, arena in arenas do
-			arena.box:render(0, 0, 1)
-		end
-	end
-
 	if playerFollow then
 		World.clear()
 		readOtherInputs()
@@ -2402,4 +2400,10 @@ function tick(dt)
 		ballInCenterCheck()
 	end
 	sendArenaInfo()
+
+	if boundingBoxDebug then
+		for _, arena in arenas do
+			arena.box:render(1, 0, 1)
+		end
+	end
 end
