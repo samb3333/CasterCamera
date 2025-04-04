@@ -703,6 +703,7 @@ function onGui()
 	if Gui.button(Icon.Question) then
 		controlsScreen = not controlsScreen
 	end
+	Gui.setItemTooltip("Controls for the camera")
 
 	if controlsScreen then
 		if keyboardControls then
@@ -818,6 +819,7 @@ Controller:
 		end
 		Gui.endCombo()
 	end
+	Gui.setItemTooltip("Start a replay and select it here to practice casting")
 
 	Gui.newLine()
 	Gui.separatorText("Camera")
@@ -828,6 +830,7 @@ Controller:
 		selectedArena.home.players = {}
 		selectedArena.away.players = {}
 	end
+	Gui.setItemTooltip("Gets the closest arena | For most accuracy be inside the arena when pressing")
 
 	if Gui.beginCombo("Selected Arena", selectedArena.name) then
 		for _, arena in arenas do
@@ -838,6 +841,7 @@ Controller:
 		Gui.endCombo()
 	end
 	Gui.newLine()
+	Gui.setItemTooltip("The currently selected arena")
 
 	cameraFOV = Gui.sliderFloat("Field Of View", cameraFOV, 1, 179)
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
@@ -895,6 +899,9 @@ Controller:
 			g = math.clamp(homeDefault.y, 0, 1),
 			b = math.clamp(homeDefault.z, 0, 1),
 		}
+		Gui.setItemTooltip(
+			"The default color for team Home, this gets overwritten by the actual color when a player joins the team"
+		)
 		local awayDefault: Vec3 = Vec3.new(awayTeamDefaultColor.r, awayTeamDefaultColor.g, awayTeamDefaultColor.b)
 		awayDefault = Gui.sliderFloat3("Away Default Color", awayDefault, 0, 1)
 		awayTeamDefaultColor = {
@@ -902,15 +909,21 @@ Controller:
 			g = math.clamp(awayDefault.y, 0, 1),
 			b = math.clamp(awayDefault.z, 0, 1),
 		}
+		Gui.setItemTooltip(
+			"The default color for team Away, this gets overwritten by the actual color when a player joins the team"
+		)
 		Gui.unindent()
 	end
 
 	if Gui.collapsingHeader("POV") then
 		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing", followPosititonSmoothing, 0, 1)
+		Gui.setItemTooltip("Sets the smoothing for when the camera is in POV mode")
 		followPosititonSmoothing = math.clamp(followPosititonSmoothing, 0, 1)
 		followFOV = Gui.sliderInt("Field of View", followFOV, 1, 179)
+		Gui.setItemTooltip("Sets the FOV for when the camera is in POV mode")
 		followFOV = math.clamp(followFOV, 1, 179)
 		followRadius = Gui.sliderFloat("3rd Person Radius", followRadius, 5, 100)
+		Gui.setItemTooltip("The distance from the player when the camera is in 3rd Person POV mode")
 		followRadius = math.clamp(followRadius, 5, 100)
 	end
 	Gui.unindent()
@@ -947,6 +960,7 @@ Controller:
 
 		saveConfig()
 	end
+	Gui.setItemTooltip("Saves your settings!")
 
 	Gui.newLine()
 
