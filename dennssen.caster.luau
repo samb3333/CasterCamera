@@ -1,4 +1,4 @@
-local version: string = "1.0.3"
+local version: string = "1.1.0"
 metadata = {
 	name = "Caster",
 	description = "TBD",
@@ -1652,7 +1652,7 @@ function readOtherInputs()
 
 	if not Input.getKey(dPadLeft) then
 		if Input.getKeyDown(vInput) or Input.getKeyDown(topFaceButton) then
-			if not currentPlayerName or cameraMode == CameraMode.HeadRotation then
+			if currentPlayerName == "" or cameraMode == CameraMode.HeadRotation then
 				cameraMode = CameraMode.HeadRotation
 				getPlayer()
 			else
@@ -1662,7 +1662,7 @@ function readOtherInputs()
 		end
 
 		if Input.getKeyDown(cInput) or Input.getKeyDown(rightFaceButton) then
-			if not currentPlayerName or cameraMode == CameraMode.FirstPerson then
+			if currentPlayerName == "" or cameraMode == CameraMode.FirstPerson then
 				cameraMode = CameraMode.FirstPerson
 				getPlayer()
 			else
