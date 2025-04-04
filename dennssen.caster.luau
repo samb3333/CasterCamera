@@ -491,6 +491,9 @@ local function initializeConfig()
 	local neededValues = {
 		cameraFOV = 90,
 		deadzone = 0,
+		followFOV = 100,
+		followPosititonSmoothing = 0.01,
+		followRadius = 20,
 		mouseSensitivity = 1,
 		invertMouseLookHorizontal = false,
 		invertMouseLookVertical = false,
@@ -597,6 +600,9 @@ local playerFollow = false
 local currentPlayerName: string = ""
 local currentPlayerId: number = -1
 local currentPlayerIndex: number = 1
+local followFOV: number = config.followFOV
+local followPosititonSmoothing: number = config.followPosititonSmoothing
+local followRadius: number = config.followRadius
 
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
@@ -898,6 +904,15 @@ Controller:
 		}
 		Gui.unindent()
 	end
+
+	if Gui.collapsingHeader("POV") then
+		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing", followPosititonSmoothing, 0, 1)
+		followPosititonSmoothing = math.clamp(followPosititonSmoothing, 0, 1)
+		followFOV = Gui.sliderInt("Field of View", followFOV, 1, 179)
+		followFOV = math.clamp(followFOV, 1, 179)
+		followRadius = Gui.sliderFloat("3rd Person Radius", followRadius, 5, 100)
+		followRadius = math.clamp(followRadius, 5, 100)
+	end
 	Gui.unindent()
 
 	Gui.newLine()
@@ -905,6 +920,9 @@ Controller:
 	if Gui.button("Save Config " .. Icon.Save) then
 		config.cameraFOV = cameraFOV
 		config.deadzone = deadzone
+		config.followFOV = followFOV
+		config.followPosititonSmoothing = followPosititonSmoothing
+		config.followRadius = followRadius
 		config.invertMouseLookHorizontal = invertMouseLookHorizontal
 		config.invertMouseLookVertical = invertMouseLookVertical
 		config.mouseSensitivity = mouseSensitivity
@@ -1896,10 +1914,10 @@ function followPlayer()
 		showNameTags = true,
 		muteSelf = false,
 		targetPlayerId = currentPlayerId,
-		positionSmoothing = 0.1,
-		cameraFOV = camera.fieldOfView,
+		positionSmoothing = followPosititonSmoothing,
+		cameraFOV = followFOV,
 		cameraMode = cameraMode,
-		radius = 20,
+		radius = followRadius,
 		threshold = 5,
 		cameraPositionOffset = tostring(Vec3.zeroVector),
 		cameraEulerOffset = tostring(Vec3.zeroVector),
