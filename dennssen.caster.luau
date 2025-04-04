@@ -492,6 +492,10 @@ local function initializeConfig()
 		cameraFOV = 90,
 		deadzone = 0,
 		mouseSensitivity = 1,
+		invertMouseLookHorizontal = false,
+		invertMouseLookVertical = false,
+		invertControllerLookHorizontal = false,
+		invertControllerLookVertical = false,
 		controllerSensitivity = 0.5,
 		positionSmoothing = 0.02,
 		lookSmoothness = 0,
@@ -644,12 +648,16 @@ local enter = Input.Key.Enter
 local backspace = Input.Key.BackSpace
 
 --  Mouse
+local invertMouseLookHorizontal: boolean = config.invertMouseLookHorizontal
+local invertMouseLookVertical: boolean = config.invertMouseLookVertical
 local rightMouseButton = Input.Key.RightMouseButton
 local middleMouseButton = Input.Key.MiddleMouseButton
 local mouseSensitivity: number = config.mouseSensitivity
 local mouseWheelAxis = Input.Key.MouseWheelAxis
 
 --  Gamepad
+local invertControllerLookHorizontal: boolean = config.invertControllerLookHorizontal
+local invertControllerLookVertical: boolean = config.invertControllerLookVertical
 local controllerSensitivity: number = config.controllerSensitivity
 local leftAnalogVertical = Input.Gamepad.LeftY
 local leftAnalogHorizontal = Input.Gamepad.LeftX
@@ -852,11 +860,15 @@ Controller:
 
 	if Gui.collapsingHeader("Sensitivity & Deadzone") then
 		Gui.indent()
+		invertControllerLookHorizontal = Gui.checkbox("Invert Controller Horizontal", invertControllerLookHorizontal)
+		invertControllerLookVertical = Gui.checkbox("Invert Controller Vertical", invertControllerLookVertical)
 		controllerSensitivity = Gui.sliderFloat("Controller Sensitivity", controllerSensitivity, 0.001, 2)
 		controllerSensitivity = math.clamp(controllerSensitivity, 0.001, 2)
 		deadzone = Gui.sliderFloat("Controller Deadzone", deadzone, 0, 0.999)
 		deadzone = math.clamp(deadzone, 0, 0.999)
 		Gui.newLine()
+		invertMouseLookHorizontal = Gui.checkbox("Invert Mouse Horizontal", invertMouseLookHorizontal)
+		invertMouseLookVertical = Gui.checkbox("Invert Mouse Vertical", invertMouseLookVertical)
 		mouseSensitivity = Gui.sliderFloat("Mouse Sensitivity", mouseSensitivity, 0.001, 2)
 		mouseSensitivity = math.clamp(mouseSensitivity, 0.001, 2)
 		Gui.unindent()
@@ -893,7 +905,11 @@ Controller:
 	if Gui.button("Save Config " .. Icon.Save) then
 		config.cameraFOV = cameraFOV
 		config.deadzone = deadzone
+		config.invertMouseLookHorizontal = invertMouseLookHorizontal
+		config.invertMouseLookVertical = invertMouseLookVertical
 		config.mouseSensitivity = mouseSensitivity
+		config.invertControllerLookHorizontal = invertControllerLookHorizontal
+		config.invertControllerLookVertical = invertControllerLookVertical
 		config.controllerSensitivity = controllerSensitivity
 		config.positionSmoothing = positionSmoothing
 		config.lookSmoothness = lookSmoothness
@@ -1778,6 +1794,15 @@ local rotDelta: Vec3 = Vec3.zeroVector
 function rotateCamera()
 	local mouse = Input.getMouseDelta()
 	local adjustedLookSmoothness = 1 - (1 - dynamicLookSmoothness) ^ 3
+
+	if invertMouseLookHorizontal then
+		mouse.x = -mouse.x
+	end
+
+	if invertMouseLookVertical then
+		mouse.y = -mouse.y
+	end
+
 	-- Keyboard
 	if Input.getKey(rightMouseButton) then
 		turnVelocity = Vec2.new(mouse.x, mouse.y) * 10
@@ -1788,6 +1813,15 @@ function rotateCamera()
 	turnVelocity = Vec2.new(Input.getAnalog(Input.Gamepad.RightX), Input.getAnalog(Input.Gamepad.RightY))
 		* controllerSensitivity
 		* 2
+
+	if invertControllerLookHorizontal then
+		turnVelocity.x = -turnVelocity.x
+	end
+
+	if invertControllerLookVertical then
+		turnVelocity.y = -turnVelocity.y
+	end
+
 	rotDelta += Vec3.new(0, turnVelocity.y, turnVelocity.x)
 
 	local nextLookDiff = rotDelta * math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1)
@@ -1863,7 +1897,7 @@ function followPlayer()
 		muteSelf = false,
 		targetPlayerId = currentPlayerId,
 		positionSmoothing = 0.1,
-		cameraFOV = 130,
+		cameraFOV = camera.fieldOfView,
 		cameraMode = cameraMode,
 		radius = 20,
 		threshold = 5,
