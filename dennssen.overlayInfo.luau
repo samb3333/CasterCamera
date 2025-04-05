@@ -17,6 +17,7 @@ local configStructure = {
 	},
 	arenaInfo = {
 		home = {
+			name = "",
 			score = 0,
 			players = {},
 			color = {
@@ -26,6 +27,7 @@ local configStructure = {
 			},
 		},
 		away = {
+			name = "",
 			score = 0,
 			players = {},
 			color = {
@@ -116,6 +118,8 @@ function onMessageReceived(messageTable: { info: string, value: any })
 
 	if info == "startTime" then
 		currentConfig.arenaInfo.startTime = value
+		currentConfig.arenaInfo.home.score = 0
+		currentConfig.arenaInfo.away.score = 0
 	elseif info == "players" then
 		currentConfig.arenaInfo[value.team].players = value.players
 	elseif info == "score" then
@@ -137,5 +141,8 @@ function onMessageReceived(messageTable: { info: string, value: any })
 	elseif info == "clearStats" then
 		currentConfig.statsInfo.home = {}
 		currentConfig.statsInfo.away = {}
+	elseif info == "teamNames" then
+		currentConfig.arenaInfo.home.name = value.home
+		currentConfig.arenaInfo.away.name = value.away
 	end
 end

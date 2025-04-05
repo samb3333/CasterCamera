@@ -414,7 +414,7 @@ local requiredBallCenterTime: number = 10
 local ballCenterTime: number = 0
 
 local boxPositionOffset = Vec3.new(0, 0, 425)
-local boxSize = Vec3.new(6600, 4900, 1440)
+local boxSize = Vec3.new(6650, 5100, 1440)
 
 local arenas: { [any]: Arena } = {
 	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
@@ -607,6 +607,8 @@ local followRadius: number = config.followRadius
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
 local usingOverlay: boolean = false
+local homeTeam: string = ""
+local awayTeam: string = ""
 
 -- Ball
 local ball: ReplayBall
@@ -925,6 +927,23 @@ Controller:
 		followRadius = Gui.sliderFloat("3rd Person Radius", followRadius, 5, 100)
 		Gui.setItemTooltip("The distance from the player when the camera is in 3rd Person POV mode")
 		followRadius = math.clamp(followRadius, 5, 100)
+	end
+
+	if usingOverlay then
+		if Gui.collapsingHeader("Overlay") then
+			homeTeam = Gui.inputText("Home Team Name", homeTeam)
+			awayTeam = Gui.inputText("Away Team Name", awayTeam)
+
+			if Gui.button(Icon.Upload .. "Send Teams to Overlay") then
+				sendMessage(overlayCamera, {
+					info = "teamNames",
+					value = {
+						home = homeTeam,
+						away = awayTeam,
+					},
+				})
+			end
+		end
 	end
 	Gui.unindent()
 
@@ -1880,11 +1899,6 @@ function teamLists()
 
 	for _, player in gameData.players do
 		if player.teamIndex == TeamIndex.NoTeam then
-			continue
-		end
-		local closestArena = getClosestArena(player.root.position)
-
-		if closestArena ~= selectedArena then
 			continue
 		end
 
