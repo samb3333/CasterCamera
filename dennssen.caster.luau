@@ -410,7 +410,7 @@ local midfieldOffset = 840
 local midfieldMaxTime = 20
 local midfieldTimePassed: number = 0
 
-local requiredBallCenterTime: number = 10
+local requiredBallCenterTime: number = 5
 local ballCenterTime: number = 0
 
 local boxPositionOffset = Vec3.new(0, 0, 425)
@@ -918,7 +918,7 @@ Controller:
 	end
 
 	if Gui.collapsingHeader("POV") then
-		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing", followPosititonSmoothing, 0, 1)
+		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing##2", followPosititonSmoothing, 0, 1)
 		Gui.setItemTooltip("Sets the smoothing for when the camera is in POV mode")
 		followPosititonSmoothing = math.clamp(followPosititonSmoothing, 0, 1)
 		followFOV = Gui.sliderInt("Field of View", followFOV, 1, 179)
@@ -1584,6 +1584,8 @@ function readOtherInputs()
 	elseif Input.getKey(dPadDown) then
 		cameraFOV += 50 * deltaTime
 	end
+
+	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
 	if Input.getKeyDown(middleMouseButton) or Input.getKeyDown(dPadRight) then
 		cameraFOV = config.cameraFOV
