@@ -760,6 +760,8 @@ Keyboard:
 		6/NumPadTwo - Mid Overview
 		7/NumPadThree - Right Overview
 
+		Enter - Get Closest Arena
+
 		^^The Overviews Side is based on which side the ball is on^^
 	]])
 		end
