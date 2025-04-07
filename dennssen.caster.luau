@@ -1262,6 +1262,7 @@ function getPlayer()
 end
 
 function stopFollow()
+	toggleSmoothing(true, true)
 	playerFollow = false
 	camera:followCamera(nil)
 	camera.position = followPlussCamera:getSmoothedPosition()
@@ -1958,6 +1959,7 @@ function followPlayer()
 		autoBall = false,
 		autoGoalCam = false,
 	}
+	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
 	camera:followCamera(followPlussCamera)
 end
