@@ -1039,6 +1039,7 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 end
 
 function onTransitionBegin(transitionInfo: Transition)
+	alwaysTick = true
 	camera.position = transitionInfo.startPosition
 	camera.rotation = transitionInfo.startRotation
 	rotEuler = transitionInfo.startRotation:euler()
@@ -2430,6 +2431,8 @@ end
 
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
+		alwaysTick = false
+		onExit()
 		return
 	end
 
@@ -2487,5 +2490,11 @@ function tick(dt)
 		for _, arena in arenas do
 			arena.box:render(1, 0, 1)
 		end
+	end
+end
+
+function onExit()
+	if playerFollow then
+		stopFollow()
 	end
 end
