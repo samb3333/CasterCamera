@@ -2377,8 +2377,8 @@ end
 
 function ballInCenterCheck()
 	local centerBox: BoxType = Box.new(
-		selectedArena.position + selectedArena.rotation:rotateVector(Vec3.new(0, 0, 40)),
-		Vec3.new(50, 50, 75),
+		selectedArena.position + selectedArena.rotation:rotateVector(Vec3.new(0, 0, 75)),
+		Vec3.new(50, 50, 125),
 		selectedArena.rotation:euler()
 	)
 	if boundingBoxDebug then
