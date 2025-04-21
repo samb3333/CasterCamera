@@ -702,6 +702,12 @@ function main()
 end
 
 function onGui()
+	if followPlussCamera == nil then
+		Gui.text(
+			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
+		)
+	end
+
 	if Gui.button(Icon.Question) then
 		controlsScreen = not controlsScreen
 	end
@@ -1164,8 +1170,7 @@ function getClosestArenaBall(targetPosition: Vec3, frameData: ReplayFrame)
 	local clostestBall: ReplayBall = nil
 	for i in balls do
 		local ball = balls[i]
-		-- because some arenas are directly above others
-		-- we limit the balls to those where the ball is between the arenas floor and roof position
+
 		if not selectedArena.box:checkPointIntersect(ball.transform.position) then
 			continue
 		end
@@ -1234,7 +1239,6 @@ end
 
 function getPlayer()
 	if followPlussCamera == nil then
-		warn("Failed to switch to POV: 'Follow Pluss Camera' is missing.")
 		return
 	end
 
