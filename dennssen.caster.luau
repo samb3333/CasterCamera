@@ -994,8 +994,29 @@ Controller:
 	if Gui.treeNode("Debug") then
 		Gui.text(`Version: {version}`)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
-		boxPositionOffset = Gui.dragFloat3("box pos", boxPositionOffset, 1, -math.huge, math.huge)
-		boxSize = Gui.dragFloat3("box size", boxSize, 1, -math.huge, math.huge)
+		if Gui.button("Print Closest Gamemode") then
+			local gamemode = camera:getClosestGamemodeSlot()
+			print("Gamemode SlotID: ")
+			print(gamemode.slotId)
+			print("Gamemode Position: ")
+			print(gamemode.transform.position)
+			print("Gamemode Rotation: ")
+			print(gamemode.transform.rotation:euler())
+		end
+		if Gui.button("Set Orientation to Arena") then
+			camera.position = selectedArena.position
+			rotEuler = selectedArena.rotation:euler()
+			camera.rotation = selectedArena.rotation
+		end
+		Gui.sameLine()
+		if Gui.button("Print Relative Orientation") then
+			local RelativeLocation = selectedArena.rotation:rotateVector(camera.position - selectedArena.position)
+			local RelativeRotation = camera.rotation * selectedArena.rotation:inverse()
+			print(`Relative Position ({selectedArena.name}):`)
+			print(RelativeLocation)
+			print(`Relative Rotation ({selectedArena.name}):`)
+			print(RelativeRotation:euler())
+		end
 		if Gui.button("Reset All Stats") then
 			sendMessage(overlayCamera, { resetAllStats = true })
 		end
@@ -2504,3 +2525,5 @@ function onExit()
 		stopFollow()
 	end
 end
+
+-- Make overviews customizable.
