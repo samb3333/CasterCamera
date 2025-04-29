@@ -385,7 +385,7 @@ local requiredBallCenterTime: number = 5
 local ballCenterTime: number = 0
 
 local boxPositionOffset = Vec3.new(0, 0, 425)
-local boxSize = Vec3.new(6650, 5100, 1440)
+local boxSize = Vec3.new(6750, 5100, 1440)
 
 local arenas: { [any]: Arena } = {
 	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
