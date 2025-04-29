@@ -19,6 +19,9 @@ end
 
 local deltaTime: number = 0
 
+local loadTime: number
+local transitionTime: number
+local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
 local defaultRotation = Quat.fromEuler(0, 0, 90)
 
@@ -662,6 +665,7 @@ local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
 
 function main()
+	loadTime = os.clock()
 	camera.position = defaultPosition
 	camera.rotation = defaultRotation
 	rotEuler = defaultRotation:euler()
@@ -1045,11 +1049,22 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 end
 
 function onTransitionBegin(transitionInfo: Transition)
+	transitionTime = os.clock()
+	firstTransition = transitionTime <= loadTime + 1 -- Margin of 1 second
+
+	if firstTransition then
+		camera.position = defaultPosition
+		camera.rotation = defaultRotation
+		rotEuler = defaultRotation:euler()
+		rotEuler.x = 0
+	else
+		camera.position = transitionInfo.startPosition
+		camera.rotation = transitionInfo.startRotation
+		rotEuler = transitionInfo.startRotation:euler()
+		rotEuler.x = 0
+	end
+
 	alwaysTick = true
-	camera.position = transitionInfo.startPosition
-	camera.rotation = transitionInfo.startRotation
-	rotEuler = transitionInfo.startRotation:euler()
-	rotEuler.x = 0
 	camera.rotationSmoothing = 0.02
 	camera.hideNearestHead = false
 	camera.showNameTags = true
