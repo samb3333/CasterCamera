@@ -56,7 +56,6 @@ type BoxType = {
 	getRotation: (self: BoxType) -> Vec3,
 	getRotationDeg: (self: BoxType) -> Vec3,
 	generatePoints: (self: BoxType) -> (),
-	getRotationMatrix: (self: BoxType, roll: number, pitch: number, yaw: number) -> { { number } },
 	multiplyMatrices: (self: BoxType, matrix1: { { number } }, matrix2: { { number } }) -> { { number } },
 	applyRotationMatrix: (self: BoxType, vec: Vec3, matrix: { { number } }) -> Vec3,
 	render: (self: BoxType, r: number, g: number, b: number) -> (),
@@ -148,34 +147,6 @@ function Box:generatePoints(): ()
 	end
 
 	self.vertexLocations = newVertexLocations
-end
-
-function Box:getRotationMatrix(roll: number, pitch: number, yaw: number): { { number } }
-	local cos: (number) -> number = math.cos
-	local sin: (number) -> number = math.sin
-
-	local yawMatrix: { { number } } = {
-		{ cos(yaw), 0, sin(yaw) },
-		{ 0, 1, 0 },
-		{ -sin(yaw), 0, cos(yaw) },
-	}
-
-	local pitchMatrix: { { number } } = {
-		{ 1, 0, 0 },
-		{ 0, cos(pitch), -sin(pitch) },
-		{ 0, sin(pitch), cos(pitch) },
-	}
-
-	local rollMatrix: { { number } } = {
-		{ cos(roll), -sin(roll), 0 },
-		{ sin(roll), cos(roll), 0 },
-		{ 0, 0, 1 },
-	}
-
-	local combinedMatrix = self:multiplyMatrices(rollMatrix, pitchMatrix)
-	combinedMatrix = self:multiplyMatrices(combinedMatrix, yawMatrix)
-
-	return combinedMatrix
 end
 
 function Box:multiplyMatrices(matrix1: { { number } }, matrix2: { { number } }): { { number } }
