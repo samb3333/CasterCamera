@@ -6,8 +6,6 @@ metadata = {
 	defaultKeybind = "",
 }
 
--- Note: Arenas need boxes around them to make sure players that are in other arenas/practice areas don't get set to the team of an arena
-
 local function parseBallJSON(str)
 	-- Table to store the parsed data
 	local result = {}
@@ -476,6 +474,7 @@ local function initializeConfig()
 		particleSimSpeed = 1,
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
+		sendOverlayInfo = false,
 		homeTeamDefaultColor = {
 			r = 0,
 			g = 0.5,
@@ -578,6 +577,7 @@ local followRadius: number = config.followRadius
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
 local usingOverlay: boolean = false
+local sendOverlayInfo: boolean = config.sendOverlayInfo
 local homeTeam: string = ""
 local awayTeam: string = ""
 
@@ -910,6 +910,13 @@ Controller:
 
 	if usingOverlay then
 		if Gui.collapsingHeader("Overlay") then
+			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
+			Gui.setItemTooltip(
+				"Toggle this off to stop the camera from sending info to the overlay even if you have the overlay script \nThis is useful for keeping the overlay info config small when not using the overlay, as this avoids crashing."
+			)
+
+			Gui.newLine()
+
 			homeTeam = Gui.inputText("Home Team Name", homeTeam)
 			awayTeam = Gui.inputText("Away Team Name", awayTeam)
 
@@ -945,6 +952,7 @@ Controller:
 		config.particleSimSpeed = particleSimSpeed
 		config.vibrance = vibrance
 		config.getBallVariant = getBallVariant
+		config.sendOverlayInfo = sendOverlayInfo
 		config.homeTeamDefaultColor = {
 			r = homeTeamDefaultColor.r,
 			g = homeTeamDefaultColor.g,
