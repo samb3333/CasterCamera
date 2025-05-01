@@ -959,6 +959,9 @@ Controller:
 			if Gui.button(`Set Overview To Camera##{i}`) then
 				overview.message = updateOverview(i, camera.position, camera.rotation)
 			end
+			Gui.setItemTooltip(
+				"This will overwrite the current overview with your current position and rotation and save it to your settings"
+			)
 
 			if overview.message then
 				Gui.text(overview.message)
