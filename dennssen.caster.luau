@@ -281,18 +281,10 @@ type Arena = {
 	box: BoxType,
 	home: {
 		overview: {
-			middle: {
+			{
 				position: Vec3,
-				rotation: Quat,
-			},
-			right: {
-				position: Vec3,
-				rotation: Quat,
-			},
-			left: {
-				position: Vec3,
-				rotation: Quat,
-			},
+				rotation: Vec3,
+			}
 		},
 		goal: {
 			position: Vec3,
@@ -305,18 +297,10 @@ type Arena = {
 	},
 	away: {
 		overview: {
-			middle: {
+			{
 				position: Vec3,
 				rotation: Quat,
-			},
-			right: {
-				position: Vec3,
-				rotation: Quat,
-			},
-			left: {
-				position: Vec3,
-				rotation: Quat,
-			},
+			}
 		},
 		goal: {
 			position: Vec3,
@@ -337,11 +321,7 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 		rotation = rotation,
 		box = nil,
 		home = {
-			overview = {
-				middle = nil,
-				right = nil,
-				left = nil,
-			},
+			overview = {},
 			goal = nil,
 			midfield = {
 				position = nil,
@@ -349,11 +329,7 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 			players = {},
 		},
 		away = {
-			overview = {
-				middle = nil,
-				right = nil,
-				left = nil,
-			},
+			overview = {},
 			goal = nil,
 			midfield = {
 				position = nil,
@@ -361,100 +337,6 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 			players = {},
 		},
 		players = {},
-	}
-end
-
--- goal
-local goalPositionOffset = 3150
-local goalHeightOffset = Vec3.new(0, 0, -50)
-local homeGoalRotationOffset = Quat.fromEuler(0, 0, 180)
-local awayGoalRotationOffset = Quat.fromEuler(0, 0, 0)
-
---arena
-local middleOverviewOffset = Vec3.new(1000, 0, 1000)
-local middleOverviewRotationOffset = Quat.fromEuler(0, -35, 0)
-local rightOverviewOffset = Vec3.new(1300, 2200, 950)
-local rightOverviewRotationOffset = Quat.fromEuler(0, -20, -60)
-local leftOverviewOffset = Vec3.new(1300, -2200, 950)
-local leftOverviewRotationOffset = Quat.fromEuler(0, -20, 60)
-
-local midfieldOffset = 840
-local midfieldMaxTime = 20
-local midfieldTimePassed: number = 0
-
-local requiredBallCenterTime: number = 5
-local ballCenterTime: number = 0
-
-local boxPositionOffset = Vec3.new(0, 0, 425)
-local boxSize = Vec3.new(6750, 5100, 1440)
-
-local arenas: { [any]: Arena } = {
-	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
-	plazaEast = createArena("Plaza East", Vec3.new(-4425, 18550, -29650), Quat.fromEuler(0, 0, 90)),
-	plazaWest = createArena("Plaza West", Vec3.new(4425, 18550, -29650), Quat.fromEuler(0, 0, -90)),
-	stadiumPrime = createArena("Stadium Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
-	theBunker = createArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
-	fieldhouseEast = createArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
-	fieldhouseWest = createArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
-	driftplex1 = createArena("Driftplex 01", Vec3.new(12799.231, 13600.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplex2 = createArena("Driftplex 02", Vec3.new(17475.770, 13600.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex3 = createArena("Driftplex 03", Vec3.new(12799.231, 6400.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplex4 = createArena("Driftplex 04", Vec3.new(17475.770, 6400.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex5 = createArena("Driftplex 05", Vec3.new(17475.770, 23200.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex6 = createArena("Driftplex 06", Vec3.new(12799.231, 23200.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplexLab = createArena("Driftplex Lab", Vec3.new(15137.500, 29200.000, -26218.920), Quat.fromEuler(0, 30, 0)),
-}
-
-for _, arena in pairs(arenas) do
-	arena.box =
-		Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffset), boxSize, arena.rotation:euler())
-
-	arena.home.overview.middle = {
-		position = arena.position + arena.rotation:rotateVector(middleOverviewOffset),
-		rotation = (arena.rotation * middleOverviewRotationOffset),
-	}
-
-	arena.away.overview.middle = {
-		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(middleOverviewOffset),
-		rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * middleOverviewRotationOffset),
-	}
-
-	arena.home.overview.right = {
-		position = arena.position + arena.rotation:rotateVector(rightOverviewOffset),
-		rotation = (arena.rotation * rightOverviewRotationOffset),
-	}
-	arena.away.overview.right = {
-		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(rightOverviewOffset),
-		rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * rightOverviewRotationOffset),
-	}
-
-	arena.home.overview.left = {
-		position = arena.position + arena.rotation:rotateVector(leftOverviewOffset),
-		rotation = (arena.rotation * leftOverviewRotationOffset),
-	}
-	arena.away.overview.left = {
-		position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(leftOverviewOffset),
-		rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * leftOverviewRotationOffset),
-	}
-
-	arena.home.goal = {
-		position = arena.position
-			+ arena.rotation:rotateVector(goalHeightOffset)
-			+ arena.rotation:getForwardVector() * goalPositionOffset,
-		rotation = arena.rotation * homeGoalRotationOffset,
-	}
-	arena.away.goal = {
-		position = arena.position
-			+ arena.rotation:rotateVector(goalHeightOffset)
-			+ arena.rotation:getForwardVector() * -goalPositionOffset,
-		rotation = arena.rotation * awayGoalRotationOffset,
-	}
-
-	arena.home.midfield = {
-		position = arena.position + arena.rotation:getForwardVector() * midfieldOffset,
-	}
-	arena.away.midfield = {
-		position = arena.position + arena.rotation:getForwardVector() * -midfieldOffset,
 	}
 end
 
@@ -488,6 +370,20 @@ local function initializeConfig()
 			g = 0.1,
 			b = 0.1,
 		},
+		overviewOffsets = {
+			{
+				position = Vec3.new(1300, -2200, 950),
+				rotation = Quat.fromEuler(0, -20, 60),
+			},
+			{
+				position = Vec3.new(1000, 0, 1000),
+				rotation = Quat.fromEuler(0, -35, 0),
+			},
+			{
+				position = Vec3.new(1300, 2200, 950),
+				rotation = Quat.fromEuler(0, -20, -60),
+			},
+		},
 	}
 
 	-- saves new values that are not there from before to all profiles
@@ -512,6 +408,111 @@ local function initializeConfig()
 end
 
 initializeConfig()
+
+-- goal
+local goalPositionOffset = 3150
+local goalHeightOffset = Vec3.new(0, 0, -50)
+local homeGoalRotationOffset = Quat.fromEuler(0, 0, 180)
+local awayGoalRotationOffset = Quat.fromEuler(0, 0, 0)
+
+--arena
+local overviewOffsets = {}
+for _, overview in config.overviewOffsets do
+	table.insert(overviewOffsets, overview)
+end
+
+local midfieldOffset = 840
+local midfieldMaxTime = 20
+local midfieldTimePassed: number = 0
+
+local requiredBallCenterTime: number = 5
+local ballCenterTime: number = 0
+
+local boxPositionOffset = Vec3.new(0, 0, 425)
+local boxSize = Vec3.new(6750, 5100, 1440)
+
+local arenas: { [any]: Arena } = {
+	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
+	plazaEast = createArena("Plaza East", Vec3.new(-4425, 18550, -29650), Quat.fromEuler(0, 0, 90)),
+	plazaWest = createArena("Plaza West", Vec3.new(4425, 18550, -29650), Quat.fromEuler(0, 0, -90)),
+	stadiumPrime = createArena("Stadium Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
+	theBunker = createArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
+	fieldhouseEast = createArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
+	fieldhouseWest = createArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
+	driftplex1 = createArena("Driftplex 01", Vec3.new(12799.231, 13600.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplex2 = createArena("Driftplex 02", Vec3.new(17475.770, 13600.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex3 = createArena("Driftplex 03", Vec3.new(12799.231, 6400.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplex4 = createArena("Driftplex 04", Vec3.new(17475.770, 6400.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex5 = createArena("Driftplex 05", Vec3.new(17475.770, 23200.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex6 = createArena("Driftplex 06", Vec3.new(12799.231, 23200.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplexLab = createArena("Driftplex Lab", Vec3.new(15137.500, 29200.000, -26218.920), Quat.fromEuler(0, 30, 0)),
+}
+
+for _, arena in pairs(arenas) do
+	arena.box =
+		Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffset), boxSize, arena.rotation:euler())
+
+	for _, overview in overviewOffsets do
+		local homeOverview = {
+			position = arena.position + arena.rotation:rotateVector(overview.position),
+			rotation = (arena.rotation * overview.rotation),
+		}
+		local awayOverview = {
+			position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(overview.position),
+			rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * overview.rotation),
+		}
+
+		table.insert(arena.home.overview, homeOverview)
+		table.insert(arena.away.overview, awayOverview)
+	end
+
+	arena.home.goal = {
+		position = arena.position
+			+ arena.rotation:rotateVector(goalHeightOffset)
+			+ arena.rotation:getForwardVector() * goalPositionOffset,
+		rotation = arena.rotation * homeGoalRotationOffset,
+	}
+	arena.away.goal = {
+		position = arena.position
+			+ arena.rotation:rotateVector(goalHeightOffset)
+			+ arena.rotation:getForwardVector() * -goalPositionOffset,
+		rotation = arena.rotation * awayGoalRotationOffset,
+	}
+
+	arena.home.midfield = {
+		position = arena.position + arena.rotation:getForwardVector() * midfieldOffset,
+	}
+	arena.away.midfield = {
+		position = arena.position + arena.rotation:getForwardVector() * -midfieldOffset,
+	}
+end
+
+function updateArenaOverviews()
+	overviewOffsets = {}
+	for _, overview in config.overviewOffsets do
+		table.insert(overviewOffsets, overview)
+	end
+
+	for _, arena in arenas do
+		arena.home.overview = {}
+		arena.away.overview = {}
+
+		for _, overview in overviewOffsets do
+			local homeOverview = {
+				position = arena.position + arena.rotation:rotateVector(overview.position),
+				rotation = (arena.rotation * overview.rotation),
+			}
+			local awayOverview = {
+				position = arena.position
+					+ (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(overview.position),
+				rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * overview.rotation),
+			}
+
+			table.insert(arena.home.overview, homeOverview)
+			table.insert(arena.away.overview, awayOverview)
+		end
+	end
+end
 
 local selectedArena: Arena = arenas.gatewayArena
 
@@ -674,6 +675,38 @@ function main()
 	if overlayCamera ~= nil then
 		usingOverlay = true
 	end
+end
+
+function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globalOverviewRotation: Quat): string
+	local closestArena: Arena = getClosestArena(globalOverviewPosition)
+
+	if not closestArena.box:checkPointIntersect(globalOverviewPosition) then
+		return "Overviews cannot be outside an arena!"
+	end
+
+	local isOnHomeSide = closestArena.rotation
+		:getForwardVector()
+		:dot(getForward(closestArena.position, globalOverviewPosition)) >= 0
+
+	local translatedOverviewPosition
+	local translatedOverviewRotation
+	if isOnHomeSide then
+		translatedOverviewPosition =
+			closestArena.rotation:inverse():rotateVector(globalOverviewPosition - closestArena.position)
+		translatedOverviewRotation = closestArena.rotation:inverse() * globalOverviewRotation
+	else
+		local flipQuat = closestArena.rotation:inverse() * Quat.fromEuler(0, 0, 180)
+		translatedOverviewPosition = flipQuat:rotateVector(globalOverviewPosition - closestArena.position)
+		translatedOverviewRotation = flipQuat * globalOverviewRotation
+	end
+
+	config.overviewOffsets[overviewKey] = {
+		position = translatedOverviewPosition,
+		rotation = translatedOverviewRotation,
+	}
+	saveConfig()
+	updateArenaOverviews()
+	return `Succesfully set {overviewKey} to Camera`
 end
 
 function onGui()
@@ -910,6 +943,29 @@ Controller:
 		followRadius = Gui.sliderFloat("3rd Person Radius", followRadius, 5, 100)
 		Gui.setItemTooltip("The distance from the player when the camera is in 3rd Person POV mode")
 		followRadius = math.clamp(followRadius, 5, 100)
+	end
+
+	if Gui.collapsingHeader("Overviews") then
+		Gui.indent()
+
+		for i, overview in overviewOffsets do
+			if i ~= 1 then
+				Gui.separator()
+			end
+			Gui.text(`#{i} Overview`)
+			Gui.dragFloat3(`Position##{i}`, overview.position, 0, -math.huge, math.huge)
+			Gui.dragFloat3(`Rotation##{i}`, overview.rotation:euler(), 0, -math.huge, math.huge)
+
+			if Gui.button(`Set Overview To Camera##{i}`) then
+				overview.message = updateOverview(i, camera.position, camera.rotation)
+			end
+
+			if overview.message then
+				Gui.text(overview.message)
+			end
+		end
+
+		Gui.unindent()
 	end
 
 	if usingOverlay then
@@ -1660,11 +1716,11 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if ballIsOnHomeSide() then
-			camera.position = selectedArena.home.overview.left.position
-			setGlobalCameraRotation(selectedArena.home.overview.left.rotation)
+			camera.position = selectedArena.home.overview[1].position
+			setGlobalCameraRotation(selectedArena.home.overview[1].rotation)
 		else
-			camera.position = selectedArena.away.overview.left.position
-			setGlobalCameraRotation(selectedArena.away.overview.left.rotation)
+			camera.position = selectedArena.away.overview[1].position
+			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
 		end
 	end
 	if
@@ -1676,11 +1732,11 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if ballIsOnHomeSide() then
-			camera.position = selectedArena.home.overview.middle.position
-			setGlobalCameraRotation(selectedArena.home.overview.middle.rotation)
+			camera.position = selectedArena.home.overview[2].position
+			setGlobalCameraRotation(selectedArena.home.overview[2].rotation)
 		else
-			camera.position = selectedArena.away.overview.middle.position
-			setGlobalCameraRotation(selectedArena.away.overview.middle.rotation)
+			camera.position = selectedArena.away.overview[2].position
+			setGlobalCameraRotation(selectedArena.away.overview[2].rotation)
 		end
 	end
 	if
@@ -1692,11 +1748,11 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if ballIsOnHomeSide() then
-			camera.position = selectedArena.home.overview.right.position
-			setGlobalCameraRotation(selectedArena.home.overview.right.rotation)
+			camera.position = selectedArena.home.overview[3].position
+			setGlobalCameraRotation(selectedArena.home.overview[3].rotation)
 		else
-			camera.position = selectedArena.away.overview.right.position
-			setGlobalCameraRotation(selectedArena.away.overview.right.rotation)
+			camera.position = selectedArena.away.overview[3].position
+			setGlobalCameraRotation(selectedArena.away.overview[3].rotation)
 		end
 	end
 
