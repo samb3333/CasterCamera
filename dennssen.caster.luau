@@ -1,4 +1,4 @@
-local version: string = "1.1.0"
+local version: string = "1.2.0"
 metadata = {
 	name = "Caster",
 	description = "TBD",
@@ -746,9 +746,7 @@ function onGui()
 
 		if keyboardControls then
 			Gui.text([[
-Controller is HIGHLY RECOMMENDED
-
-Keyboard:
+Keyboard (Controller is recommended):
 	Modes:
 		Z - Freecam Mode
 		C - FirstPerson Mode
@@ -770,9 +768,9 @@ Keyboard:
 		D - Right Player Cycle
 		
 	In All modes:
-		5/NumPadOne - Left Overview
-		6/NumPadTwo - Mid Overview
-		7/NumPadThree - Right Overview
+		5/NumPadOne - First Overview
+		6/NumPadTwo - Second Overview
+		7/NumPadThree - Third Overview
 
 		Enter - Get Closest Arena
 
@@ -804,9 +802,11 @@ Controller:
 		Right Bumper - Right Player Cycle
 	
 	In All modes:
-		Dpad Left + Left Face Button - Left Overview
-		Dpad Left + Top Face Button - Mid Overview
-		Dpad Left + Right Face Button - Right Overview
+		Dpad Left + Left Face Button - First Overview
+		Dpad Left + Top Face Button - Second Overview
+		Dpad Left + Right Face Button - Third Overview
+
+		Enter - Get Closest Arena
 
 		^^The Overviews Side is based on which side the ball is on^^
 	]])
