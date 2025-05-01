@@ -664,6 +664,10 @@ local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
+local overviewMessage = {
+	overviewNumber = 0,
+	message = "",
+}
 
 function main()
 	loadTime = os.clock()
@@ -706,7 +710,7 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 	}
 	saveConfig()
 	updateArenaOverviews()
-	return `Succesfully set {overviewKey} to Camera`
+	return `Succesfully set Overview #{overviewKey} to Camera`
 end
 
 function onGui()
@@ -952,19 +956,20 @@ Controller:
 			if i ~= 1 then
 				Gui.separator()
 			end
-			Gui.text(`#{i} Overview`)
+			Gui.text(`Overview #{i}`)
 			Gui.dragFloat3(`Position##{i}`, overview.position, 0, -math.huge, math.huge)
 			Gui.dragFloat3(`Rotation##{i}`, overview.rotation:euler(), 0, -math.huge, math.huge)
 
 			if Gui.button(`Set Overview To Camera##{i}`) then
-				overview.message = updateOverview(i, camera.position, camera.rotation)
+				overviewMessage.overviewNumber = i
+				overviewMessage.message = updateOverview(i, camera.position, camera.rotation)
 			end
 			Gui.setItemTooltip(
 				"This will overwrite the current overview with your current position and rotation and save it to your settings"
 			)
 
-			if overview.message then
-				Gui.text(overview.message)
+			if overviewMessage.overviewNumber == i then
+				Gui.text(overviewMessage.message)
 			end
 		end
 
@@ -2578,5 +2583,3 @@ function onExit()
 		stopFollow()
 	end
 end
-
--- Make overviews customizable.
