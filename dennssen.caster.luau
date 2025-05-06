@@ -886,18 +886,45 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 	return inputData
 end
 
+local inputs = {
+	keyboard = {
+		forwards = createCasterInput(Input.Key.W, "Moves the camera in the forwards direction"),
+		right = createCasterInput(Input.Key.D, "Moves the camera in the right direction"),
+		left = createCasterInput(Input.Key.A, "Moves the camera in the left direction"),
+		backwards = createCasterInput(Input.Key.S, "Moves the camera in the backwards direction"),
+		up = createCasterInput(Input.Key.E, "Moves the camera in the up direction"),
+		down = createCasterInput(Input.Key.Q, "Moves the camera in the down direction"),
+		nextPlayer = createCasterInput(Input.Key.D, "Switches to the next player in POV mode"),
+		previousPlayer = createCasterInput(Input.Key.A, "Switches to the previous player in POV mode"),
+		lineOfSight = createCasterInput(
+			Input.Key.Q,
+			"Sets the get player method to 'player closest to line of sight'",
+			{ Input.Key.LeftAlt }
+		),
+		playerBallDistance = createCasterInput(
+			Input.Key.E,
+			"Sets the get player method to 'player closest to the ball'",
+			{ Input.Key.LeftAlt }
+		),
+		speedUp = createCasterInput(
+			Input.Key.LeftShift,
+			"Speeds up the camera by one gear (Or doubles speed if held down at top gear)"
+		),
+		speedDown = createCasterInput(Input.Key.LeftControl, "Slows down the camera by one gear"),
+		thirdPerson = createCasterInput(
+			Input.Key.V,
+			"Changes the camera mode to POV if you aren't already and will switch to Third Person view (It will get a new player acording to the 'get player method' if you are already in Third Person)"
+		),
+		firstPerson = createCasterInput(
+			Input.Key.C,
+			"Changes the camera mode to POV if you aren't already and will switch to First Person view (It will get a new player acording to the 'get player method' if you are already in First Person)"
+		),
+		freeCam = createCasterInput(Input.Key.Z, "Changes the camera mode to Free Cam"),
+	},
+}
+
 --  Keyboard
-local wInput = Input.Key.W
-local aInput = Input.Key.A
-local sInput = Input.Key.S
-local dInput = Input.Key.D
-local qInput = Input.Key.Q
-local eInput = Input.Key.E
-local vInput = Input.Key.V
-local cInput = Input.Key.C
 local zInput = Input.Key.Z
-local leftShiftInput = Input.Key.LeftShift
-local leftControlInput = Input.Key.LeftControl
 local numPadOne = Input.Key.NumPadOne
 local numPadTwo = Input.Key.NumPadTwo
 local numPadThree = Input.Key.NumPadThree
@@ -929,6 +956,8 @@ local invertControllerLookVertical: boolean = config.invertControllerLookVertica
 local controllerSensitivity: number = config.controllerSensitivity
 local leftAnalogVertical = Input.Gamepad.LeftY
 local leftAnalogHorizontal = Input.Gamepad.LeftX
+local rightAnalogVertical = Input.Gamepad.RightY
+local rightAnalogHorizontal = Input.Gamepad.RightX
 local leftTrigger = Input.Gamepad.LeftTrigger
 local rightTrigger = Input.Gamepad.RightTrigger
 local leftShoulder = Input.Gamepad.LeftShoulder
@@ -2000,18 +2029,18 @@ function readOtherInputs()
 		cameraFOV = config.cameraFOV
 	end
 
-	if Input.getKeyDown(leftShiftInput) or Input.getKeyDown(rightShoulder) then
+	if getCasterKey(inputs.keyboard.speedUp).down or Input.getKeyDown(rightShoulder) then
 		if speedIndex == #speedGears - 1 then
 			speedMultiplierHoldBuffer = true
 		end
 		speedIndex += 1
 	end
-	if Input.getKeyDown(leftControlInput) or Input.getKeyDown(leftShoulder) then
+	if getCasterKey(inputs.keyboard.speedDown).down or Input.getKeyDown(leftShoulder) then
 		speedIndex -= 1
 	end
 	speedIndex = math.clamp(speedIndex, 1, #speedGears)
 
-	if speedMultiplierHoldBuffer and (Input.getKeyUp(leftShiftInput) or Input.getKeyUp(rightShoulder)) then
+	if speedMultiplierHoldBuffer and (getCasterKey(inputs.keyboard.speedUp).up or Input.getKeyUp(rightShoulder)) then
 		speedMultiplierHoldBuffer = false
 	end
 
@@ -2028,7 +2057,7 @@ function readOtherInputs()
 	end
 
 	if
-		(Input.getKey(leftShiftInput) or Input.getKey(rightShoulder))
+		(getCasterKey(inputs.keyboard.speedUp).held or Input.getKey(rightShoulder))
 		and speedIndex == #speedGears
 		and not speedMultiplierHoldBuffer
 	then
@@ -2086,16 +2115,16 @@ function readOtherInputs()
 		end
 	end
 
-	if (Input.getKey(leftAlt) and Input.getKeyDown(qInput)) or Input.getKeyDown(leftJoystick) then
+	if getCasterKey(inputs.keyboard.lineOfSight).down or Input.getKeyDown(leftJoystick) then
 		getBallVariant = GetBallVariant.LineOfSight
 	end
 
-	if (Input.getKey(leftAlt) and Input.getKeyDown(eInput)) or Input.getKeyDown(rightJoystick) then
+	if getCasterKey(inputs.keyboard.playerBallDistance).down or Input.getKeyDown(rightJoystick) then
 		getBallVariant = GetBallVariant.PlayerBallDistance
 	end
 
 	if not Input.getKey(dPadLeft) then
-		if Input.getKeyDown(vInput) or Input.getKeyDown(topFaceButton) then
+		if getCasterKey(inputs.keyboard.thirdPerson).down or Input.getKeyDown(topFaceButton) then
 			if currentPlayerName == "" or cameraMode == thirdPersonMode then
 				cameraMode = thirdPersonMode
 				getPlayer()
@@ -2105,7 +2134,7 @@ function readOtherInputs()
 			end
 		end
 
-		if Input.getKeyDown(cInput) or Input.getKeyDown(rightFaceButton) then
+		if getCasterKey(inputs.keyboard.firstPerson).down or Input.getKeyDown(rightFaceButton) then
 			if currentPlayerName == "" or cameraMode == CameraMode.FirstPerson then
 				cameraMode = CameraMode.FirstPerson
 				getPlayer()
@@ -2115,14 +2144,14 @@ function readOtherInputs()
 			end
 		end
 
-		if Input.getKeyDown(leftFaceButton) or Input.getKeyDown(zInput) then
+		if getCasterKey(inputs.keyboard.freeCam).down or Input.getKeyDown(leftFaceButton) then
 			if playerFollow then
 				stopFollow()
 			end
 		end
 	end
 
-	if playerFollow and (Input.getKeyDown(leftShoulder) or Input.getKeyDown(aInput)) then
+	if playerFollow and (Input.getKeyDown(leftShoulder) or Input.getKeyDown(inputs.keyboard.previousPlayer.hotkey)) then
 		currentPlayerIndex -= 1
 		if currentPlayerIndex < 1 then
 			currentPlayerIndex = #selectedArena.players
@@ -2131,7 +2160,7 @@ function readOtherInputs()
 		currentPlayerId = selectedArena.players[currentPlayerIndex].playerId
 		followPlayer()
 	end
-	if playerFollow and (Input.getKeyDown(rightShoulder) or Input.getKeyDown(dInput)) then
+	if playerFollow and (Input.getKeyDown(rightShoulder) or Input.getKeyDown(inputs.keyboard.nextPlayer.hotkey)) then
 		currentPlayerIndex += 1
 		if currentPlayerIndex > #selectedArena.players then
 			currentPlayerIndex = 1
@@ -2149,21 +2178,21 @@ function readMoveInput()
 		Horizontal = Input.getAnalog(leftAnalogHorizontal)
 		return
 	else
-		if Input.getKey(wInput) and Input.getKey(sInput) then
+		if getCasterKey(inputs.keyboard.forwards).held and getCasterKey(inputs.keyboard.backwards).held then
 			Vertical = 0
-		elseif Input.getKey(wInput) then
+		elseif getCasterKey(inputs.keyboard.forwards).held then
 			Vertical = 1
-		elseif Input.getKey(sInput) then
+		elseif getCasterKey(inputs.keyboard.backwards).held then
 			Vertical = -1
 		else
 			Vertical = 0
 		end
 
-		if Input.getKey(dInput) and Input.getKey(aInput) then
+		if getCasterKey(inputs.keyboard.right).held and getCasterKey(inputs.keyboard.left).held then
 			Horizontal = 0
-		elseif Input.getKey(dInput) then
+		elseif getCasterKey(inputs.keyboard.right).held then
 			Horizontal = 1
-		elseif Input.getKey(aInput) then
+		elseif getCasterKey(inputs.keyboard.left).held then
 			Horizontal = -1
 		else
 			Horizontal = 0
@@ -2185,15 +2214,11 @@ function readUpInput()
 		return
 	end
 
-	if Input.getKey(leftAlt) then
-		return
-	end
-
-	if Input.getKey(qInput) and Input.getKey(eInput) then
+	if getCasterKey(inputs.keyboard.down).held and getCasterKey(inputs.keyboard.up).held then
 		Up = 0
-	elseif Input.getKey(eInput) then
+	elseif getCasterKey(inputs.keyboard.up).held then
 		Up = 1
-	elseif Input.getKey(qInput) then
+	elseif getCasterKey(inputs.keyboard.down).held then
 		Up = -1
 	else
 		Up = 0
