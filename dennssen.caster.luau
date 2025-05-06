@@ -17,6 +17,15 @@ local function parseBallJSON(str)
 	return result
 end
 
+function getDictSize(dict): number
+	local i = 0
+	for _, _ in dict do
+		i += 1
+	end
+
+	return i
+end
+
 local deltaTime: number = 0
 
 local loadTime: number
@@ -608,11 +617,274 @@ local GetBallVariant = {
 local getBallVariant = config.getBallVariant
 
 -- Input
+local keyboardKeys: { string } = {
+	"Tab",
+	"Enter",
+	"Pause",
+	"CapsLock",
+	"Escape",
+	"SpaceBar",
+	"PageUp",
+	"PageDown",
+	"End",
+	"Home",
+	"Left",
+	"Up",
+	"Right",
+	"Down",
+	"Insert",
+	"BackSpace",
+	"Delete",
+	"Zero",
+	"One",
+	"Two",
+	"Three",
+	"Four",
+	"Five",
+	"Six",
+	"Seven",
+	"Eight",
+	"Nine",
+	"A",
+	"B",
+	"C",
+	"D",
+	"E",
+	"F",
+	"G",
+	"H",
+	"I",
+	"J",
+	"K",
+	"L",
+	"M",
+	"N",
+	"O",
+	"P",
+	"Q",
+	"R",
+	"S",
+	"T",
+	"U",
+	"V",
+	"W",
+	"X",
+	"Y",
+	"Z",
+	"NumPadZero",
+	"NumPadOne",
+	"NumPadTwo",
+	"NumPadThree",
+	"NumPadFour",
+	"NumPadFive",
+	"NumPadSix",
+	"NumPadSeven",
+	"NumPadEight",
+	"NumPadNine",
+	"Multiply",
+	"Add",
+	"Subtract",
+	"Decimal",
+	"Divide",
+	"F1",
+	"F2",
+	"F3",
+	"F4",
+	"F5",
+	"F6",
+	"F7",
+	"F8",
+	"F9",
+	"F10",
+	"F11",
+	"F12",
+	"NumLock",
+	"ScrollLock",
+	"LeftShift",
+	"RightShift",
+	"LeftControl",
+	"RightControl",
+	"LeftAlt",
+	"RightAlt",
+	"LeftCommand",
+	"RightCommand",
+	"Semicolon",
+	"Equals",
+	"Comma",
+	"Hyphen",
+	"Underscore",
+	"Period",
+	"Slash",
+	"Tilde",
+	"LeftBracket",
+	"Backslash",
+	"RightBracket",
+	"Apostrophe",
+	"Quote",
+	"LeftParantheses",
+	"RightParantheses",
+	"Ampersand",
+	"Asterix",
+	"Caret",
+	"Dollar",
+	"Exclamation",
+	"Colon",
+	"A_AccentGrave",
+	"E_AccentGrave",
+	"E_AccentAigu",
+	"C_Cedille",
+	"Section",
+}
+
+function getAnyKeyboardKeyDown()
+	local bannedInputs = {}
+
+	for _, key in pairs(keyboardKeys) do
+		if Input.getKeyDown(Input.Key[key]) then
+			local banned = false
+			for _, bannedValue: Key in pairs(bannedInputs) do
+				if bannedValue == Input.Key[key] then
+					banned = true
+					break
+				end
+			end
+
+			if banned then
+				continue
+			end
+
+			return Input.Key[key]
+		end
+	end
+	return nil
+end
+
+function getAnyKeyboardKeyUp()
+	local bannedInputs = {}
+
+	for _, key in pairs(keyboardKeys) do
+		if Input.getKeyUp(Input.Key[key]) then
+			local banned = false
+			for _, bannedValue: Key in pairs(bannedInputs) do
+				if bannedValue == Input.Key[key] then
+					banned = true
+					break
+				end
+			end
+
+			if banned then
+				continue
+			end
+
+			return Input.Key[key]
+		end
+	end
+	return nil
+end
+
 local Vertical: number = 0
 local Horizontal: number = 0
 local Up: number = 0
 local deadzone: number = config.deadzone
 local rotEuler: Vec3 = Vec3.zeroVector
+
+local pressedInputKeys = {}
+
+local modifierKeys = {
+	"LeftAlt",
+	"LeftControl",
+	"LeftShift",
+	"RightAlt",
+	"RightControl",
+	"RightShift",
+}
+
+type CasterInput = {
+	hotkey: Key,
+	modifiers: { Key }?,
+	description: string,
+	editable: boolean,
+}
+
+function createCasterInput(_hotkey: Key, _description: string, _modifires: { Key }?, _editable: boolean?): CasterInput
+	if _editable == nil then
+		_editable = true
+	end
+
+	return {
+		hotkey = _hotkey,
+		description = _description,
+		modifiers = _modifires,
+		editable = _editable,
+	}
+end
+
+function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boolean }
+	local primary = key.hotkey
+	local modifiers = key.modifiers
+
+	local inputData = {
+		down = false,
+		held = false,
+		up = false,
+	}
+
+	-- no keys are pressed atm
+	if getDictSize(pressedInputKeys) == 0 then
+		return inputData
+	end
+
+	-- primary key isn't pressed so no point in checking modifiers
+	if pressedInputKeys[tostring(primary)] == nil then
+		return inputData
+	end
+
+	local currentPrimaryTime = pressedInputKeys[tostring(primary)].time
+
+	if modifiers then
+		-- check for modifier keys not being held down
+		for _, key: Key in modifiers do
+			if not Input.getKeyDown(key) and not Input.getKey(key) then
+				return inputData
+			end
+
+			-- if modifier is pressed after primary we don't allow the input
+			local modTime = pressedInputKeys[tostring(key)].time
+			if modTime > currentPrimaryTime then
+				return inputData
+			end
+		end
+	else
+		-- check for unwanted modifier keys that are pressed and held down and also CONCIDERED modifiers
+		for _, key: string in modifierKeys do
+			local modifier = pressedInputKeys[key]
+			if modifier == nil then
+				continue
+			end
+
+			-- check if the modifier key is concidered a modifier
+			local isModifier = modifier.isModifier and key ~= tostring(primary)
+
+			if (Input.getKeyDown(Input.Key[key]) or Input.getKey(Input.Key[key])) and isModifier then
+				return inputData
+			end
+		end
+	end
+
+	if Input.getKeyDown(primary) then
+		inputData.down = true
+	end
+
+	if Input.getKey(primary) then
+		inputData.held = true
+	end
+
+	if Input.getKeyUp(primary) then
+		inputData.up = true
+	end
+
+	return inputData
+end
 
 --  Keyboard
 local wInput = Input.Key.W
@@ -692,6 +964,7 @@ function main()
 	if overlayCamera ~= nil then
 		usingOverlay = true
 	end
+	print(pressedInputKeys)
 end
 
 function getLastEnumValue(enum): number
@@ -1898,38 +2171,6 @@ function readMoveInput()
 	end
 end
 
-function readVerticalInput()
-	if Input.getAnalog(leftAnalogVertical) then
-		Vertical = Input.getAnalog(leftAnalogVertical)
-	end
-
-	if Input.getKey(wInput) and Input.getKey(sInput) then
-		Vertical = 0
-	elseif Input.getKey(wInput) then
-		Vertical = 1
-	elseif Input.getKey(sInput) then
-		Vertical = -1
-	else
-		Vertical = 0
-	end
-end
-
-function readHorizontalInput()
-	if Input.getAnalog(leftAnalogHorizontal) then
-		Horizontal = Input.getAnalog(leftAnalogHorizontal)
-	end
-
-	if Input.getKey(dInput) and Input.getKey(aInput) then
-		Horizontal = 0
-	elseif Input.getKey(dInput) then
-		Horizontal = 1
-	elseif Input.getKey(aInput) then
-		Horizontal = -1
-	else
-		Horizontal = 0
-	end
-end
-
 function readUpInput()
 	if Input.getKey(leftTrigger) or Input.getKey(rightTrigger) then
 		if Input.getKey(leftTrigger) and Input.getKey(rightTrigger) then
@@ -1999,7 +2240,7 @@ function rotateCamera()
 	end
 
 	-- Gamepad
-	turnVelocity = Vec2.new(Input.getAnalog(Input.Gamepad.RightX), Input.getAnalog(Input.Gamepad.RightY))
+	turnVelocity = Vec2.new(Input.getAnalog(rightAnalogHorizontal), Input.getAnalog(rightAnalogVertical))
 		* controllerSensitivity
 		* 2
 
@@ -2563,12 +2804,44 @@ function getTeamColors()
 	end
 end
 
+function setNewInputTimes()
+	local newInput = getAnyKeyboardKeyDown()
+
+	if newInput then
+		local conciderModifier = true
+		if table.find(modifierKeys, tostring(newInput)) ~= nil then
+			for key, pressedInput in pressedInputKeys do
+				if table.find(modifierKeys, key) == nil then
+					conciderModifier = false
+				end
+			end
+		else
+			conciderModifier = false
+		end
+
+		pressedInputKeys[tostring(newInput)] = {
+			time = os.clock(),
+			isModifier = conciderModifier,
+		}
+	end
+end
+
+function setOldInputTimes()
+	local oldInput = getAnyKeyboardKeyUp()
+
+	if oldInput then
+		pressedInputKeys[tostring(oldInput)] = nil
+	end
+end
+
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = false
 		onExit()
 		return
 	end
+
+	setNewInputTimes()
 
 	deltaTime = dt
 	camera.fieldOfView = cameraFOV
@@ -2604,6 +2877,7 @@ function tick(dt)
 			ballInCenterCheck()
 		end
 		sendArenaInfo()
+		setOldInputTimes()
 		return
 	end
 
@@ -2619,6 +2893,8 @@ function tick(dt)
 		ballInCenterCheck()
 	end
 	sendArenaInfo()
+
+	setOldInputTimes()
 
 	if boundingBoxDebug then
 		for _, arena in arenas do
