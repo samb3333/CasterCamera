@@ -36,6 +36,12 @@ local CameraMode = {
 	VelocityRotation = 3,
 	FaceTheBall = 4,
 }
+local CAMERA_MODE_NAMES = {
+	[1] = "First Person",
+	[2] = "Head Rotation",
+	[3] = "Velocity Rotation",
+	[4] = "Face The Ball",
+}
 
 -- Bounding Box start
 
@@ -360,6 +366,7 @@ local function initializeConfig()
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
 		sendOverlayInfo = false,
+		thirdPersonMode = 2,
 		homeTeamDefaultColor = {
 			r = 0,
 			g = 0.5,
@@ -577,6 +584,12 @@ local currentPlayerIndex: number = 1
 local followFOV: number = config.followFOV
 local followPosititonSmoothing: number = config.followPosititonSmoothing
 local followRadius: number = config.followRadius
+local thirdPersonMode: number = config.thirdPersonMode
+local THIRD_PERSON_MODES = {
+	HeadRotation = 2,
+	VelocityRotation = 3,
+	FaceTheBall = 4,
+}
 
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
@@ -679,6 +692,17 @@ function main()
 	if overlayCamera ~= nil then
 		usingOverlay = true
 	end
+end
+
+function getLastEnumValue(enum): number
+	local lastValue: number = 0
+	for key, value in enum do
+		if value > lastValue then
+			lastValue = value
+		end
+	end
+
+	return lastValue
 end
 
 function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globalOverviewRotation: Quat): string
@@ -935,18 +959,39 @@ Controller:
 			"The default color for team Away, this gets overwritten by the actual color when a player joins the team"
 		)
 		Gui.unindent()
+		Gui.newLine()
 	end
 
 	if Gui.collapsingHeader("POV") then
-		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing##2", followPosititonSmoothing, 0, 1)
-		Gui.setItemTooltip("Sets the smoothing for when the camera is in POV mode")
-		followPosititonSmoothing = math.clamp(followPosititonSmoothing, 0, 1)
+		Gui.indent()
+
 		followFOV = Gui.sliderInt("Field of View", followFOV, 1, 179)
 		Gui.setItemTooltip("Sets the FOV for when the camera is in POV mode")
 		followFOV = math.clamp(followFOV, 1, 179)
+
+		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing##2", followPosititonSmoothing, 0, 1)
+		Gui.setItemTooltip("Sets the smoothing for when the camera is in POV mode")
+		followPosititonSmoothing = math.clamp(followPosititonSmoothing, 0, 1)
+
+		Gui.newLine()
+
+		if Gui.beginCombo("Third Person Mode", CAMERA_MODE_NAMES[thirdPersonMode]) then
+			for key, value in THIRD_PERSON_MODES do
+				if Gui.selectable(CAMERA_MODE_NAMES[value], thirdPersonMode == value) then
+					thirdPersonMode = value
+				end
+			end
+			Gui.endCombo()
+		end
+		Gui.setItemTooltip("Sets the Camera Mode to be used in 3rd Person POV mode")
+		thirdPersonMode = math.clamp(thirdPersonMode, 2, #CAMERA_MODE_NAMES)
+
 		followRadius = Gui.sliderFloat("3rd Person Radius", followRadius, 5, 100)
 		Gui.setItemTooltip("The distance from the player when the camera is in 3rd Person POV mode")
 		followRadius = math.clamp(followRadius, 5, 100)
+
+		Gui.unindent()
+		Gui.newLine()
 	end
 
 	if Gui.collapsingHeader("Overviews") then
@@ -974,13 +1019,15 @@ Controller:
 		end
 
 		Gui.unindent()
+		Gui.newLine()
 	end
 
 	if usingOverlay then
 		if Gui.collapsingHeader("Overlay") then
+			Gui.indent()
 			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
 			Gui.setItemTooltip(
-				"Toggle this off to stop the camera from sending info to the overlay even if you have the overlay script \nThis is useful for keeping the overlay info config small when not using the overlay, as this avoids crashing."
+				"Toggle this off to stop the camera from sending info to the overlay even if you have the overlay script \nThis is useful if you don't want the script to reload because you have pressed F5 (spectator bug)"
 			)
 
 			Gui.newLine()
@@ -997,6 +1044,7 @@ Controller:
 					},
 				})
 			end
+			Gui.unindent()
 		end
 	end
 	Gui.unindent()
@@ -1021,6 +1069,7 @@ Controller:
 		config.vibrance = vibrance
 		config.getBallVariant = getBallVariant
 		config.sendOverlayInfo = sendOverlayInfo
+		config.thirdPersonMode = thirdPersonMode
 		config.homeTeamDefaultColor = {
 			r = homeTeamDefaultColor.r,
 			g = homeTeamDefaultColor.g,
@@ -1774,11 +1823,11 @@ function readOtherInputs()
 
 	if not Input.getKey(dPadLeft) then
 		if Input.getKeyDown(vInput) or Input.getKeyDown(topFaceButton) then
-			if currentPlayerName == "" or cameraMode == CameraMode.HeadRotation then
-				cameraMode = CameraMode.HeadRotation
+			if currentPlayerName == "" or cameraMode == thirdPersonMode then
+				cameraMode = thirdPersonMode
 				getPlayer()
 			else
-				cameraMode = CameraMode.HeadRotation
+				cameraMode = thirdPersonMode
 				followPlayer()
 			end
 		end
