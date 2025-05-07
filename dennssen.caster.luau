@@ -800,20 +800,28 @@ local modifierKeys = {
 }
 
 type CasterInput = {
+	name: string,
+	description: string,
 	hotkey: Key,
 	modifiers: { Key }?,
-	description: string,
 	editable: boolean,
 }
 
-function createCasterInput(_hotkey: Key, _description: string, _modifires: { Key }?, _editable: boolean?): CasterInput
+function createCasterInput(
+	_name: string,
+	_description: string,
+	_hotkey: Key,
+	_modifires: { Key }?,
+	_editable: boolean?
+): CasterInput
 	if _editable == nil then
 		_editable = true
 	end
 
 	return {
-		hotkey = _hotkey,
+		name = _name,
 		description = _description,
+		hotkey = _hotkey,
 		modifiers = _modifires,
 		editable = _editable,
 	}
@@ -888,60 +896,78 @@ end
 
 local inputs = {
 	keyboard = {
-		forwards = createCasterInput(Input.Key.W, "Moves the camera in the forwards direction"),
-		right = createCasterInput(Input.Key.D, "Moves the camera in the right direction"),
-		left = createCasterInput(Input.Key.A, "Moves the camera in the left direction"),
-		backwards = createCasterInput(Input.Key.S, "Moves the camera in the backwards direction"),
-		up = createCasterInput(Input.Key.E, "Moves the camera in the up direction"),
-		down = createCasterInput(Input.Key.Q, "Moves the camera in the down direction"),
-		nextPlayer = createCasterInput(Input.Key.D, "Switches to the next player in POV mode"),
-		previousPlayer = createCasterInput(Input.Key.A, "Switches to the previous player in POV mode"),
+		forwards = createCasterInput("Move Forwards", "Moves the camera in the forwards direction", Input.Key.W),
+		right = createCasterInput("Move Right", "Moves the camera in the right direction", Input.Key.D),
+		left = createCasterInput("Move Left", "Moves the camera in the left direction", Input.Key.A),
+		backwards = createCasterInput("Move Backwards", "Moves the camera in the backwards direction", Input.Key.S),
+		up = createCasterInput("Move Up", "Moves the camera in the up direction", Input.Key.E),
+		down = createCasterInput("Move Down", "Moves the camera in the down direction", Input.Key.Q),
+		nextPlayer = createCasterInput("Next Player", "Switches to the next player in POV mode", Input.Key.D),
+		previousPlayer = createCasterInput(
+			"Previous Player",
+			"Switches to the previous player in POV mode",
+			Input.Key.A
+		),
 		lineOfSight = createCasterInput(
-			Input.Key.Q,
+			"Line of Sight (Get Player Method)",
 			"Sets the get player method to 'player closest to line of sight'",
+			Input.Key.Q,
 			{ Input.Key.LeftAlt }
 		),
 		playerBallDistance = createCasterInput(
-			Input.Key.E,
+			"Closest to Ball (Get Player Method)",
 			"Sets the get player method to 'player closest to the ball'",
+			Input.Key.E,
 			{ Input.Key.LeftAlt }
 		),
 		speedUp = createCasterInput(
-			Input.Key.LeftShift,
-			"Speeds up the camera by one gear (Or doubles speed if held down at top gear)"
+			"Speed Up",
+			"Speeds up the camera by one gear (Or doubles speed if held down at top gear)",
+			Input.Key.LeftShift
 		),
-		speedDown = createCasterInput(Input.Key.LeftControl, "Slows down the camera by one gear"),
+		speedDown = createCasterInput("Speed Down", "Slows down the camera by one gear", Input.Key.LeftControl),
 		thirdPerson = createCasterInput(
-			Input.Key.V,
-			"Changes the camera mode to POV if you aren't already and will switch to Third Person view (It will get a new player acording to the 'get player method' if you are already in Third Person)"
+			"Third Person (POV mode)",
+			"Changes the camera mode to POV if you aren't already and will switch to Third Person view (It will get a new player acording to the 'get player method' if you are already in Third Person)",
+			Input.Key.V
 		),
 		firstPerson = createCasterInput(
-			Input.Key.C,
-			"Changes the camera mode to POV if you aren't already and will switch to First Person view (It will get a new player acording to the 'get player method' if you are already in First Person)"
+			"First Person (POV mode)",
+			"Changes the camera mode to POV if you aren't already and will switch to First Person view (It will get a new player acording to the 'get player method' if you are already in First Person)",
+			Input.Key.C
 		),
-		freeCam = createCasterInput(Input.Key.Z, "Changes the camera mode to Free Cam"),
+		freeCam = createCasterInput("Free Cam", "Changes the camera mode to Free Cam", Input.Key.Z),
 		overview1 = createCasterInput(
-			Input.Key.Five,
-			"Sets the cameras transform to the transform of the first overview"
+			"First Overview",
+			"Sets the cameras transform to the transform of the first overview",
+			Input.Key.Five
 		),
 		overview2 = createCasterInput(
-			Input.Key.Six,
-			"Sets the cameras transform to the transform of the second overview"
+			"Second Overview",
+			"Sets the cameras transform to the transform of the second overview",
+			Input.Key.Six
 		),
 		overview3 = createCasterInput(
-			Input.Key.Seven,
-			"Sets the cameras transform to the transform of the third overview"
+			"Third Overview",
+			"Sets the cameras transform to the transform of the third overview",
+			Input.Key.Seven
 		),
 		getClosestArena = createCasterInput(
-			Input.Key.Enter,
-			"Sets the selected arena to the arena closest to you. (make sure to be inside the arena for the best outcome)"
+			"Select Closest Arena",
+			"Sets the selected arena to the arena closest to you. (make sure to be inside the arena for the best outcome)",
+			Input.Key.Enter
 		),
-		clearOverlayInfo = createCasterInput(Input.Key.BackSpace, "Clears the overlay scripts configuration"),
+		clearOverlayInfo = createCasterInput(
+			"Clear Overlay Info",
+			"Clears the overlay scripts configuration",
+			Input.Key.BackSpace
+		),
 		lookAround = createCasterInput(
-			Input.Key.RightMouseButton,
-			"Held down allows you to rotate your camera with your mouse"
+			"Look Around",
+			"Held down allows you to rotate your camera with your mouse",
+			Input.Key.RightMouseButton
 		),
-		resetFOV = createCasterInput(Input.Key.MiddleMouseButton, "Resets the FOV to your default FOV"),
+		resetFOV = createCasterInput("Reset FOV", "Resets the FOV to your default FOV", Input.Key.MiddleMouseButton),
 	},
 }
 
