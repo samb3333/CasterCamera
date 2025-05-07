@@ -896,78 +896,65 @@ end
 
 local inputs = {
 	keyboard = {
-		forwards = createCasterInput("Move Forwards", "Moves the camera in the forwards direction", Input.Key.W),
-		right = createCasterInput("Move Right", "Moves the camera in the right direction", Input.Key.D),
-		left = createCasterInput("Move Left", "Moves the camera in the left direction", Input.Key.A),
-		backwards = createCasterInput("Move Backwards", "Moves the camera in the backwards direction", Input.Key.S),
-		up = createCasterInput("Move Up", "Moves the camera in the up direction", Input.Key.E),
-		down = createCasterInput("Move Down", "Moves the camera in the down direction", Input.Key.Q),
-		nextPlayer = createCasterInput("Next Player", "Switches to the next player in POV mode", Input.Key.D),
-		previousPlayer = createCasterInput(
-			"Previous Player",
-			"Switches to the previous player in POV mode",
-			Input.Key.A
-		),
+		forwards = createCasterInput("Move Forwards", "Move camera forward", Input.Key.W),
+		right = createCasterInput("Move Right", "Move camera right", Input.Key.D),
+		left = createCasterInput("Move Left", "Move camera left", Input.Key.A),
+		backwards = createCasterInput("Move Backwards", "Move camera backward", Input.Key.S),
+		up = createCasterInput("Move Up", "Move camera up", Input.Key.E),
+		down = createCasterInput("Move Down", "Move camera down", Input.Key.Q),
+		nextPlayer = createCasterInput("Next Player", "Cycle to next player (POV mode)", Input.Key.D),
+		previousPlayer = createCasterInput("Previous Player", "Cycle to previous player (POV mode)", Input.Key.A),
 		lineOfSight = createCasterInput(
-			"Line of Sight (Get Player Method)",
-			"Sets the get player method to 'player closest to line of sight'",
+			"Line of Sight",
+			"Target: Player in line of sight",
 			Input.Key.Q,
 			{ Input.Key.LeftAlt }
 		),
 		playerBallDistance = createCasterInput(
-			"Closest to Ball (Get Player Method)",
-			"Sets the get player method to 'player closest to the ball'",
+			"Closest to Ball",
+			"Target: Player nearest ball",
 			Input.Key.E,
 			{ Input.Key.LeftAlt }
 		),
-		speedUp = createCasterInput(
-			"Speed Up",
-			"Speeds up the camera by one gear (Or doubles speed if held down at top gear)",
-			Input.Key.LeftShift
-		),
-		speedDown = createCasterInput("Speed Down", "Slows down the camera by one gear", Input.Key.LeftControl),
-		thirdPerson = createCasterInput(
-			"Third Person (POV mode)",
-			"Changes the camera mode to POV if you aren't already and will switch to Third Person view (It will get a new player acording to the 'get player method' if you are already in Third Person)",
-			Input.Key.V
-		),
-		firstPerson = createCasterInput(
-			"First Person (POV mode)",
-			"Changes the camera mode to POV if you aren't already and will switch to First Person view (It will get a new player acording to the 'get player method' if you are already in First Person)",
-			Input.Key.C
-		),
-		freeCam = createCasterInput("Free Cam", "Changes the camera mode to Free Cam", Input.Key.Z),
-		overview1 = createCasterInput(
-			"First Overview",
-			"Sets the cameras transform to the transform of the first overview",
-			Input.Key.Five
-		),
-		overview2 = createCasterInput(
-			"Second Overview",
-			"Sets the cameras transform to the transform of the second overview",
-			Input.Key.Six
-		),
-		overview3 = createCasterInput(
-			"Third Overview",
-			"Sets the cameras transform to the transform of the third overview",
-			Input.Key.Seven
-		),
-		getClosestArena = createCasterInput(
-			"Select Closest Arena",
-			"Sets the selected arena to the arena closest to you. (make sure to be inside the arena for the best outcome)",
-			Input.Key.Enter
-		),
-		clearOverlayInfo = createCasterInput(
-			"Clear Overlay Info",
-			"Clears the overlay scripts configuration",
-			Input.Key.BackSpace
-		),
-		lookAround = createCasterInput(
-			"Look Around",
-			"Held down allows you to rotate your camera with your mouse",
-			Input.Key.RightMouseButton
-		),
-		resetFOV = createCasterInput("Reset FOV", "Resets the FOV to your default FOV", Input.Key.MiddleMouseButton),
+		speedUp = createCasterInput("Speed Up", "Increase camera speed", Input.Key.LeftShift),
+		speedDown = createCasterInput("Speed Down", "Decrease camera speed", Input.Key.LeftControl),
+		thirdPerson = createCasterInput("Third Person", "Toggle third-person view", Input.Key.V),
+		firstPerson = createCasterInput("First Person", "Toggle first-person view", Input.Key.C),
+		freeCam = createCasterInput("Free Cam", "Switch to free camera", Input.Key.Z),
+		overview1 = createCasterInput("Overview 1", "Jump to first overview position", Input.Key.Five),
+		overview2 = createCasterInput("Overview 2", "Jump to second overview position", Input.Key.Six),
+		overview3 = createCasterInput("Overview 3", "Jump to third overview position", Input.Key.Seven),
+		getClosestArena = createCasterInput("Select Arena", "Select closest arena", Input.Key.Enter),
+		clearOverlayInfo = createCasterInput("Clear Overlay", "Reset overlay settings", Input.Key.BackSpace),
+		lookAround = createCasterInput("Look Around", "Hold to rotate camera", Input.Key.RightMouseButton),
+		resetFOV = createCasterInput("Reset FOV", "Reset field of view", Input.Key.MiddleMouseButton),
+	},
+}
+
+local inputOrder = {
+	keyboard = {
+		"forwards",
+		"right",
+		"left",
+		"backwards",
+		"up",
+		"down",
+		"nextPlayer",
+		"previousPlayer",
+		"lineOfSight",
+		"playerBallDistance",
+		"speedUp",
+		"speedDown",
+		"thirdPerson",
+		"firstPerson",
+		"freeCam",
+		"overview1",
+		"overview2",
+		"overview3",
+		"getClosestArena",
+		"clearOverlayInfo",
+		"lookAround",
+		"resetFOV",
 	},
 }
 
@@ -1107,37 +1094,36 @@ function onGui()
 		end
 
 		if keyboardControls then
-			Gui.text([[
-Keyboard (Controller is recommended):
-	Modes:
-		Z - Freecam Mode
-		C - FirstPerson Mode
-		V - ThirdPerson Mode
+			if Gui.beginTable("KeyboardControls", 3) then
+				Gui.tableSetupColumn("Name")
+				Gui.tableSetupColumn("Description")
+				Gui.tableSetupColumn("Hotkey")
+				Gui.tableHeadersRow()
 
-	In Freecam mode:
-		WASD - Horizontal Movement
-		QE - Vertical Movement
-		Right Mouse + Mouse Move - Rotating
-		LeftShift - Gear Increase
-		LeftControl - Gear Decrease
-		Left Alt + E - "Get Player Method" = Player Closest To Ball
-		Left Alt + Q - "Get Player Method" = Player Closest To Lign of Sight
-		Scroll Wheel Up - Zoom In
-		Scroll Wheel Down - Zoom Out
+				for _, casterInputKey: string in inputOrder.keyboard do
+					local casterInput = inputs.keyboard[casterInputKey]
 
-	In FirstPerson & ThirdPerson mode:
-		A - Left Player Cycle
-		D - Right Player Cycle
-		
-	In All modes:
-		5/NumPadOne - First Overview
-		6/NumPadTwo - Second Overview
-		7/NumPadThree - Third Overview
+					Gui.tableNextRow()
+					Gui.tableNextColumn()
+					Gui.text(casterInput.name)
+					Gui.tableNextColumn()
+					Gui.text(casterInput.description)
+					Gui.tableNextColumn()
 
-		Enter - Get Closest Arena
+					local buttonLabel = ""
+					if casterInput.modifiers then
+						for _, input: Key in casterInput.modifiers do
+							buttonLabel = buttonLabel .. `{tostring(input)} + `
+						end
+					end
+					buttonLabel = buttonLabel .. `{tostring(casterInput.hotkey)}`
 
-		^^The Overviews Side is based on which side the ball is on^^
-	]])
+					if Gui.button(`{buttonLabel}##{casterInputKey}`) then
+						print(`here: {buttonLabel}`)
+					end
+				end
+				Gui.endTable()
+			end
 		end
 
 		if controllerControls then
