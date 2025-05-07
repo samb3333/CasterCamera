@@ -920,33 +920,39 @@ local inputs = {
 			"Changes the camera mode to POV if you aren't already and will switch to First Person view (It will get a new player acording to the 'get player method' if you are already in First Person)"
 		),
 		freeCam = createCasterInput(Input.Key.Z, "Changes the camera mode to Free Cam"),
+		overview1 = createCasterInput(
+			Input.Key.Five,
+			"Sets the cameras transform to the transform of the first overview"
+		),
+		overview2 = createCasterInput(
+			Input.Key.Six,
+			"Sets the cameras transform to the transform of the second overview"
+		),
+		overview3 = createCasterInput(
+			Input.Key.Seven,
+			"Sets the cameras transform to the transform of the third overview"
+		),
+		getClosestArena = createCasterInput(
+			Input.Key.Enter,
+			"Sets the selected arena to the arena closest to you. (make sure to be inside the arena for the best outcome)"
+		),
+		clearOverlayInfo = createCasterInput(Input.Key.BackSpace, "Clears the overlay scripts configuration"),
+		lookAround = createCasterInput(
+			Input.Key.RightMouseButton,
+			"Held down allows you to rotate your camera with your mouse"
+		),
+		resetFOV = createCasterInput(Input.Key.MiddleMouseButton, "Resets the FOV to your default FOV"),
 	},
 }
 
---  Keyboard
-local zInput = Input.Key.Z
-local numPadOne = Input.Key.NumPadOne
-local numPadTwo = Input.Key.NumPadTwo
-local numPadThree = Input.Key.NumPadThree
+--  Keyboard (debug)
 local one = Input.Key.One
 local two = Input.Key.Two
 local three = Input.Key.Three
-local four = Input.Key.Four
-local five = Input.Key.Five
-local six = Input.Key.Six
-local seven = Input.Key.Seven
-local eight = Input.Key.Eight
-local nine = Input.Key.Nine
-local zero = Input.Key.Zero
-local leftAlt = Input.Key.LeftAlt
-local enter = Input.Key.Enter
-local backspace = Input.Key.BackSpace
 
 --  Mouse
 local invertMouseLookHorizontal: boolean = config.invertMouseLookHorizontal
 local invertMouseLookVertical: boolean = config.invertMouseLookVertical
-local rightMouseButton = Input.Key.RightMouseButton
-local middleMouseButton = Input.Key.MiddleMouseButton
 local mouseSensitivity: number = config.mouseSensitivity
 local mouseWheelAxis = Input.Key.MouseWheelAxis
 
@@ -2025,7 +2031,7 @@ function readOtherInputs()
 
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
-	if Input.getKeyDown(middleMouseButton) or Input.getKeyDown(dPadRight) then
+	if getCasterKey(inputs.keyboard.resetFOV).down or Input.getKeyDown(dPadRight) then
 		cameraFOV = config.cameraFOV
 	end
 
@@ -2044,13 +2050,13 @@ function readOtherInputs()
 		speedMultiplierHoldBuffer = false
 	end
 
-	if Input.getKeyDown(enter) then
+	if getCasterKey(inputs.keyboard.getClosestArena) then
 		selectedArena = getClosestArena(camera.position)
 		selectedArena.home.players = {}
 		selectedArena.away.players = {}
 	end
 
-	if Input.getKeyDown(backspace) then
+	if getCasterKey(inputs.keyboard.clearOverlayInfo).down then
 		sendMessage(overlayCamera, {
 			info = "clearStats",
 		})
@@ -2067,8 +2073,7 @@ function readOtherInputs()
 	end
 
 	if
-		(Input.getKeyDown(numPadOne) or Input.getKeyDown(five))
-		or (Input.getKey(dPadLeft) and Input.getKeyDown(leftFaceButton))
+		getCasterKey(inputs.keyboard.overview1).down or (Input.getKey(dPadLeft) and Input.getKeyDown(leftFaceButton))
 	then
 		if playerFollow then
 			stopFollow()
@@ -2082,10 +2087,7 @@ function readOtherInputs()
 			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
 		end
 	end
-	if
-		(Input.getKeyDown(numPadTwo) or Input.getKeyDown(six))
-		or (Input.getKey(dPadLeft) and Input.getKeyDown(topFaceButton))
-	then
+	if getCasterKey(inputs.keyboard.overview2).down or (Input.getKey(dPadLeft) and Input.getKeyDown(topFaceButton)) then
 		if playerFollow then
 			stopFollow()
 		end
@@ -2099,7 +2101,7 @@ function readOtherInputs()
 		end
 	end
 	if
-		(Input.getKeyDown(numPadThree) or Input.getKeyDown(seven))
+		getCasterKey(inputs.keyboard.overview3).down
 		or (Input.getKey(dPadLeft) and Input.getKeyDown(rightFaceButton))
 	then
 		if playerFollow then
@@ -2259,7 +2261,7 @@ function rotateCamera()
 	end
 
 	-- Keyboard
-	if Input.getKey(rightMouseButton) then
+	if getCasterKey(inputs.keyboard.lookAround).held then
 		turnVelocity = Vec2.new(mouse.x, mouse.y) * 10
 		rotDelta += Vec3.new(0, turnVelocity.y, turnVelocity.x) * mouseSensitivity
 	end
