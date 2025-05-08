@@ -2811,12 +2811,14 @@ function ballInCenterCheck()
 		if ballCenterTime > requiredBallCenterTime then
 			resetPlayersWithBall()
 			GameStartEffect()
-			local startTimestamp = os.date("%H:%M:%S", os.time())
-			print(startTimestamp)
-			sendMessage(overlayCamera, {
-				info = "startTime",
-				value = startTimestamp,
-			})
+			if usingOverlay then
+				local startTimestamp = os.date("%H:%M:%S", os.time())
+				print(startTimestamp)
+				sendMessage(overlayCamera, {
+					info = "startTime",
+					value = startTimestamp,
+				})
+			end
 		end
 		ballCenterTime = 0
 	end
