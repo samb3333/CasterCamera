@@ -686,17 +686,9 @@ local keyboardKeys: { string } = {
 	"Subtract",
 	"Decimal",
 	"Divide",
-	"F1",
-	"F2",
-	"F3",
-	"F4",
-	"F5",
-	"F6",
-	"F7",
 	"F8",
 	"F9",
 	"F10",
-	"F11",
 	"F12",
 	"NumLock",
 	"ScrollLock",
@@ -734,6 +726,9 @@ local keyboardKeys: { string } = {
 	"E_AccentAigu",
 	"C_Cedille",
 	"Section",
+	"LeftMouseButton",
+	"MiddleMouseButton",
+	"RightMouseButton",
 }
 
 function getAnyKeyboardKeyDown()
@@ -934,29 +929,31 @@ local inputs = {
 local inputOrder = {
 	keyboard = {
 		"forwards",
-		"right",
 		"left",
 		"backwards",
-		"up",
+		"right",
 		"down",
+		"up",
 		"nextPlayer",
 		"previousPlayer",
 		"lineOfSight",
 		"playerBallDistance",
 		"speedUp",
 		"speedDown",
-		"thirdPerson",
-		"firstPerson",
+		"lookAround",
 		"freeCam",
+		"firstPerson",
+		"thirdPerson",
 		"overview1",
 		"overview2",
 		"overview3",
 		"getClosestArena",
 		"clearOverlayInfo",
-		"lookAround",
 		"resetFOV",
 	},
 }
+
+local keyToBeRebinded: string = ""
 
 --  Keyboard (debug)
 local one = Input.Key.One
@@ -1118,8 +1115,16 @@ function onGui()
 					end
 					buttonLabel = buttonLabel .. `{tostring(casterInput.hotkey)}`
 
+					if keyToBeRebinded == casterInputKey then
+						buttonLabel = "..."
+					end
+
 					if Gui.button(`{buttonLabel}##{casterInputKey}`) then
-						print(`here: {buttonLabel}`)
+						if keyToBeRebinded ~= casterInputKey then
+							keyToBeRebinded = casterInputKey
+						else
+							keyToBeRebinded = ""
+						end
 					end
 				end
 				Gui.endTable()
@@ -2865,11 +2870,18 @@ function setNewInputTimes()
 	end
 end
 
-function setOldInputTimes()
-	local oldInput = getAnyKeyboardKeyUp()
+function removeOldInputTimes()
+	local removeKeys = {}
+	for keyKey: string, _ in pressedInputKeys do
+		if Input.getKeyDown(Input.Key[keyKey]) or Input.getKey(Input.Key[keyKey]) then
+			continue
+		end
 
-	if oldInput then
-		pressedInputKeys[tostring(oldInput)] = nil
+		table.insert(removeKeys, keyKey)
+	end
+
+	for _, removeKeyKey: string in removeKeys do
+		pressedInputKeys[removeKeyKey] = nil
 	end
 end
 
@@ -2916,7 +2928,7 @@ function tick(dt)
 			ballInCenterCheck()
 		end
 		sendArenaInfo()
-		setOldInputTimes()
+		removeOldInputTimes()
 		return
 	end
 
@@ -2933,7 +2945,7 @@ function tick(dt)
 	end
 	sendArenaInfo()
 
-	setOldInputTimes()
+	removeOldInputTimes()
 
 	if boundingBoxDebug then
 		for _, arena in arenas do
