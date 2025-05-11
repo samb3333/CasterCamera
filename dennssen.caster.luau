@@ -788,6 +788,7 @@ local Up: number = 0
 local deadzone: number = config.deadzone
 local rotEuler: Vec3 = Vec3.zeroVector
 
+local pressedRebindModifiers = {}
 local pressedInputKeys = {}
 
 local modifierKeys = {
@@ -2041,6 +2042,11 @@ function readInput()
 end
 
 function readOtherInputs()
+	if keyToBeRebinded ~= "" then
+		-- don't read inputs on rebind
+		return
+	end
+
 	cameraFOV -= Input.getAnalog(mouseWheelAxis) * 10
 
 	if Input.getKey(dPadUp) and Input.getKey(dPadDown) then
@@ -2196,6 +2202,11 @@ function readOtherInputs()
 end
 
 function readMoveInput()
+	if keyToBeRebinded ~= "" then
+		-- don't read inputs on rebind
+		return
+	end
+
 	local input = math.abs(Input.getAnalog(leftAnalogVertical)) + math.abs(Input.getAnalog(leftAnalogHorizontal))
 	if input > deadzone then
 		Vertical = Input.getAnalog(leftAnalogVertical)
@@ -2225,6 +2236,11 @@ function readMoveInput()
 end
 
 function readUpInput()
+	if keyToBeRebinded ~= "" then
+		-- don't read inputs on rebind
+		return
+	end
+
 	if Input.getKey(leftTrigger) or Input.getKey(rightTrigger) then
 		if Input.getKey(leftTrigger) and Input.getKey(rightTrigger) then
 			Up = 0
@@ -2271,6 +2287,11 @@ end
 
 local rotDelta: Vec3 = Vec3.zeroVector
 function rotateCamera()
+	if keyToBeRebinded ~= "" then
+		-- don't read input on rebind
+		return
+	end
+
 	local mouse = Input.getMouseDelta()
 	local adjustedLookSmoothness = 1 - (1 - dynamicLookSmoothness) ^ 3
 
@@ -2892,6 +2913,66 @@ function removeOldInputTimes()
 	end
 end
 
+function doRebind()
+	if getDictSize(pressedInputKeys) == 0 then
+		if getDictSize(pressedRebindModifiers) ~= 0 then
+			local primary: string
+			local biggestTime = 0
+
+			for key, pressedRebindInput in pressedRebindModifiers do
+				if pressedRebindInput.time > biggestTime then
+					biggestTime = pressedRebindInput.time
+					primary = key
+				end
+			end
+
+			local modifiers = {}
+			for key, _ in pressedRebindModifiers do
+				if key ~= primary then
+					table.insert(modifiers, Input.Key[key])
+				end
+			end
+
+			inputs.keyboard[keyToBeRebinded].modifiers = modifiers
+			inputs.keyboard[keyToBeRebinded].hotkey = Input.Key[primary]
+			keyToBeRebinded = ""
+			pressedRebindModifiers = {}
+		end
+
+		return
+	end
+
+	local newestKey: string
+	local biggestTime = 0
+	for key, pressedInputInfo in pressedInputKeys do
+		if pressedInputInfo.time > biggestTime then
+			biggestTime = pressedInputInfo.time
+			newestKey = key
+		end
+	end
+
+	-- newest key is primary
+	if table.find(modifierKeys, newestKey) == nil then
+		local modifiers = {}
+
+		for key, pressedInputInfo in pressedInputKeys do
+			if table.find(modifierKeys, key) ~= nil and pressedInputInfo.isModifier then
+				table.insert(modifiers, Input.Key[key])
+			end
+		end
+
+		inputs.keyboard[keyToBeRebinded].modifiers = modifiers
+		inputs.keyboard[keyToBeRebinded].hotkey = Input.Key[newestKey]
+		keyToBeRebinded = ""
+		pressedRebindModifiers = {}
+	else
+		-- store modifier
+		pressedRebindModifiers[newestKey] = {
+			time = biggestTime,
+		}
+	end
+end
+
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = false
@@ -2900,6 +2981,10 @@ function tick(dt)
 	end
 
 	setNewInputTimes()
+
+	if keyToBeRebinded ~= "" then
+		doRebind()
+	end
 
 	deltaTime = dt
 	camera.fieldOfView = cameraFOV
