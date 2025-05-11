@@ -6,6 +6,11 @@ metadata = {
 	defaultKeybind = "",
 }
 
+--Notes:
+-- finish keybinds keyboard
+-- add keybinds controller
+-- integrate post processing into script and make it saveable
+
 local function parseBallJSON(str)
 	-- Table to store the parsed data
 	local result = {}
@@ -915,12 +920,12 @@ local inputs = {
 		speedDown = createCasterInput("Speed Down", "Decrease camera speed", Input.Key.LeftControl),
 		thirdPerson = createCasterInput("Third Person", "Toggle third-person view", Input.Key.V),
 		firstPerson = createCasterInput("First Person", "Toggle first-person view", Input.Key.C),
-		freeCam = createCasterInput("Free Cam", "Switch to free camera", Input.Key.Z),
+		freeCam = createCasterInput("Free Cam", "Toggle free-cam view", Input.Key.Z),
 		overview1 = createCasterInput("Overview 1", "Jump to first overview position", Input.Key.Five),
 		overview2 = createCasterInput("Overview 2", "Jump to second overview position", Input.Key.Six),
 		overview3 = createCasterInput("Overview 3", "Jump to third overview position", Input.Key.Seven),
 		getClosestArena = createCasterInput("Select Arena", "Select closest arena", Input.Key.Enter),
-		clearOverlayInfo = createCasterInput("Clear Overlay", "Reset overlay settings", Input.Key.BackSpace),
+		clearOverlayInfo = createCasterInput("Clear Overlay", "Reset overlay info", Input.Key.BackSpace),
 		lookAround = createCasterInput("Look Around", "Hold to rotate camera", Input.Key.RightMouseButton),
 		resetFOV = createCasterInput("Reset FOV", "Reset field of view", Input.Key.MiddleMouseButton),
 	},
