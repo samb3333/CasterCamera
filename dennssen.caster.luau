@@ -1732,7 +1732,7 @@ function stopFollow()
 	rotEuler = followPlussCamera:getSmoothedRotation():euler()
 	rotEuler.x = 0
 	currentPlayerName = ""
-	camera.fieldOfView = 100
+	camera.fieldOfView = cameraFOV
 	camera.hideNearestHead = false
 end
 
