@@ -895,6 +895,9 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 	return inputData
 end
 
+local keybindsSerialized: string
+local keybindsDeserialized
+
 local inputs = {
 	keyboard = {
 		forwards = createCasterInput("Move Forwards", "Move camera forward", Input.Key.W),
@@ -960,6 +963,54 @@ local inputOrder = {
 }
 
 local keyToBeRebinded: string = ""
+
+--example: "{key:{primary:"keybind",modifiers:{"keybind","keybind"}}}"
+
+function SerializeKeybinds(): string
+	local serializedString = ""
+	for key, value: CasterInput in inputs.keyboard :: { CasterInput } do
+		serializedString ..= "{" .. `{key}:` .. "{" .. `primary:"{tostring(value.hotkey)}",modifiers:` .. "{"
+
+		if value.modifiers then
+			for i, modifier: Key in value.modifiers do
+				serializedString ..= `"{tostring(modifier)}"`
+				if i ~= #value.modifiers then
+					serializedString ..= `,`
+				end
+			end
+		end
+
+		serializedString ..= "}}}"
+	end
+
+	return serializedString
+end
+
+function DeserializeKeybinds(string: string)
+	local keybinds = {}
+
+	for fullEntry in string:gmatch("{(.-:{.-}})}") do
+		local key, content = fullEntry:match("(.-):{(.*)}")
+		if not key or not content then
+			continue
+		end
+
+		local entry = {}
+
+		entry.primary = content:match('primary:"([^"]+)"')
+
+		local modifierContent = content:match("modifiers:{(.-)}") or ""
+		entry.modifiers = {}
+
+		for modifier in modifierContent:gmatch('"([^"]+)"') do
+			table.insert(entry.modifiers, modifier)
+		end
+
+		keybinds[key] = entry
+	end
+
+	return keybinds
+end
 
 --  Keyboard (debug)
 local one = Input.Key.One
