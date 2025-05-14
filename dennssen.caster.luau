@@ -360,6 +360,31 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 	}
 end
 
+local defaultKeybinds = {
+	lineOfSight = { primary = "Q", modifiers = { "LeftAlt" } },
+	previousPlayer = { primary = "A", modifiers = {} },
+	right = { primary = "D", modifiers = {} },
+	left = { primary = "A", modifiers = {} },
+	resetFOV = { primary = "MiddleMouseButton", modifiers = {} },
+	getClosestArena = { primary = "Enter", modifiers = {} },
+	thirdPerson = { primary = "V", modifiers = {} },
+	speedDown = { primary = "LeftControl", modifiers = {} },
+	lookAround = { primary = "RightMouseButton", modifiers = {} },
+	up = { primary = "E", modifiers = {} },
+	clearOverlayInfo = { primary = "BackSpace", modifiers = {} },
+	forwards = { primary = "W", modifiers = {} },
+	overview3 = { primary = "Seven", modifiers = {} },
+	freeCam = { primary = "Z", modifiers = {} },
+	overview1 = { primary = "Five", modifiers = {} },
+	backwards = { primary = "S", modifiers = {} },
+	playerBallDistance = { primary = "E", modifiers = { "LeftAlt" } },
+	speedUp = { primary = "LeftShift", modifiers = {} },
+	overview2 = { primary = "Six", modifiers = {} },
+	nextPlayer = { primary = "D", modifiers = {} },
+	down = { primary = "Q", modifiers = {} },
+	firstPerson = { primary = "C", modifiers = {} },
+}
+
 local function initializeConfig()
 	local saveToConfig = false
 	local neededValues = {
@@ -405,6 +430,7 @@ local function initializeConfig()
 				rotation = Quat.fromEuler(0, -20, -60),
 			},
 		},
+		keybinds = "",
 	}
 
 	-- saves new values that are not there from before to all profiles
@@ -622,6 +648,32 @@ local GetBallVariant = {
 local getBallVariant = config.getBallVariant
 
 -- Input
+function DeserializeKeybinds(string: string)
+	local keybinds = {}
+
+	for fullEntry in string:gmatch("{(.-:{.-}})}") do
+		local key, content = fullEntry:match("(.-):{(.*)}")
+		if not key or not content then
+			continue
+		end
+
+		local entry = {}
+
+		entry.primary = Input.Key[content:match('primary:"([^"]+)"')]
+
+		local modifierContent = content:match("modifiers:{(.-)}") or ""
+		entry.modifiers = {}
+
+		for modifier in modifierContent:gmatch('"([^"]+)"') do
+			table.insert(entry.modifiers, Input.Key[modifier])
+		end
+
+		keybinds[key] = entry
+	end
+
+	return keybinds
+end
+
 local keyboardKeys: { string } = {
 	"Tab",
 	"Enter",
@@ -895,43 +947,146 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 	return inputData
 end
 
-local keybindsSerialized: string
-local keybindsDeserialized
+local keybindsDeserialized = DeserializeKeybinds(config.keybinds)
+
+if #keybindsDeserialized == 0 then
+	keybindsDeserialized = defaultKeybinds
+end
 
 local inputs = {
 	keyboard = {
-		forwards = createCasterInput("Move Forwards", "Move camera forward", Input.Key.W),
-		right = createCasterInput("Move Right", "Move camera right", Input.Key.D),
-		left = createCasterInput("Move Left", "Move camera left", Input.Key.A),
-		backwards = createCasterInput("Move Backwards", "Move camera backward", Input.Key.S),
-		up = createCasterInput("Move Up", "Move camera up", Input.Key.E),
-		down = createCasterInput("Move Down", "Move camera down", Input.Key.Q),
-		nextPlayer = createCasterInput("Next Player", "Cycle to next player (POV mode)", Input.Key.D),
-		previousPlayer = createCasterInput("Previous Player", "Cycle to previous player (POV mode)", Input.Key.A),
+		forwards = createCasterInput(
+			"Move Forwards",
+			"Move camera forward",
+			keybindsDeserialized["forwards"].primary,
+			keybindsDeserialized["forwards"].modifiers
+		),
+		right = createCasterInput(
+			"Move Right",
+			"Move camera right",
+			keybindsDeserialized["right"].primary,
+			keybindsDeserialized["right"].modifiers
+		),
+		left = createCasterInput(
+			"Move Left",
+			"Move camera left",
+			keybindsDeserialized["left"].primary,
+			keybindsDeserialized["left"].modifiers
+		),
+		backwards = createCasterInput(
+			"Move Backwards",
+			"Move camera backward",
+			keybindsDeserialized["backwards"].primary,
+			keybindsDeserialized["backwards"].modifiers
+		),
+		up = createCasterInput(
+			"Move Up",
+			"Move camera up",
+			keybindsDeserialized["up"].primary,
+			keybindsDeserialized["up"].modifiers
+		),
+		down = createCasterInput(
+			"Move Down",
+			"Move camera down",
+			keybindsDeserialized["down"].primary,
+			keybindsDeserialized["down"].modifiers
+		),
+		nextPlayer = createCasterInput(
+			"Next Player",
+			"Cycle to next player (POV mode)",
+			keybindsDeserialized["nextPlayer"].primary,
+			keybindsDeserialized["nextPlayer"].modifiers
+		),
+		previousPlayer = createCasterInput(
+			"Previous Player",
+			"Cycle to previous player (POV mode)",
+			keybindsDeserialized["previousPlayer"].primary,
+			keybindsDeserialized["previousPlayer"].modifiers
+		),
 		lineOfSight = createCasterInput(
 			"Line of Sight",
 			"Target: Player in line of sight",
-			Input.Key.Q,
-			{ Input.Key.LeftAlt }
+			keybindsDeserialized["lineOfSight"].primary,
+			keybindsDeserialized["lineOfSight"].modifiers
 		),
 		playerBallDistance = createCasterInput(
 			"Closest to Ball",
 			"Target: Player nearest ball",
-			Input.Key.E,
-			{ Input.Key.LeftAlt }
+			keybindsDeserialized["playerBallDistance"].primary,
+			keybindsDeserialized["playerBallDistance"].modifiers
 		),
-		speedUp = createCasterInput("Speed Up", "Increase camera speed", Input.Key.LeftShift),
-		speedDown = createCasterInput("Speed Down", "Decrease camera speed", Input.Key.LeftControl),
-		thirdPerson = createCasterInput("Third Person", "Toggle third-person view", Input.Key.V),
-		firstPerson = createCasterInput("First Person", "Toggle first-person view", Input.Key.C),
-		freeCam = createCasterInput("Free Cam", "Toggle free-cam view", Input.Key.Z),
-		overview1 = createCasterInput("Overview 1", "Jump to first overview position", Input.Key.Five),
-		overview2 = createCasterInput("Overview 2", "Jump to second overview position", Input.Key.Six),
-		overview3 = createCasterInput("Overview 3", "Jump to third overview position", Input.Key.Seven),
-		getClosestArena = createCasterInput("Select Arena", "Select closest arena", Input.Key.Enter),
-		clearOverlayInfo = createCasterInput("Clear Overlay", "Reset overlay info", Input.Key.BackSpace),
-		lookAround = createCasterInput("Look Around", "Hold to rotate camera", Input.Key.RightMouseButton),
-		resetFOV = createCasterInput("Reset FOV", "Reset field of view", Input.Key.MiddleMouseButton),
+		speedUp = createCasterInput(
+			"Speed Up",
+			"Increase camera speed",
+			keybindsDeserialized["speedUp"].primary,
+			keybindsDeserialized["speedUp"].modifiers
+		),
+		speedDown = createCasterInput(
+			"Speed Down",
+			"Decrease camera speed",
+			keybindsDeserialized["speedDown"].primary,
+			keybindsDeserialized["speedDown"].modifiers
+		),
+		thirdPerson = createCasterInput(
+			"Third Person",
+			"Toggle third-person view",
+			keybindsDeserialized["thirdPerson"].primary,
+			keybindsDeserialized["thirdPerson"].modifiers
+		),
+		firstPerson = createCasterInput(
+			"First Person",
+			"Toggle first-person view",
+			keybindsDeserialized["firstPerson"].primary,
+			keybindsDeserialized["firstPerson"].modifiers
+		),
+		freeCam = createCasterInput(
+			"Free Cam",
+			"Toggle free-cam view",
+			keybindsDeserialized["freeCam"].primary,
+			keybindsDeserialized["freeCam"].modifiers
+		),
+		overview1 = createCasterInput(
+			"Overview 1",
+			"Jump to first overview position",
+			keybindsDeserialized["overview1"].primary,
+			keybindsDeserialized["overview1"].modifiers
+		),
+		overview2 = createCasterInput(
+			"Overview 2",
+			"Jump to second overview position",
+			keybindsDeserialized["overview2"].primary,
+			keybindsDeserialized["overview2"].modifiers
+		),
+		overview3 = createCasterInput(
+			"Overview 3",
+			"Jump to third overview position",
+			keybindsDeserialized["overview3"].primary,
+			keybindsDeserialized["overview3"].modifiers
+		),
+		getClosestArena = createCasterInput(
+			"Select Arena",
+			"Select closest arena",
+			keybindsDeserialized["getClosestArena"].primary,
+			keybindsDeserialized["getClosestArena"].modifiers
+		),
+		clearOverlayInfo = createCasterInput(
+			"Clear Overlay",
+			"Reset overlay info",
+			keybindsDeserialized["clearOverlayInfo"].primary,
+			keybindsDeserialized["clearOverlayInfo"].modifiers
+		),
+		lookAround = createCasterInput(
+			"Look Around",
+			"Hold to rotate camera",
+			keybindsDeserialized["lookAround"].primary,
+			keybindsDeserialized["lookAround"].modifiers
+		),
+		resetFOV = createCasterInput(
+			"Reset FOV",
+			"Reset field of view",
+			keybindsDeserialized["resetFOV"].primary,
+			keybindsDeserialized["resetFOV"].modifiers
+		),
 	},
 }
 
@@ -965,7 +1120,6 @@ local inputOrder = {
 local keyToBeRebinded: string = ""
 
 --example: "{key:{primary:"keybind",modifiers:{"keybind","keybind"}}}"
-
 function SerializeKeybinds(): string
 	local serializedString = ""
 	for key, value: CasterInput in inputs.keyboard :: { CasterInput } do
@@ -984,32 +1138,6 @@ function SerializeKeybinds(): string
 	end
 
 	return serializedString
-end
-
-function DeserializeKeybinds(string: string)
-	local keybinds = {}
-
-	for fullEntry in string:gmatch("{(.-:{.-}})}") do
-		local key, content = fullEntry:match("(.-):{(.*)}")
-		if not key or not content then
-			continue
-		end
-
-		local entry = {}
-
-		entry.primary = content:match('primary:"([^"]+)"')
-
-		local modifierContent = content:match("modifiers:{(.-)}") or ""
-		entry.modifiers = {}
-
-		for modifier in modifierContent:gmatch('"([^"]+)"') do
-			table.insert(entry.modifiers, modifier)
-		end
-
-		keybinds[key] = entry
-	end
-
-	return keybinds
 end
 
 --  Keyboard (debug)
@@ -2964,6 +3092,20 @@ function removeOldInputTimes()
 	end
 end
 
+function saveKeybinds()
+	local keybindsSerilazied = SerializeKeybinds()
+	config.keybinds = keybindsSerilazied
+	saveConfig()
+end
+
+function rebind(primary: string, modifiers: { Key }?)
+	inputs.keyboard[keyToBeRebinded].modifiers = modifiers
+	inputs.keyboard[keyToBeRebinded].hotkey = Input.Key[primary]
+	keyToBeRebinded = ""
+	pressedRebindModifiers = {}
+	saveKeybinds()
+end
+
 function doRebind()
 	if getDictSize(pressedInputKeys) == 0 then
 		if getDictSize(pressedRebindModifiers) ~= 0 then
@@ -2984,10 +3126,7 @@ function doRebind()
 				end
 			end
 
-			inputs.keyboard[keyToBeRebinded].modifiers = modifiers
-			inputs.keyboard[keyToBeRebinded].hotkey = Input.Key[primary]
-			keyToBeRebinded = ""
-			pressedRebindModifiers = {}
+			rebind(primary, modifiers)
 		end
 
 		return
@@ -3012,10 +3151,7 @@ function doRebind()
 			end
 		end
 
-		inputs.keyboard[keyToBeRebinded].modifiers = modifiers
-		inputs.keyboard[keyToBeRebinded].hotkey = Input.Key[newestKey]
-		keyToBeRebinded = ""
-		pressedRebindModifiers = {}
+		rebind(newestKey, modifiers)
 	else
 		-- store modifier
 		pressedRebindModifiers[newestKey] = {
