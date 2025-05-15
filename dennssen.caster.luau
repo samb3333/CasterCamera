@@ -576,6 +576,18 @@ local vibrance = config.vibrance
 local particlesTable = {}
 local particleSimSpeed = config.particleSimSpeed
 
+-- Post Processing
+
+local bloomIntensity = 0.675
+local bloomThreshold = -1
+local depthOfFieldFstop = 4
+local depthOfFieldFocalDistance = 0
+local depthOfFieldSensorWidth = 24.576
+local chromaticAberrationIntensity = 0
+local motionBlurAmount = 0
+local vignetteIntensity = 0.4
+local exposureBias = 1
+
 -- Stats
 local lastPlayerWithBall: ReplayPlayer? = nil
 local previousLastPlayerWithBall: ReplayPlayer? = nil
@@ -1470,6 +1482,50 @@ Controller:
 		)
 		Gui.unindent()
 		Gui.newLine()
+	end
+
+	if Gui.collapsingHeader("Post Processing") then
+		if Gui.button("Apply Preset") then
+			postProcessSettings.bloomIntensity = bloomIntensity
+			postProcessSettings.bloomThreshold = bloomThreshold
+			postProcessSettings.depthOfFieldFstop = depthOfFieldFstop
+			postProcessSettings.depthOfFieldFocalDistance = depthOfFieldFocalDistance
+			postProcessSettings.depthOfFieldSensorWidth = depthOfFieldSensorWidth
+			postProcessSettings.chromaticAberrationIntensity = chromaticAberrationIntensity
+			postProcessSettings.motionBlurAmount = motionBlurAmount
+			postProcessSettings.vignetteIntensity = vignetteIntensity
+			postProcessSettings.autoExposureBias = exposureBias
+		end
+
+		Gui.sameLine()
+
+		if Gui.button("Save Post Processing to Preset") then
+			bloomIntensity = postProcessSettings.bloomIntensity
+			bloomThreshold = postProcessSettings.bloomThreshold
+			depthOfFieldFstop = postProcessSettings.depthOfFieldFstop
+			depthOfFieldFocalDistance = postProcessSettings.depthOfFieldFocalDistance
+			depthOfFieldSensorWidth = postProcessSettings.depthOfFieldSensorWidth
+			chromaticAberrationIntensity = postProcessSettings.chromaticAberrationIntensity
+			motionBlurAmount = postProcessSettings.motionBlurAmount
+			vignetteIntensity = postProcessSettings.vignetteIntensity
+			exposureBias = postProcessSettings.autoExposureBias
+		end
+
+		Gui.newLine()
+		Gui.text("Preset")
+		Gui.separator()
+
+		bloomIntensity = Gui.sliderFloat("Bloom Intensity", bloomIntensity, 0, 10)
+		bloomThreshold = Gui.sliderFloat("Bloom Threshold", bloomThreshold, -1, 10)
+		depthOfFieldFstop = Gui.sliderFloat("Depth of Field Fstop", depthOfFieldFstop, 0, 22)
+		depthOfFieldFocalDistance =
+			Gui.dragFloat("Depth of Field Focal Distance", depthOfFieldFocalDistance, 1, 0, math.huge)
+		depthOfFieldSensorWidth = Gui.sliderFloat("Depth of Field Sensor Width", depthOfFieldSensorWidth, 0, 200)
+		chromaticAberrationIntensity =
+			Gui.sliderFloat("Chromatic Aberration Intensity", chromaticAberrationIntensity, 0, 2)
+		motionBlurAmount = Gui.sliderFloat("Motion Blur Amount", motionBlurAmount, 0, 1)
+		vignetteIntensity = Gui.sliderFloat("Vignette Intenisty", vignetteIntensity, 0, 1)
+		exposureBias = Gui.sliderFloat("Exposure Bias", exposureBias, -6, 6)
 	end
 
 	if Gui.collapsingHeader("POV") then
