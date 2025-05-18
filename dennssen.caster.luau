@@ -7,9 +7,10 @@ metadata = {
 }
 
 --Notes:
--- finish keybinds keyboard
--- add keybinds controller
+-- Controller keybinds in GUI
+-- Controller keybinds saveable
 -- integrate post processing into script and make it saveable
+-- ballCam?
 
 local function parseBallJSON(str)
 	-- Table to store the parsed data
@@ -29,6 +30,10 @@ function getDictSize(dict): number
 	end
 
 	return i
+end
+
+function keyToString(key: Key): string
+	return string.gsub(tostring(key), "Gamepad_", "")
 end
 
 local deltaTime: number = 0
@@ -800,14 +805,33 @@ local keyboardKeys: { string } = {
 	"RightMouseButton",
 }
 
-function getAnyKeyboardKeyDown()
-	local bannedInputs = {}
+function getAnyGamepadKeyDown(): Key?
+	local bannedInputs =
+		{ -- values to be ignored because their apperances are not predictable or should not be accepted
+			Input.Gamepad.Left2D,
+			Input.Gamepad.Right2D,
+			Input.Gamepad.RightY,
+			Input.Gamepad.RightX,
+			Input.Gamepad.LeftY,
+			Input.Gamepad.LeftX,
+			Input.Gamepad.LeftTriggerAxis,
+			Input.Gamepad.RightTriggerAxis,
+		}
+	local inputMeta = getmetatable(Input)
+	local gamepad = inputMeta.__index.Gamepad
+	local inputTable = nil
+	for key, value in pairs(gamepad) do
+		if type(value) == "table" then
+			inputTable = value
+			break
+		end
+	end
 
-	for _, key in pairs(keyboardKeys) do
-		if Input.getKeyDown(Input.Key[key]) then
+	for key, _ in pairs(inputTable) do
+		if Input.getKeyDown(Input.Gamepad[key]) then
 			local banned = false
-			for _, bannedValue: Key in pairs(bannedInputs) do
-				if bannedValue == Input.Key[key] then
+			for _, bannedValue in pairs(bannedInputs) do
+				if keyToString(bannedValue) == keyToString(Input.Gamepad[key]) then
 					banned = true
 					break
 				end
@@ -817,17 +841,17 @@ function getAnyKeyboardKeyDown()
 				continue
 			end
 
-			return Input.Key[key]
+			return Input.Gamepad[key]
 		end
 	end
 	return nil
 end
 
-function getAnyKeyboardKeyUp()
+function getAnyKeyboardKeyDown()
 	local bannedInputs = {}
 
 	for _, key in pairs(keyboardKeys) do
-		if Input.getKeyUp(Input.Key[key]) then
+		if Input.getKeyDown(Input.Key[key]) then
 			local banned = false
 			for _, bannedValue: Key in pairs(bannedInputs) do
 				if bannedValue == Input.Key[key] then
@@ -862,6 +886,10 @@ local modifierKeys = {
 	"RightAlt",
 	"RightControl",
 	"RightShift",
+	"DPad_Up",
+	"DPad_Down",
+	"DPad_Right",
+	"DPad_Left",
 }
 
 type CasterInput = {
@@ -908,11 +936,11 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 	end
 
 	-- primary key isn't pressed so no point in checking modifiers
-	if pressedInputKeys[tostring(primary)] == nil then
+	if pressedInputKeys[keyToString(primary)] == nil then
 		return inputData
 	end
 
-	local currentPrimaryTime = pressedInputKeys[tostring(primary)].time
+	local currentPrimaryTime = pressedInputKeys[keyToString(primary)].time
 
 	if modifiers then
 		-- check for modifier keys not being held down
@@ -922,7 +950,7 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 			end
 
 			-- if modifier is pressed after primary we don't allow the input
-			local modTime = pressedInputKeys[tostring(key)].time
+			local modTime = pressedInputKeys[keyToString(key)].time
 			if modTime > currentPrimaryTime then
 				return inputData
 			end
@@ -936,9 +964,14 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 			end
 
 			-- check if the modifier key is concidered a modifier
-			local isModifier = modifier.isModifier and key ~= tostring(primary)
+			local isModifier = modifier.isModifier and key ~= keyToString(primary)
 
-			if (Input.getKeyDown(Input.Key[key]) or Input.getKey(Input.Key[key])) and isModifier then
+			local inputKey = Input.Key[key]
+			if inputKey == nil then
+				inputKey = Input.Gamepad[key]
+			end
+
+			if (Input.getKeyDown(inputKey) or Input.getKey(inputKey)) and isModifier then
 				return inputData
 			end
 		end
@@ -957,6 +990,22 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 	end
 
 	return inputData
+end
+
+function getCasterAnalog(key: CasterInput): number
+	local primary = key.hotkey
+	local modifiers = key.modifiers
+
+	if modifiers then
+		-- check for modifier keys not being held down
+		for _, key: Key in modifiers do
+			if not Input.getKeyDown(key) and not Input.getKey(key) then
+				return 0
+			end
+		end
+	end
+
+	return Input.getAnalog(primary)
 end
 
 local keybindsDeserialized = DeserializeKeybinds(config.keybinds)
@@ -1082,8 +1131,8 @@ local inputs = {
 			keybindsDeserialized["getClosestArena"].modifiers
 		),
 		clearOverlayInfo = createCasterInput(
-			"Clear Overlay",
-			"Reset overlay info",
+			"Clear Overlay Data",
+			"Remove overlay data",
 			keybindsDeserialized["clearOverlayInfo"].primary,
 			keybindsDeserialized["clearOverlayInfo"].modifiers
 		),
@@ -1099,6 +1148,58 @@ local inputs = {
 			keybindsDeserialized["resetFOV"].primary,
 			keybindsDeserialized["resetFOV"].modifiers
 		),
+	},
+	gamepad = {
+		moveY = createCasterInput("MoveY", "Move Camera Forwards/Backwards", Input.Gamepad.LeftY, {}, false),
+		moveX = createCasterInput("MoveX", "Move Camera Left/Right", Input.Gamepad.LeftX, {}, false),
+		up = createCasterInput("Move Up", "Move Camera Up", Input.Gamepad.RightTrigger),
+		down = createCasterInput("Move Down", "Move Camera Down", Input.Gamepad.LeftTrigger),
+		nextPlayer = createCasterInput("Next Player", "Cycle to next player (POV mode)", Input.Gamepad.RightShoulder),
+		previousPlayer = createCasterInput(
+			"Previous Player",
+			"Cycle to previous player (POV mode)",
+			Input.Gamepad.LeftShoulder
+		),
+		lineOfSight = createCasterInput(
+			"Line Of Sight",
+			"Target: Player in line of sight",
+			Input.Gamepad.LeftThumbstick
+		),
+		playerBallDistance = createCasterInput(
+			"Closest to Ball",
+			"Target: Player nearest ball",
+			Input.Gamepad.RightThumbstick
+		),
+		speedUp = createCasterInput("Speed Up", "Increase camera speed", Input.Gamepad.RightShoulder),
+		speedDown = createCasterInput("Speed Down", "Decrease camera speed", Input.Gamepad.LeftShoulder),
+		lookY = createCasterInput("LookY", "Look Up/Down", Input.Gamepad.RightY, {}, false),
+		lookX = createCasterInput("LookX", "Look Left/Right", Input.Gamepad.RightX, {}, false),
+		zoomIn = createCasterInput("Zoom In", "Increase field of view", Input.Gamepad.DPad_Up),
+		zoomOut = createCasterInput("Zoom Out", "Decrease field of view", Input.Gamepad.DPad_Down),
+		resetFOV = createCasterInput("Reser FOV", "Reset field of view", Input.Gamepad.DPad_Right),
+		freeCam = createCasterInput("Free Cam", "Toggle free-cam view", Input.Gamepad.FaceButton_Left),
+		firstPerson = createCasterInput("First Person", "Toggle first-person view", Input.Gamepad.FaceButton_Right),
+		thirdPerson = createCasterInput("Third Person", "Toggle third-person view", Input.Gamepad.FaceButton_Top),
+		overview1 = createCasterInput(
+			"Overview 1",
+			"Jump to first overview position",
+			Input.Gamepad.FaceButton_Left,
+			{ Input.Gamepad.DPad_Left }
+		),
+		overview2 = createCasterInput(
+			"Overview 2",
+			"Jump to second overview position",
+			Input.Gamepad.FaceButton_Top,
+			{ Input.Gamepad.DPad_Left }
+		),
+		overview3 = createCasterInput(
+			"Overview 3",
+			"Jump to third overview position",
+			Input.Gamepad.FaceButton_Right,
+			{ Input.Gamepad.DPad_Left }
+		),
+		getClosestArena = createCasterInput("Select Arena", "Select closest arena", Input.Gamepad.Special_Right),
+		clearOverlayInfo = createCasterInput("Clear Overlay Data", "Remove Overlay Data", Input.Gamepad.Special_Left),
 	},
 }
 
@@ -1116,6 +1217,7 @@ local inputOrder = {
 		"playerBallDistance",
 		"speedUp",
 		"speedDown",
+		"resetFOV",
 		"lookAround",
 		"freeCam",
 		"firstPerson",
@@ -1125,7 +1227,6 @@ local inputOrder = {
 		"overview3",
 		"getClosestArena",
 		"clearOverlayInfo",
-		"resetFOV",
 	},
 }
 
@@ -1135,11 +1236,11 @@ local keyToBeRebinded: string = ""
 function SerializeKeybinds(): string
 	local serializedString = ""
 	for key, value: CasterInput in inputs.keyboard :: { CasterInput } do
-		serializedString ..= "{" .. `{key}:` .. "{" .. `primary:"{tostring(value.hotkey)}",modifiers:` .. "{"
+		serializedString ..= "{" .. `{key}:` .. "{" .. `primary:"{keyToString(value.hotkey)}",modifiers:` .. "{"
 
 		if value.modifiers then
 			for i, modifier: Key in value.modifiers do
-				serializedString ..= `"{tostring(modifier)}"`
+				serializedString ..= `"{keyToString(modifier)}"`
 				if i ~= #value.modifiers then
 					serializedString ..= `,`
 				end
@@ -1307,10 +1408,10 @@ function onGui()
 					local buttonLabel = ""
 					if casterInput.modifiers then
 						for _, input: Key in casterInput.modifiers do
-							buttonLabel = buttonLabel .. `{tostring(input)} + `
+							buttonLabel = buttonLabel .. `{keyToString(input)} + `
 						end
 					end
-					buttonLabel = buttonLabel .. `{tostring(casterInput.hotkey)}`
+					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
 
 					if keyToBeRebinded == casterInputKey then
 						buttonLabel = "..."
@@ -2284,49 +2385,52 @@ function readOtherInputs()
 
 	cameraFOV -= Input.getAnalog(mouseWheelAxis) * 10
 
-	if Input.getKey(dPadUp) and Input.getKey(dPadDown) then
+	if getCasterKey(inputs.gamepad.zoomIn).held and getCasterKey(inputs.gamepad.zoomOut).held then
 		cameraFOV += 0
-	elseif Input.getKey(dPadUp) then
+	elseif getCasterKey(inputs.gamepad.zoomIn).held then
 		cameraFOV -= 50 * deltaTime
-	elseif Input.getKey(dPadDown) then
+	elseif getCasterKey(inputs.gamepad.zoomOut).held then
 		cameraFOV += 50 * deltaTime
 	end
 
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
-	if getCasterKey(inputs.keyboard.resetFOV).down or Input.getKeyDown(dPadRight) then
+	if getCasterKey(inputs.keyboard.resetFOV).down or getCasterKey(inputs.gamepad.resetFOV).down then
 		cameraFOV = config.cameraFOV
 	end
 
-	if getCasterKey(inputs.keyboard.speedUp).down or Input.getKeyDown(rightShoulder) then
+	if getCasterKey(inputs.keyboard.speedUp).down or getCasterKey(inputs.gamepad.speedUp).down then
 		if speedIndex == #speedGears - 1 then
 			speedMultiplierHoldBuffer = true
 		end
 		speedIndex += 1
 	end
-	if getCasterKey(inputs.keyboard.speedDown).down or Input.getKeyDown(leftShoulder) then
+	if getCasterKey(inputs.keyboard.speedDown).down or getCasterKey(inputs.gamepad.speedDown).down then
 		speedIndex -= 1
 	end
 	speedIndex = math.clamp(speedIndex, 1, #speedGears)
 
-	if speedMultiplierHoldBuffer and (getCasterKey(inputs.keyboard.speedUp).up or Input.getKeyUp(rightShoulder)) then
+	if
+		speedMultiplierHoldBuffer
+		and (getCasterKey(inputs.keyboard.speedUp).up or getCasterKey(inputs.gamepad.speedUp).up)
+	then
 		speedMultiplierHoldBuffer = false
 	end
 
-	if getCasterKey(inputs.keyboard.getClosestArena) then
+	if getCasterKey(inputs.keyboard.getClosestArena).down or getCasterKey(inputs.gamepad.getClosestArena).down then
 		selectedArena = getClosestArena(camera.position)
 		selectedArena.home.players = {}
 		selectedArena.away.players = {}
 	end
 
-	if getCasterKey(inputs.keyboard.clearOverlayInfo).down then
+	if getCasterKey(inputs.keyboard.clearOverlayInfo).down or getCasterKey(inputs.gamepad.clearOverlayInfo).down then
 		sendMessage(overlayCamera, {
 			info = "clearStats",
 		})
 	end
 
 	if
-		(getCasterKey(inputs.keyboard.speedUp).held or Input.getKey(rightShoulder))
+		(getCasterKey(inputs.keyboard.speedUp).held or getCasterKey(inputs.gamepad.speedUp).held)
 		and speedIndex == #speedGears
 		and not speedMultiplierHoldBuffer
 	then
@@ -2335,9 +2439,7 @@ function readOtherInputs()
 		speedGearMultiplier = 1
 	end
 
-	if
-		getCasterKey(inputs.keyboard.overview1).down or (Input.getKey(dPadLeft) and Input.getKeyDown(leftFaceButton))
-	then
+	if getCasterKey(inputs.keyboard.overview1).down or getCasterKey(inputs.gamepad.overview1).down then
 		if playerFollow then
 			stopFollow()
 		end
@@ -2350,7 +2452,7 @@ function readOtherInputs()
 			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
 		end
 	end
-	if getCasterKey(inputs.keyboard.overview2).down or (Input.getKey(dPadLeft) and Input.getKeyDown(topFaceButton)) then
+	if getCasterKey(inputs.keyboard.overview2).down or getCasterKey(inputs.gamepad.overview2).down then
 		if playerFollow then
 			stopFollow()
 		end
@@ -2363,10 +2465,7 @@ function readOtherInputs()
 			setGlobalCameraRotation(selectedArena.away.overview[2].rotation)
 		end
 	end
-	if
-		getCasterKey(inputs.keyboard.overview3).down
-		or (Input.getKey(dPadLeft) and Input.getKeyDown(rightFaceButton))
-	then
+	if getCasterKey(inputs.keyboard.overview3).down or getCasterKey(inputs.gamepad.overview3).down then
 		if playerFollow then
 			stopFollow()
 		end
@@ -2380,43 +2479,46 @@ function readOtherInputs()
 		end
 	end
 
-	if getCasterKey(inputs.keyboard.lineOfSight).down or Input.getKeyDown(leftJoystick) then
+	if getCasterKey(inputs.keyboard.lineOfSight).down or getCasterKey(inputs.gamepad.lineOfSight).down then
 		getBallVariant = GetBallVariant.LineOfSight
 	end
 
-	if getCasterKey(inputs.keyboard.playerBallDistance).down or Input.getKeyDown(rightJoystick) then
+	if
+		getCasterKey(inputs.keyboard.playerBallDistance).down or getCasterKey(inputs.gamepad.playerBallDistance).down
+	then
 		getBallVariant = GetBallVariant.PlayerBallDistance
 	end
 
-	if not Input.getKey(dPadLeft) then
-		if getCasterKey(inputs.keyboard.thirdPerson).down or Input.getKeyDown(topFaceButton) then
-			if currentPlayerName == "" or cameraMode == thirdPersonMode then
-				cameraMode = thirdPersonMode
-				getPlayer()
-			else
-				cameraMode = thirdPersonMode
-				followPlayer()
-			end
-		end
-
-		if getCasterKey(inputs.keyboard.firstPerson).down or Input.getKeyDown(rightFaceButton) then
-			if currentPlayerName == "" or cameraMode == CameraMode.FirstPerson then
-				cameraMode = CameraMode.FirstPerson
-				getPlayer()
-			else
-				cameraMode = CameraMode.FirstPerson
-				followPlayer()
-			end
-		end
-
-		if getCasterKey(inputs.keyboard.freeCam).down or Input.getKeyDown(leftFaceButton) then
-			if playerFollow then
-				stopFollow()
-			end
+	if getCasterKey(inputs.keyboard.thirdPerson).down or getCasterKey(inputs.gamepad.thirdPerson).down then
+		if currentPlayerName == "" or cameraMode == thirdPersonMode then
+			cameraMode = thirdPersonMode
+			getPlayer()
+		else
+			cameraMode = thirdPersonMode
+			followPlayer()
 		end
 	end
 
-	if playerFollow and (Input.getKeyDown(leftShoulder) or Input.getKeyDown(inputs.keyboard.previousPlayer.hotkey)) then
+	if getCasterKey(inputs.keyboard.firstPerson).down or getCasterKey(inputs.gamepad.firstPerson).down then
+		if currentPlayerName == "" or cameraMode == CameraMode.FirstPerson then
+			cameraMode = CameraMode.FirstPerson
+			getPlayer()
+		else
+			cameraMode = CameraMode.FirstPerson
+			followPlayer()
+		end
+	end
+
+	if getCasterKey(inputs.keyboard.freeCam).down or getCasterKey(inputs.gamepad.freeCam).down then
+		if playerFollow then
+			stopFollow()
+		end
+	end
+
+	if
+		playerFollow
+		and (getCasterKey(inputs.gamepad.previousPlayer).down or getCasterKey(inputs.keyboard.previousPlayer).down)
+	then
 		currentPlayerIndex -= 1
 		if currentPlayerIndex < 1 then
 			currentPlayerIndex = #selectedArena.players
@@ -2425,7 +2527,10 @@ function readOtherInputs()
 		currentPlayerId = selectedArena.players[currentPlayerIndex].playerId
 		followPlayer()
 	end
-	if playerFollow and (Input.getKeyDown(rightShoulder) or Input.getKeyDown(inputs.keyboard.nextPlayer.hotkey)) then
+	if
+		playerFollow
+		and (getCasterKey(inputs.gamepad.nextPlayer).down or getCasterKey(inputs.keyboard.nextPlayer).down)
+	then
 		currentPlayerIndex += 1
 		if currentPlayerIndex > #selectedArena.players then
 			currentPlayerIndex = 1
@@ -2442,10 +2547,10 @@ function readMoveInput()
 		return
 	end
 
-	local input = math.abs(Input.getAnalog(leftAnalogVertical)) + math.abs(Input.getAnalog(leftAnalogHorizontal))
+	local input = math.abs(getCasterAnalog(inputs.gamepad.moveY)) + math.abs(getCasterAnalog(inputs.gamepad.moveX))
 	if input > deadzone then
-		Vertical = Input.getAnalog(leftAnalogVertical)
-		Horizontal = Input.getAnalog(leftAnalogHorizontal)
+		Vertical = getCasterAnalog(inputs.gamepad.moveY)
+		Horizontal = getCasterAnalog(inputs.gamepad.moveX)
 		return
 	else
 		if getCasterKey(inputs.keyboard.forwards).held and getCasterKey(inputs.keyboard.backwards).held then
@@ -2476,12 +2581,12 @@ function readUpInput()
 		return
 	end
 
-	if Input.getKey(leftTrigger) or Input.getKey(rightTrigger) then
-		if Input.getKey(leftTrigger) and Input.getKey(rightTrigger) then
+	if getCasterKey(inputs.gamepad.down).held or getCasterKey(inputs.gamepad.up).held then
+		if getCasterKey(inputs.gamepad.down).held and getCasterKey(inputs.gamepad.up).held then
 			Up = 0
-		elseif Input.getKey(rightTrigger) then
+		elseif getCasterKey(inputs.gamepad.up).held then
 			Up = 1
-		elseif Input.getKey(leftTrigger) then
+		elseif getCasterKey(inputs.gamepad.down).held then
 			Up = -1
 		else
 			Up = 0
@@ -2545,7 +2650,7 @@ function rotateCamera()
 	end
 
 	-- Gamepad
-	turnVelocity = Vec2.new(Input.getAnalog(rightAnalogHorizontal), Input.getAnalog(rightAnalogVertical))
+	turnVelocity = Vec2.new(getCasterAnalog(inputs.gamepad.lookX), getCasterAnalog(inputs.gamepad.lookY))
 		* controllerSensitivity
 		* 2
 
@@ -2711,7 +2816,7 @@ function goalExitCheck()
 end
 
 function sendArenaInfo()
-	if not usingOverlay then
+	if not usingOverlay or not sendOverlayInfo then
 		return
 	end
 
@@ -3111,12 +3216,12 @@ function getTeamColors()
 	end
 end
 
-function setNewInputTimes()
-	local newInput = getAnyKeyboardKeyDown()
-
+function setNewInputTimes(newInput: Key?)
 	if newInput then
+		local newInputString = keyToString(newInput)
+
 		local conciderModifier = true
-		if table.find(modifierKeys, tostring(newInput)) ~= nil then
+		if table.find(modifierKeys, newInputString) ~= nil then
 			for key, pressedInput in pressedInputKeys do
 				if table.find(modifierKeys, key) == nil then
 					conciderModifier = false
@@ -3126,7 +3231,7 @@ function setNewInputTimes()
 			conciderModifier = false
 		end
 
-		pressedInputKeys[tostring(newInput)] = {
+		pressedInputKeys[newInputString] = {
 			time = os.clock(),
 			isModifier = conciderModifier,
 		}
@@ -3136,7 +3241,14 @@ end
 function removeOldInputTimes()
 	local removeKeys = {}
 	for keyKey: string, _ in pressedInputKeys do
-		if Input.getKeyDown(Input.Key[keyKey]) or Input.getKey(Input.Key[keyKey]) then
+		local key: Key
+		if Input.Key[keyKey] then
+			key = Input.Key[keyKey]
+		else
+			key = Input.Gamepad[keyKey]
+		end
+
+		if Input.getKeyDown(key) or Input.getKey(key) then
 			continue
 		end
 
@@ -3223,10 +3335,22 @@ function tick(dt)
 		return
 	end
 
-	setNewInputTimes()
+	setNewInputTimes(getAnyKeyboardKeyDown())
+	setNewInputTimes(getAnyGamepadKeyDown())
 
 	if keyToBeRebinded ~= "" then
 		doRebind()
+	end
+
+	if Input.getKey(Input.Key.N) then
+		local test: Key
+
+		test = Input.Key["Å"]
+		if test == nil then
+			test = Input.Gamepad["LeftShoulder"]
+		end
+
+		print(Input.getKey(test))
 	end
 
 	deltaTime = dt
@@ -3257,21 +3381,13 @@ function tick(dt)
 	if playerFollow then
 		World.clear()
 		readOtherInputs()
-		particleAffect()
-		if ball ~= nil then
-			goalScoreCheck()
-			ballInCenterCheck()
-		end
-		sendArenaInfo()
-		removeOldInputTimes()
-		return
+	else
+		toggleSmoothing(true, true)
+		readInput()
+
+		moveCamera()
+		rotateCamera()
 	end
-
-	toggleSmoothing(true, true)
-	readInput()
-
-	moveCamera()
-	rotateCamera()
 
 	particleAffect()
 	if ball ~= nil then
