@@ -1228,9 +1228,37 @@ local inputOrder = {
 		"getClosestArena",
 		"clearOverlayInfo",
 	},
+	gamepad = {
+		"moveY",
+		"moveX",
+		"up",
+		"down",
+		"nextPlayer",
+		"previousPlayer",
+		"lineOfSight",
+		"playerBallDistance",
+		"speedUp",
+		"speedDown",
+		"lookY",
+		"lookX",
+		"zoomIn",
+		"zoomOut",
+		"resetFOV",
+		"freeCam",
+		"firstPerson",
+		"thirdPerson",
+		"overview1",
+		"overview2",
+		"overview3",
+		"getClosestArena",
+		"clearOverlayInfo",
+	},
 }
 
-local keyToBeRebinded: string = ""
+local keyToBeRebinded = {
+	key = "",
+	type = "",
+}
 
 --example: "{key:{primary:"keybind",modifiers:{"keybind","keybind"}}}"
 function SerializeKeybinds(): string
@@ -1268,24 +1296,6 @@ local mouseWheelAxis = Input.Key.MouseWheelAxis
 local invertControllerLookHorizontal: boolean = config.invertControllerLookHorizontal
 local invertControllerLookVertical: boolean = config.invertControllerLookVertical
 local controllerSensitivity: number = config.controllerSensitivity
-local leftAnalogVertical = Input.Gamepad.LeftY
-local leftAnalogHorizontal = Input.Gamepad.LeftX
-local rightAnalogVertical = Input.Gamepad.RightY
-local rightAnalogHorizontal = Input.Gamepad.RightX
-local leftTrigger = Input.Gamepad.LeftTrigger
-local rightTrigger = Input.Gamepad.RightTrigger
-local leftShoulder = Input.Gamepad.LeftShoulder
-local rightShoulder = Input.Gamepad.RightShoulder
-local topFaceButton = Input.Gamepad.FaceButton_Top
-local bottomFaceButton = Input.Gamepad.FaceButton_Bottom
-local leftFaceButton = Input.Gamepad.FaceButton_Left
-local rightFaceButton = Input.Gamepad.FaceButton_Right
-local dPadUp = Input.Gamepad.DPad_Up
-local dPadDown = Input.Gamepad.DPad_Down
-local dPadLeft = Input.Gamepad.DPad_Left
-local dPadRight = Input.Gamepad.DPad_Right
-local leftJoystick = Input.Gamepad.LeftThumbstick
-local rightJoystick = Input.Gamepad.RightThumbstick
 
 -- Gui
 local controlsScreen: boolean = false
@@ -1413,15 +1423,16 @@ function onGui()
 					end
 					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
 
-					if keyToBeRebinded == casterInputKey then
+					if keyToBeRebinded.key == casterInputKey then
 						buttonLabel = "..."
 					end
 
 					if Gui.button(`{buttonLabel}##{casterInputKey}`) then
-						if keyToBeRebinded ~= casterInputKey then
-							keyToBeRebinded = casterInputKey
+						if keyToBeRebinded.key ~= casterInputKey then
+							keyToBeRebinded.key = casterInputKey
+							keyToBeRebinded.type = "keyboard"
 						else
-							keyToBeRebinded = ""
+							keyToBeRebinded.key = ""
 						end
 					end
 				end
@@ -1430,37 +1441,53 @@ function onGui()
 		end
 
 		if controllerControls then
-			Gui.text([[
-Controller:
-	Modes:
-		Left Face Button - Freecam Mode
-		Right Face Button - FirstPerson Mode
-		Top Face Button - ThirdPerson Mode
-					
-	In Freecam mode:
-		Left Joystick - Horizontal Movement
-		Left & Right Trigger - Vertical Movement
-		Right Joystick - Rotating
-		Right Bumper - Gear Increase
-		Left Bumper - Gear Decrease
-		Right Joystick Down - "Get Player Method" = Player Closest To Ball
-		Left Joystick Down - "Get Player Method" = Player Closest To Lign of Sight
-		Dpad Up - Zoom In
-		Dpad Down - Zoom Out
-					
-	In FirstPerson & ThirdPerson mode:
-		Left Bumper - Left Player Cycle
-		Right Bumper - Right Player Cycle
-	
-	In All modes:
-		Dpad Left + Left Face Button - First Overview
-		Dpad Left + Top Face Button - Second Overview
-		Dpad Left + Right Face Button - Third Overview
+			if Gui.beginTable("ControllerControls", 3) then
+				Gui.tableSetupColumn("Name")
+				Gui.tableSetupColumn("Description")
+				Gui.tableSetupColumn("Hotkey")
+				Gui.tableHeadersRow()
 
-		Enter - Get Closest Arena
+				for _, casterInputKey: string in inputOrder.gamepad do
+					local casterInput: CasterInput = inputs.gamepad[casterInputKey]
 
-		^^The Overviews Side is based on which side the ball is on^^
-	]])
+					Gui.tableNextRow()
+					Gui.tableNextColumn()
+					Gui.text(casterInput.name)
+					Gui.tableNextColumn()
+					Gui.text(casterInput.description)
+					Gui.tableNextColumn()
+
+					local buttonLabel = ""
+					if casterInput.modifiers then
+						for _, input: Key in casterInput.modifiers do
+							buttonLabel = buttonLabel .. `{keyToString(input)} + `
+						end
+					end
+					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
+
+					if keyToBeRebinded.key == casterInputKey then
+						buttonLabel = "..."
+					end
+
+					if not casterInput.editable then
+						Gui.beginDisabled()
+					end
+
+					if Gui.button(`{buttonLabel}##{casterInputKey}`) then
+						if keyToBeRebinded.key ~= casterInputKey then
+							keyToBeRebinded.key = casterInputKey
+							keyToBeRebinded.type = "gamepad"
+						else
+							keyToBeRebinded.key = ""
+						end
+					end
+
+					if not casterInput.editable then
+						Gui.endDisabled()
+					end
+				end
+				Gui.endTable()
+			end
 		end
 
 		return
@@ -2378,7 +2405,7 @@ function readInput()
 end
 
 function readOtherInputs()
-	if keyToBeRebinded ~= "" then
+	if keyToBeRebinded.key ~= "" then
 		-- don't read inputs on rebind
 		return
 	end
@@ -2542,7 +2569,7 @@ function readOtherInputs()
 end
 
 function readMoveInput()
-	if keyToBeRebinded ~= "" then
+	if keyToBeRebinded.key ~= "" then
 		-- don't read inputs on rebind
 		return
 	end
@@ -2576,7 +2603,7 @@ function readMoveInput()
 end
 
 function readUpInput()
-	if keyToBeRebinded ~= "" then
+	if keyToBeRebinded.key ~= "" then
 		-- don't read inputs on rebind
 		return
 	end
@@ -2627,7 +2654,7 @@ end
 
 local rotDelta: Vec3 = Vec3.zeroVector
 function rotateCamera()
-	if keyToBeRebinded ~= "" then
+	if keyToBeRebinded.key ~= "" then
 		-- don't read input on rebind
 		return
 	end
@@ -3266,10 +3293,64 @@ function saveKeybinds()
 	saveConfig()
 end
 
+function removeGamepadKeys(keysList: { Key }): { Key }
+	local removeIndexes: { number } = {}
+	for i, key: Key in keysList do
+		local keyString = keyToString(key)
+		if table.find(keyboardKeys, keyString) == nil then
+			table.insert(removeIndexes, i)
+		end
+	end
+
+	for _, index in removeIndexes do
+		table.remove(keysList, index)
+	end
+
+	return keysList
+end
+
+function removeKeyboardKeys(keysList: { Key })
+	local removeIndexes: { number } = {}
+	for i, key: Key in keysList do
+		local keyString = keyToString(key)
+		if table.find(keyboardKeys, keyString) ~= nil then
+			table.insert(removeIndexes, i)
+		end
+	end
+
+	for _, index in removeIndexes do
+		table.remove(keysList, index)
+	end
+
+	return keysList
+end
+
 function rebind(primary: string, modifiers: { Key }?)
-	inputs.keyboard[keyToBeRebinded].modifiers = modifiers
-	inputs.keyboard[keyToBeRebinded].hotkey = Input.Key[primary]
-	keyToBeRebinded = ""
+	if keyToBeRebinded.type == "keyboard" then
+		if table.find(keyboardKeys, primary) == nil then
+			return
+		end
+
+		if modifiers then
+			modifiers = removeGamepadKeys(modifiers)
+		end
+
+		inputs.keyboard[keyToBeRebinded.key].modifiers = modifiers
+		inputs.keyboard[keyToBeRebinded.key].hotkey = Input.Key[primary]
+	elseif keyToBeRebinded.type == "gamepad" then
+		if table.find(keyboardKeys, primary) ~= nil then
+			return
+		end
+
+		if modifiers then
+			modifiers = removeKeyboardKeys(modifiers)
+		end
+
+		inputs.gamepad[keyToBeRebinded.key].modifiers = modifiers
+		inputs.gamepad[keyToBeRebinded.key].hotkey = Input.Key[primary]
+	end
+
+	keyToBeRebinded.key = ""
 	pressedRebindModifiers = {}
 	saveKeybinds()
 end
@@ -3338,7 +3419,7 @@ function tick(dt)
 	setNewInputTimes(getAnyKeyboardKeyDown())
 	setNewInputTimes(getAnyGamepadKeyDown())
 
-	if keyToBeRebinded ~= "" then
+	if keyToBeRebinded.key ~= "" then
 		doRebind()
 	end
 
