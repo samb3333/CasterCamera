@@ -366,28 +366,55 @@ function createArena(name: string, position: Vec3, rotation: Quat): Arena
 end
 
 local defaultKeybinds = {
-	lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
-	previousPlayer = { primary = Input.Key.A, modifiers = {} },
-	right = { primary = Input.Key.D, modifiers = {} },
-	left = { primary = Input.Key.A, modifiers = {} },
-	resetFOV = { primary = Input.Key.MiddleMouseButton, modifiers = {} },
-	getClosestArena = { primary = Input.Key.Enter, modifiers = {} },
-	thirdPerson = { primary = Input.Key.V, modifiers = {} },
-	speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
-	lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
-	up = { primary = Input.Key.E, modifiers = {} },
-	clearOverlayInfo = { primary = Input.Key.BackSpace, modifiers = {} },
-	forwards = { primary = Input.Key.W, modifiers = {} },
-	overview3 = { primary = Input.Key.Seven, modifiers = {} },
-	freeCam = { primary = Input.Key.Z, modifiers = {} },
-	overview1 = { primary = Input.Key.Five, modifiers = {} },
-	backwards = { primary = Input.Key.S, modifiers = {} },
-	playerBallDistance = { primary = Input.Key.E, modifiers = { Input.Key.LeftAlt } },
-	speedUp = { primary = Input.Key.LeftShift, modifiers = {} },
-	overview2 = { primary = Input.Key.Six, modifiers = {} },
-	nextPlayer = { primary = Input.Key.D, modifiers = {} },
-	down = { primary = Input.Key.Q, modifiers = {} },
-	firstPerson = { primary = Input.Key.C, modifiers = {} },
+	keyboard = {
+		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
+		previousPlayer = { primary = Input.Key.A, modifiers = {} },
+		right = { primary = Input.Key.D, modifiers = {} },
+		left = { primary = Input.Key.A, modifiers = {} },
+		resetFOV = { primary = Input.Key.MiddleMouseButton, modifiers = {} },
+		getClosestArena = { primary = Input.Key.Enter, modifiers = {} },
+		thirdPerson = { primary = Input.Key.V, modifiers = {} },
+		speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
+		lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
+		up = { primary = Input.Key.E, modifiers = {} },
+		clearOverlayInfo = { primary = Input.Key.BackSpace, modifiers = {} },
+		forwards = { primary = Input.Key.W, modifiers = {} },
+		overview3 = { primary = Input.Key.Seven, modifiers = {} },
+		freeCam = { primary = Input.Key.Z, modifiers = {} },
+		overview1 = { primary = Input.Key.Five, modifiers = {} },
+		backwards = { primary = Input.Key.S, modifiers = {} },
+		playerBallDistance = { primary = Input.Key.E, modifiers = { Input.Key.LeftAlt } },
+		speedUp = { primary = Input.Key.LeftShift, modifiers = {} },
+		overview2 = { primary = Input.Key.Six, modifiers = {} },
+		nextPlayer = { primary = Input.Key.D, modifiers = {} },
+		down = { primary = Input.Key.Q, modifiers = {} },
+		firstPerson = { primary = Input.Key.C, modifiers = {} },
+	},
+	gamepad = {
+		moveY = { primary = Input.Gamepad.LeftY, modifiers = {} },
+		previousPlayer = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
+		moveX = { primary = Input.Gamepad.LeftX, modifiers = {} },
+		nextPlayer = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
+		clearOverlayInfo = { primary = Input.Gamepad.Special_Left, modifiers = {} },
+		lookY = { primary = Input.Gamepad.RightY, modifiers = {} },
+		resetFOV = { primary = Input.Gamepad.DPad_Right, modifiers = {} },
+		getClosestArena = { primary = Input.Gamepad.Special_Right, modifiers = {} },
+		thirdPerson = { primary = Input.Gamepad.FaceButton_Top, modifiers = {} },
+		speedDown = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
+		up = { primary = Input.Gamepad.RightTrigger, modifiers = {} },
+		overview3 = { primary = Input.Gamepad.FaceButton_Right, modifiers = { Input.Gamepad.DPad_Left } },
+		overview1 = { primary = Input.Gamepad.FaceButton_Left, modifiers = { Input.Gamepad.DPad_Left } },
+		zoomOut = { primary = Input.Gamepad.DPad_Down, modifiers = {} },
+		zoomIn = { primary = Input.Gamepad.DPad_Up, modifiers = {} },
+		firstPerson = { primary = Input.Gamepad.FaceButton_Right, modifiers = {} },
+		freeCam = { primary = Input.Gamepad.FaceButton_Left, modifiers = {} },
+		playerBallDistance = { primary = Input.Gamepad.RightThumbstick, modifiers = {} },
+		speedUp = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
+		overview2 = { primary = Input.Gamepad.FaceButton_Top, modifiers = { Input.Gamepad.DPad_Left } },
+		lineOfSight = { primary = Input.Gamepad.LeftThumbstick, modifiers = {} },
+		down = { primary = Input.Gamepad.LeftTrigger, modifiers = {} },
+		lookX = { primary = Input.Gamepad.RightX, modifiers = {} },
+	},
 }
 
 local function initializeConfig()
@@ -435,7 +462,8 @@ local function initializeConfig()
 				rotation = Quat.fromEuler(0, -20, -60),
 			},
 		},
-		keybinds = "",
+		keyboardKeybinds = "",
+		gamepadKeybinds = "",
 	}
 
 	-- saves new values that are not there from before to all profiles
@@ -677,12 +705,20 @@ function DeserializeKeybinds(string: string)
 		local entry = {}
 
 		entry.primary = Input.Key[content:match('primary:"([^"]+)"')]
+		if entry.primary == nil then
+			entry.primary = Input.Gamepad[content:match('primary:"([^"]+)"')]
+		end
 
 		local modifierContent = content:match("modifiers:{(.-)}") or ""
 		entry.modifiers = {}
 
 		for modifier in modifierContent:gmatch('"([^"]+)"') do
-			table.insert(entry.modifiers, Input.Key[modifier])
+			local modifierKey = Input.Key[modifier]
+			if modifierKey == nil then
+				modifierKey = Input.Gamepad[modifier]
+			end
+
+			table.insert(entry.modifiers, modifierKey)
 		end
 
 		keybinds[key] = entry
@@ -816,6 +852,14 @@ function getAnyGamepadKeyDown(): Key?
 			Input.Gamepad.LeftX,
 			Input.Gamepad.LeftTriggerAxis,
 			Input.Gamepad.RightTriggerAxis,
+			Input.Gamepad.LeftStick_Down,
+			Input.Gamepad.LeftStick_Left,
+			Input.Gamepad.LeftStick_Right,
+			Input.Gamepad.LeftStick_Up,
+			Input.Gamepad.RightStick_Down,
+			Input.Gamepad.RightStick_Left,
+			Input.Gamepad.RightStick_Right,
+			Input.Gamepad.RightStick_Up,
 		}
 	local inputMeta = getmetatable(Input)
 	local gamepad = inputMeta.__index.Gamepad
@@ -920,6 +964,36 @@ function createCasterInput(
 	}
 end
 
+function compareCasterInputs(a: { hotkey: Key, modifiers: { Key }? }, b: { hotkey: Key, modifiers: { Key }? }): boolean
+	if keyToString(a.hotkey) ~= keyToString(b.hotkey) then
+		return false
+	end
+
+	if (a.modifiers ~= nil) ~= (b.modifiers ~= nil) then
+		return false
+	end
+
+	local isEqual = true
+
+	if a.modifiers and b.modifiers then
+		for _, aKey: Key in a.modifiers do
+			if table.find(b.modifiers, aKey) == nil then
+				isEqual = false
+				break
+			end
+		end
+
+		for _, bKey: Key in b.modifiers do
+			if table.find(a.modifiers, bKey) == nil then
+				isEqual = false
+				break
+			end
+		end
+	end
+
+	return isEqual
+end
+
 function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boolean }
 	local primary = key.hotkey
 	local modifiers = key.modifiers
@@ -1008,10 +1082,15 @@ function getCasterAnalog(key: CasterInput): number
 	return Input.getAnalog(primary)
 end
 
-local keybindsDeserialized = DeserializeKeybinds(config.keybinds)
+local keyboardKeybindsDeserialized = DeserializeKeybinds(config.keyboardKeybinds)
+local gamepadKeybindsDeserialized = DeserializeKeybinds(config.gamepadKeybinds)
 
-if #keybindsDeserialized == 0 then
-	keybindsDeserialized = defaultKeybinds
+if getDictSize(keyboardKeybindsDeserialized) == 0 then
+	keyboardKeybindsDeserialized = defaultKeybinds.keyboard
+end
+
+if getDictSize(gamepadKeybindsDeserialized) == 0 then
+	gamepadKeybindsDeserialized = defaultKeybinds.gamepad
 end
 
 local inputs = {
@@ -1019,187 +1098,279 @@ local inputs = {
 		forwards = createCasterInput(
 			"Move Forwards",
 			"Move camera forward",
-			keybindsDeserialized["forwards"].primary,
-			keybindsDeserialized["forwards"].modifiers
+			keyboardKeybindsDeserialized["forwards"].primary,
+			keyboardKeybindsDeserialized["forwards"].modifiers
 		),
 		right = createCasterInput(
 			"Move Right",
 			"Move camera right",
-			keybindsDeserialized["right"].primary,
-			keybindsDeserialized["right"].modifiers
+			keyboardKeybindsDeserialized["right"].primary,
+			keyboardKeybindsDeserialized["right"].modifiers
 		),
 		left = createCasterInput(
 			"Move Left",
 			"Move camera left",
-			keybindsDeserialized["left"].primary,
-			keybindsDeserialized["left"].modifiers
+			keyboardKeybindsDeserialized["left"].primary,
+			keyboardKeybindsDeserialized["left"].modifiers
 		),
 		backwards = createCasterInput(
 			"Move Backwards",
 			"Move camera backward",
-			keybindsDeserialized["backwards"].primary,
-			keybindsDeserialized["backwards"].modifiers
+			keyboardKeybindsDeserialized["backwards"].primary,
+			keyboardKeybindsDeserialized["backwards"].modifiers
 		),
 		up = createCasterInput(
 			"Move Up",
 			"Move camera up",
-			keybindsDeserialized["up"].primary,
-			keybindsDeserialized["up"].modifiers
+			keyboardKeybindsDeserialized["up"].primary,
+			keyboardKeybindsDeserialized["up"].modifiers
 		),
 		down = createCasterInput(
 			"Move Down",
 			"Move camera down",
-			keybindsDeserialized["down"].primary,
-			keybindsDeserialized["down"].modifiers
+			keyboardKeybindsDeserialized["down"].primary,
+			keyboardKeybindsDeserialized["down"].modifiers
 		),
 		nextPlayer = createCasterInput(
 			"Next Player",
 			"Cycle to next player (POV mode)",
-			keybindsDeserialized["nextPlayer"].primary,
-			keybindsDeserialized["nextPlayer"].modifiers
+			keyboardKeybindsDeserialized["nextPlayer"].primary,
+			keyboardKeybindsDeserialized["nextPlayer"].modifiers
 		),
 		previousPlayer = createCasterInput(
 			"Previous Player",
 			"Cycle to previous player (POV mode)",
-			keybindsDeserialized["previousPlayer"].primary,
-			keybindsDeserialized["previousPlayer"].modifiers
+			keyboardKeybindsDeserialized["previousPlayer"].primary,
+			keyboardKeybindsDeserialized["previousPlayer"].modifiers
 		),
 		lineOfSight = createCasterInput(
 			"Line of Sight",
 			"Target: Player in line of sight",
-			keybindsDeserialized["lineOfSight"].primary,
-			keybindsDeserialized["lineOfSight"].modifiers
+			keyboardKeybindsDeserialized["lineOfSight"].primary,
+			keyboardKeybindsDeserialized["lineOfSight"].modifiers
 		),
 		playerBallDistance = createCasterInput(
 			"Closest to Ball",
 			"Target: Player nearest ball",
-			keybindsDeserialized["playerBallDistance"].primary,
-			keybindsDeserialized["playerBallDistance"].modifiers
+			keyboardKeybindsDeserialized["playerBallDistance"].primary,
+			keyboardKeybindsDeserialized["playerBallDistance"].modifiers
 		),
 		speedUp = createCasterInput(
 			"Speed Up",
 			"Increase camera speed",
-			keybindsDeserialized["speedUp"].primary,
-			keybindsDeserialized["speedUp"].modifiers
+			keyboardKeybindsDeserialized["speedUp"].primary,
+			keyboardKeybindsDeserialized["speedUp"].modifiers
 		),
 		speedDown = createCasterInput(
 			"Speed Down",
 			"Decrease camera speed",
-			keybindsDeserialized["speedDown"].primary,
-			keybindsDeserialized["speedDown"].modifiers
+			keyboardKeybindsDeserialized["speedDown"].primary,
+			keyboardKeybindsDeserialized["speedDown"].modifiers
 		),
 		thirdPerson = createCasterInput(
 			"Third Person",
 			"Toggle third-person view",
-			keybindsDeserialized["thirdPerson"].primary,
-			keybindsDeserialized["thirdPerson"].modifiers
+			keyboardKeybindsDeserialized["thirdPerson"].primary,
+			keyboardKeybindsDeserialized["thirdPerson"].modifiers
 		),
 		firstPerson = createCasterInput(
 			"First Person",
 			"Toggle first-person view",
-			keybindsDeserialized["firstPerson"].primary,
-			keybindsDeserialized["firstPerson"].modifiers
+			keyboardKeybindsDeserialized["firstPerson"].primary,
+			keyboardKeybindsDeserialized["firstPerson"].modifiers
 		),
 		freeCam = createCasterInput(
 			"Free Cam",
 			"Toggle free-cam view",
-			keybindsDeserialized["freeCam"].primary,
-			keybindsDeserialized["freeCam"].modifiers
+			keyboardKeybindsDeserialized["freeCam"].primary,
+			keyboardKeybindsDeserialized["freeCam"].modifiers
 		),
 		overview1 = createCasterInput(
 			"Overview 1",
 			"Jump to first overview position",
-			keybindsDeserialized["overview1"].primary,
-			keybindsDeserialized["overview1"].modifiers
+			keyboardKeybindsDeserialized["overview1"].primary,
+			keyboardKeybindsDeserialized["overview1"].modifiers
 		),
 		overview2 = createCasterInput(
 			"Overview 2",
 			"Jump to second overview position",
-			keybindsDeserialized["overview2"].primary,
-			keybindsDeserialized["overview2"].modifiers
+			keyboardKeybindsDeserialized["overview2"].primary,
+			keyboardKeybindsDeserialized["overview2"].modifiers
 		),
 		overview3 = createCasterInput(
 			"Overview 3",
 			"Jump to third overview position",
-			keybindsDeserialized["overview3"].primary,
-			keybindsDeserialized["overview3"].modifiers
+			keyboardKeybindsDeserialized["overview3"].primary,
+			keyboardKeybindsDeserialized["overview3"].modifiers
 		),
 		getClosestArena = createCasterInput(
 			"Select Arena",
 			"Select closest arena",
-			keybindsDeserialized["getClosestArena"].primary,
-			keybindsDeserialized["getClosestArena"].modifiers
+			keyboardKeybindsDeserialized["getClosestArena"].primary,
+			keyboardKeybindsDeserialized["getClosestArena"].modifiers
 		),
 		clearOverlayInfo = createCasterInput(
 			"Clear Overlay Data",
 			"Remove overlay data",
-			keybindsDeserialized["clearOverlayInfo"].primary,
-			keybindsDeserialized["clearOverlayInfo"].modifiers
+			keyboardKeybindsDeserialized["clearOverlayInfo"].primary,
+			keyboardKeybindsDeserialized["clearOverlayInfo"].modifiers
 		),
 		lookAround = createCasterInput(
 			"Look Around",
 			"Hold to rotate camera",
-			keybindsDeserialized["lookAround"].primary,
-			keybindsDeserialized["lookAround"].modifiers
+			keyboardKeybindsDeserialized["lookAround"].primary,
+			keyboardKeybindsDeserialized["lookAround"].modifiers
 		),
 		resetFOV = createCasterInput(
 			"Reset FOV",
 			"Reset field of view",
-			keybindsDeserialized["resetFOV"].primary,
-			keybindsDeserialized["resetFOV"].modifiers
+			keyboardKeybindsDeserialized["resetFOV"].primary,
+			keyboardKeybindsDeserialized["resetFOV"].modifiers
 		),
 	},
 	gamepad = {
-		moveY = createCasterInput("MoveY", "Move Camera Forwards/Backwards", Input.Gamepad.LeftY, {}, false),
-		moveX = createCasterInput("MoveX", "Move Camera Left/Right", Input.Gamepad.LeftX, {}, false),
-		up = createCasterInput("Move Up", "Move Camera Up", Input.Gamepad.RightTrigger),
-		down = createCasterInput("Move Down", "Move Camera Down", Input.Gamepad.LeftTrigger),
-		nextPlayer = createCasterInput("Next Player", "Cycle to next player (POV mode)", Input.Gamepad.RightShoulder),
+		moveY = createCasterInput(
+			"MoveY",
+			"Move Camera Forwards/Backwards",
+			gamepadKeybindsDeserialized["moveY"].primary,
+			gamepadKeybindsDeserialized["moveY"].modifiers,
+			false
+		),
+		moveX = createCasterInput(
+			"MoveX",
+			"Move Camera Left/Right",
+			gamepadKeybindsDeserialized["moveX"].primary,
+			gamepadKeybindsDeserialized["moveX"].modifiers,
+			false
+		),
+		up = createCasterInput(
+			"Move Up",
+			"Move Camera Up",
+			gamepadKeybindsDeserialized["up"].primary,
+			gamepadKeybindsDeserialized["up"].modifiers
+		),
+		down = createCasterInput(
+			"Move Down",
+			"Move Camera Down",
+			gamepadKeybindsDeserialized["down"].primary,
+			gamepadKeybindsDeserialized["down"].modifiers
+		),
+		nextPlayer = createCasterInput(
+			"Next Player",
+			"Cycle to next player (POV mode)",
+			gamepadKeybindsDeserialized["nextPlayer"].primary,
+			gamepadKeybindsDeserialized["nextPlayer"].modifiers
+		),
 		previousPlayer = createCasterInput(
 			"Previous Player",
 			"Cycle to previous player (POV mode)",
-			Input.Gamepad.LeftShoulder
+			gamepadKeybindsDeserialized["previousPlayer"].primary,
+			gamepadKeybindsDeserialized["previousPlayer"].modifiers
 		),
 		lineOfSight = createCasterInput(
 			"Line Of Sight",
 			"Target: Player in line of sight",
-			Input.Gamepad.LeftThumbstick
+			gamepadKeybindsDeserialized["lineOfSight"].primary,
+			gamepadKeybindsDeserialized["lineOfSight"].modifiers
 		),
 		playerBallDistance = createCasterInput(
 			"Closest to Ball",
 			"Target: Player nearest ball",
-			Input.Gamepad.RightThumbstick
+			gamepadKeybindsDeserialized["playerBallDistance"].primary,
+			gamepadKeybindsDeserialized["playerBallDistance"].modifiers
 		),
-		speedUp = createCasterInput("Speed Up", "Increase camera speed", Input.Gamepad.RightShoulder),
-		speedDown = createCasterInput("Speed Down", "Decrease camera speed", Input.Gamepad.LeftShoulder),
-		lookY = createCasterInput("LookY", "Look Up/Down", Input.Gamepad.RightY, {}, false),
-		lookX = createCasterInput("LookX", "Look Left/Right", Input.Gamepad.RightX, {}, false),
-		zoomIn = createCasterInput("Zoom In", "Increase field of view", Input.Gamepad.DPad_Up),
-		zoomOut = createCasterInput("Zoom Out", "Decrease field of view", Input.Gamepad.DPad_Down),
-		resetFOV = createCasterInput("Reser FOV", "Reset field of view", Input.Gamepad.DPad_Right),
-		freeCam = createCasterInput("Free Cam", "Toggle free-cam view", Input.Gamepad.FaceButton_Left),
-		firstPerson = createCasterInput("First Person", "Toggle first-person view", Input.Gamepad.FaceButton_Right),
-		thirdPerson = createCasterInput("Third Person", "Toggle third-person view", Input.Gamepad.FaceButton_Top),
+		speedUp = createCasterInput(
+			"Speed Up",
+			"Increase camera speed",
+			gamepadKeybindsDeserialized["speedUp"].primary,
+			gamepadKeybindsDeserialized["speedUp"].modifiers
+		),
+		speedDown = createCasterInput(
+			"Speed Down",
+			"Decrease camera speed",
+			gamepadKeybindsDeserialized["speedDown"].primary,
+			gamepadKeybindsDeserialized["speedDown"].modifiers
+		),
+		lookY = createCasterInput(
+			"LookY",
+			"Look Up/Down",
+			gamepadKeybindsDeserialized["lookY"].primary,
+			gamepadKeybindsDeserialized["lookY"].modifiers,
+			false
+		),
+		lookX = createCasterInput(
+			"LookX",
+			"Look Left/Right",
+			gamepadKeybindsDeserialized["lookX"].primary,
+			gamepadKeybindsDeserialized["lookX"].modifiers,
+			false
+		),
+		zoomIn = createCasterInput(
+			"Zoom In",
+			"Increase field of view",
+			gamepadKeybindsDeserialized["zoomIn"].primary,
+			gamepadKeybindsDeserialized["zoomIn"].modifiers
+		),
+		zoomOut = createCasterInput(
+			"Zoom Out",
+			"Decrease field of view",
+			gamepadKeybindsDeserialized["zoomOut"].primary,
+			gamepadKeybindsDeserialized["zoomOut"].modifiers
+		),
+		resetFOV = createCasterInput(
+			"Reser FOV",
+			"Reset field of view",
+			gamepadKeybindsDeserialized["resetFOV"].primary,
+			gamepadKeybindsDeserialized["resetFOV"].modifiers
+		),
+		freeCam = createCasterInput(
+			"Free Cam",
+			"Toggle free-cam view",
+			gamepadKeybindsDeserialized["freeCam"].primary,
+			gamepadKeybindsDeserialized["freeCam"].modifiers
+		),
+		firstPerson = createCasterInput(
+			"First Person",
+			"Toggle first-person view",
+			gamepadKeybindsDeserialized["firstPerson"].primary,
+			gamepadKeybindsDeserialized["firstPerson"].modifiers
+		),
+		thirdPerson = createCasterInput(
+			"Third Person",
+			"Toggle third-person view",
+			gamepadKeybindsDeserialized["thirdPerson"].primary,
+			gamepadKeybindsDeserialized["thirdPerson"].modifiers
+		),
 		overview1 = createCasterInput(
 			"Overview 1",
 			"Jump to first overview position",
-			Input.Gamepad.FaceButton_Left,
-			{ Input.Gamepad.DPad_Left }
+			gamepadKeybindsDeserialized["overview1"].primary,
+			gamepadKeybindsDeserialized["overview1"].modifiers
 		),
 		overview2 = createCasterInput(
 			"Overview 2",
 			"Jump to second overview position",
-			Input.Gamepad.FaceButton_Top,
-			{ Input.Gamepad.DPad_Left }
+			gamepadKeybindsDeserialized["overview2"].primary,
+			gamepadKeybindsDeserialized["overview2"].modifiers
 		),
 		overview3 = createCasterInput(
 			"Overview 3",
 			"Jump to third overview position",
-			Input.Gamepad.FaceButton_Right,
-			{ Input.Gamepad.DPad_Left }
+			gamepadKeybindsDeserialized["overview3"].primary,
+			gamepadKeybindsDeserialized["overview3"].modifiers
 		),
-		getClosestArena = createCasterInput("Select Arena", "Select closest arena", Input.Gamepad.Special_Right),
-		clearOverlayInfo = createCasterInput("Clear Overlay Data", "Remove Overlay Data", Input.Gamepad.Special_Left),
+		getClosestArena = createCasterInput(
+			"Select Arena",
+			"Select closest arena",
+			gamepadKeybindsDeserialized["getClosestArena"].primary,
+			gamepadKeybindsDeserialized["getClosestArena"].modifiers
+		),
+		clearOverlayInfo = createCasterInput(
+			"Clear Overlay Data",
+			"Remove Overlay Data",
+			gamepadKeybindsDeserialized["clearOverlayInfo"].primary,
+			gamepadKeybindsDeserialized["clearOverlayInfo"].modifiers
+		),
 	},
 }
 
@@ -1261,24 +1432,43 @@ local keyToBeRebinded = {
 }
 
 --example: "{key:{primary:"keybind",modifiers:{"keybind","keybind"}}}"
-function SerializeKeybinds(): string
-	local serializedString = ""
+function SerializeKeybinds()
+	local serializedKeyboardString = ""
 	for key, value: CasterInput in inputs.keyboard :: { CasterInput } do
-		serializedString ..= "{" .. `{key}:` .. "{" .. `primary:"{keyToString(value.hotkey)}",modifiers:` .. "{"
+		serializedKeyboardString ..= "{" .. `{key}:` .. "{" .. `primary:"{keyToString(value.hotkey)}",modifiers:` .. "{"
 
 		if value.modifiers then
 			for i, modifier: Key in value.modifiers do
-				serializedString ..= `"{keyToString(modifier)}"`
+				serializedKeyboardString ..= `"{keyToString(modifier)}"`
 				if i ~= #value.modifiers then
-					serializedString ..= `,`
+					serializedKeyboardString ..= `,`
 				end
 			end
 		end
 
-		serializedString ..= "}}}"
+		serializedKeyboardString ..= "}}}"
 	end
 
-	return serializedString
+	local serializedGamepadString = ""
+	for key, value: CasterInput in inputs.gamepad :: { CasterInput } do
+		serializedGamepadString ..= "{" .. `{key}:` .. "{" .. `primary:"{keyToString(value.hotkey)}",modifiers:` .. "{"
+
+		if value.modifiers then
+			for i, modifier: Key in value.modifiers do
+				serializedGamepadString ..= `"{keyToString(modifier)}"`
+				if i ~= #value.modifiers then
+					serializedGamepadString ..= `,`
+				end
+			end
+		end
+
+		serializedGamepadString ..= "}}}"
+	end
+
+	return {
+		keybord = serializedKeyboardString,
+		gamepad = serializedGamepadString,
+	}
 end
 
 --  Keyboard (debug)
@@ -1423,7 +1613,7 @@ function onGui()
 					end
 					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
 
-					if keyToBeRebinded.key == casterInputKey then
+					if keyToBeRebinded.key == casterInputKey and keyToBeRebinded.type == "keyboard" then
 						buttonLabel = "..."
 					end
 
@@ -1434,6 +1624,22 @@ function onGui()
 						else
 							keyToBeRebinded.key = ""
 						end
+					end
+
+					Gui.sameLine()
+
+					if
+						not compareCasterInputs({
+							hotkey = casterInput.hotkey,
+							modifiers = casterInput.modifiers,
+						}, {
+							hotkey = defaultKeybinds.keyboard[casterInputKey].primary,
+							modifiers = defaultKeybinds.keyboard[casterInputKey].modifiers,
+						}) and Gui.button(`{Icon.Undo}##{casterInputKey}`)
+					then
+						local defaultValue = defaultKeybinds.keyboard[casterInputKey]
+						inputs.keyboard[casterInputKey].modifiers = defaultValue.modifiers
+						inputs.keyboard[casterInputKey].hotkey = defaultValue.primary
 					end
 				end
 				Gui.endTable()
@@ -1465,7 +1671,7 @@ function onGui()
 					end
 					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
 
-					if keyToBeRebinded.key == casterInputKey then
+					if keyToBeRebinded.key == casterInputKey and keyToBeRebinded.type == "gamepad" then
 						buttonLabel = "..."
 					end
 
@@ -1484,6 +1690,22 @@ function onGui()
 
 					if not casterInput.editable then
 						Gui.endDisabled()
+					end
+
+					Gui.sameLine()
+
+					if
+						not compareCasterInputs({
+							hotkey = casterInput.hotkey,
+							modifiers = casterInput.modifiers,
+						}, {
+							hotkey = defaultKeybinds.gamepad[casterInputKey].primary,
+							modifiers = defaultKeybinds.gamepad[casterInputKey].modifiers,
+						}) and Gui.button(`{Icon.Undo}##{casterInputKey}`)
+					then
+						local defaultValue = defaultKeybinds.gamepad[casterInputKey]
+						inputs.gamepad[casterInputKey].modifiers = defaultValue.modifiers
+						inputs.gamepad[casterInputKey].hotkey = defaultValue.primary
 					end
 				end
 				Gui.endTable()
@@ -3289,7 +3511,9 @@ end
 
 function saveKeybinds()
 	local keybindsSerilazied = SerializeKeybinds()
-	config.keybinds = keybindsSerilazied
+	config.keyboardKeybinds = keybindsSerilazied.keybord
+	config.gamepadKeybinds = keybindsSerilazied.gamepad
+	print(keybindsSerilazied.gamepad)
 	saveConfig()
 end
 
@@ -3347,7 +3571,7 @@ function rebind(primary: string, modifiers: { Key }?)
 		end
 
 		inputs.gamepad[keyToBeRebinded.key].modifiers = modifiers
-		inputs.gamepad[keyToBeRebinded.key].hotkey = Input.Key[primary]
+		inputs.gamepad[keyToBeRebinded.key].hotkey = Input.Gamepad[primary]
 	end
 
 	keyToBeRebinded.key = ""
@@ -3396,7 +3620,12 @@ function doRebind()
 
 		for key, pressedInputInfo in pressedInputKeys do
 			if table.find(modifierKeys, key) ~= nil and pressedInputInfo.isModifier then
-				table.insert(modifiers, Input.Key[key])
+				local modifierKey = Input.Key[key]
+				if modifierKey == nil then
+					modifierKey = Input.Gamepad[key]
+				end
+
+				table.insert(modifiers, modifierKey)
 			end
 		end
 
