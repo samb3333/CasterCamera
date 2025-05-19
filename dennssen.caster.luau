@@ -1,15 +1,14 @@
-local version: string = "1.2.0"
+local version: string = "1.3.0"
 metadata = {
 	name = "Caster",
-	description = "TBD",
+	description = "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
 	author = "Dennssen",
 	defaultKeybind = "",
 }
 
 --Notes:
--- Controller keybinds in GUI
--- Controller keybinds saveable
 -- integrate post processing into script and make it saveable
+-- make speed linearly interpolate when switching gears
 -- ballCam?
 
 local function parseBallJSON(str)
