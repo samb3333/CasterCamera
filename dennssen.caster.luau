@@ -493,7 +493,7 @@ local function initializeConfig()
 	end
 
 	if saveToConfig then
-		--saveConfig()
+		saveConfig()
 	end
 end
 
