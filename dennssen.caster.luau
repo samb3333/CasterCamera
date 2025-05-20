@@ -7,8 +7,8 @@ metadata = {
 }
 
 --Notes:
--- integrate post processing into script and make it saveable
 -- make speed linearly interpolate when switching gears
+-- clean up config with more "Categories" like post processing has
 -- ballCam?
 
 local function parseBallJSON(str)
