@@ -7,7 +7,6 @@ metadata = {
 }
 
 --Notes:
--- make speed linearly interpolate when switching gears
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
 
@@ -29,6 +28,17 @@ function getDictSize(dict): number
 	end
 
 	return i
+end
+
+-- math.lerp is nil for some reason
+function lerp(a: number, b: number, t: number): number
+	if a == nil then
+		return b
+	end
+	if b == nil then
+		return a
+	end
+	return a * (1.0 - t) + b * t
 end
 
 function keyToString(key: Key): string
@@ -659,15 +669,18 @@ local cameraMode = nil
 local positionSmoothing = config.positionSmoothing
 local lookSmoothness = config.lookSmoothness
 local dynamicLookSmoothness = lookSmoothness
-local speedIndex: number = 1
+local targetSpeedIndex: number = 1
 local speedGears = {
-	5,
-	10,
-	15,
-	25,
+	7,
+	14,
+	21,
+	28,
+	35,
 }
-local speedMultiplierHoldBuffer = false
-local speedGearMultiplier = 1
+local currentSpeedIndex: number = targetSpeedIndex
+local gearShiftTime: number = 0
+local gearShiftTimeRequired: number = 0.3
+local speedLastGearBuffer = false
 local turnVelocity: Vec2 = Vec2.zeroVector
 
 -- Follow Camera
@@ -2059,6 +2072,9 @@ function onGui()
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
 		Gui.text("Camera Rotation: " .. tostring(camera.rotation:euler()))
+		Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
+		Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
+		Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
 		Gui.text("Home Team: ")
 		Gui.indent()
 		for i, player in selectedArena.home.players do
@@ -2669,21 +2685,24 @@ function readOtherInputs()
 	end
 
 	if getCasterKey(inputs.keyboard.speedUp).down or getCasterKey(inputs.gamepad.speedUp).down then
-		if speedIndex == #speedGears - 1 then
-			speedMultiplierHoldBuffer = true
+		if targetSpeedIndex == #speedGears - 2 then
+			speedLastGearBuffer = true
 		end
-		speedIndex += 1
+		targetSpeedIndex = math.min(targetSpeedIndex + 1, #speedGears - 1)
+		print(tostring(targetSpeedIndex) .. " | " .. tostring(#speedGears))
 	end
 	if getCasterKey(inputs.keyboard.speedDown).down or getCasterKey(inputs.gamepad.speedDown).down then
-		speedIndex -= 1
+		targetSpeedIndex = math.max(targetSpeedIndex - 1, 1)
 	end
-	speedIndex = math.clamp(speedIndex, 1, #speedGears)
 
-	if
-		speedMultiplierHoldBuffer
-		and (getCasterKey(inputs.keyboard.speedUp).up or getCasterKey(inputs.gamepad.speedUp).up)
-	then
-		speedMultiplierHoldBuffer = false
+	if getCasterKey(inputs.keyboard.speedUp).up or getCasterKey(inputs.gamepad.speedUp).up then
+		if speedLastGearBuffer then
+			speedLastGearBuffer = false
+		end
+
+		if targetSpeedIndex == #speedGears then
+			targetSpeedIndex -= 1
+		end
 	end
 
 	if getCasterKey(inputs.keyboard.getClosestArena).down or getCasterKey(inputs.gamepad.getClosestArena).down then
@@ -2700,12 +2719,10 @@ function readOtherInputs()
 
 	if
 		(getCasterKey(inputs.keyboard.speedUp).held or getCasterKey(inputs.gamepad.speedUp).held)
-		and speedIndex == #speedGears
-		and not speedMultiplierHoldBuffer
+		and targetSpeedIndex >= #speedGears - 1
+		and not speedLastGearBuffer
 	then
-		speedGearMultiplier = 2
-	else
-		speedGearMultiplier = 1
+		targetSpeedIndex = #speedGears
 	end
 
 	if getCasterKey(inputs.keyboard.overview1).down or getCasterKey(inputs.gamepad.overview1).down then
@@ -2879,7 +2896,25 @@ function moveCamera()
 	local rightDirection = camera.rotation:getRightVector()
 	local upDirection = camera.rotation:getUpVector()
 
-	local speedMultiplier = speedGears[speedIndex] * speedGearMultiplier
+	if currentSpeedIndex <= targetSpeedIndex then
+		gearShiftTime = math.min(gearShiftTime + deltaTime, gearShiftTimeRequired)
+		if gearShiftTime >= gearShiftTimeRequired and currentSpeedIndex < targetSpeedIndex then
+			currentSpeedIndex += 1
+			gearShiftTime = 0
+		end
+	elseif currentSpeedIndex > targetSpeedIndex then
+		gearShiftTime = math.max(gearShiftTime - deltaTime, 0)
+		if gearShiftTime <= 0 then
+			currentSpeedIndex -= 1
+			gearShiftTime = gearShiftTimeRequired
+		end
+	end
+
+	local speedMultiplier = lerp(
+		speedGears[math.max(currentSpeedIndex - 1, 1)],
+		speedGears[currentSpeedIndex],
+		gearShiftTime / gearShiftTimeRequired
+	)
 
 	local forwardMovement = forwardDirection * Vertical * speedMultiplier * 100 * deltaTime
 	local sidewaysMovement = rightDirection * Horizontal * speedMultiplier * 100 * deltaTime
