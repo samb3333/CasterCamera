@@ -463,6 +463,17 @@ local function initializeConfig()
 		},
 		keyboardKeybinds = "",
 		gamepadKeybinds = "",
+		postProcessing = {
+			bloomIntensity = 0.675,
+			bloomThreshold = -1,
+			depthOfFieldFstop = 4,
+			depthOfFieldFocalDistance = 0,
+			depthOfFieldSensorWidth = 24.576,
+			chromaticAberrationIntensity = 0,
+			motionBlurAmount = 0,
+			vignetteIntensity = 0.4,
+			exposureBias = 1,
+		},
 	}
 
 	-- saves new values that are not there from before to all profiles
@@ -482,7 +493,7 @@ local function initializeConfig()
 	end
 
 	if saveToConfig then
-		saveConfig()
+		--saveConfig()
 	end
 end
 
@@ -610,15 +621,15 @@ local particleSimSpeed = config.particleSimSpeed
 
 -- Post Processing
 
-local bloomIntensity = 0.675
-local bloomThreshold = -1
-local depthOfFieldFstop = 4
-local depthOfFieldFocalDistance = 0
-local depthOfFieldSensorWidth = 24.576
-local chromaticAberrationIntensity = 0
-local motionBlurAmount = 0
-local vignetteIntensity = 0.4
-local exposureBias = 1
+local bloomIntensity = config.postProcessing.bloomIntensity
+local bloomThreshold = config.postProcessing.bloomThreshold
+local depthOfFieldFstop = config.postProcessing.depthOfFieldFstop
+local depthOfFieldFocalDistance = config.postProcessing.depthOfFieldFocalDistance
+local depthOfFieldSensorWidth = config.postProcessing.depthOfFieldSensorWidth
+local chromaticAberrationIntensity = config.postProcessing.chromaticAberrationIntensity
+local motionBlurAmount = config.postProcessing.motionBlurAmount
+local vignetteIntensity = config.postProcessing.vignetteIntensity
+local exposureBias = config.postProcessing.exposureBias
 
 -- Stats
 local lastPlayerWithBall: ReplayPlayer? = nil
@@ -1966,7 +1977,7 @@ function onGui()
 
 	Gui.newLine()
 
-	if Gui.button("Save Config " .. Icon.Save) then
+	if Gui.button(Icon.Save .. " Save Config") then
 		config.cameraFOV = cameraFOV
 		config.deadzone = deadzone
 		config.followFOV = followFOV
@@ -1995,7 +2006,17 @@ function onGui()
 			g = awayTeamDefaultColor.g,
 			b = awayTeamDefaultColor.b,
 		}
-
+		config.postProcessing = {
+			bloomIntensity = bloomIntensity,
+			bloomThreshold = bloomThreshold,
+			depthOfFieldFstop = depthOfFieldFstop,
+			depthOfFieldFocalDistance = depthOfFieldFocalDistance,
+			depthOfFieldSensorWidth = depthOfFieldSensorWidth,
+			chromaticAberrationIntensity = chromaticAberrationIntensity,
+			motionBlurAmount = motionBlurAmount,
+			vignetteIntensity = vignetteIntensity,
+			exposureBias = exposureBias,
+		}
 		saveConfig()
 	end
 	Gui.setItemTooltip("Saves your settings!")
