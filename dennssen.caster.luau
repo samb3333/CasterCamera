@@ -1530,7 +1530,6 @@ function main()
 	if overlayCamera ~= nil then
 		usingOverlay = true
 	end
-	print(pressedInputKeys)
 end
 
 function getLastEnumValue(enum): number
@@ -1872,7 +1871,7 @@ function onGui()
 
 		Gui.sameLine()
 
-		if Gui.button("Save Post Processing to Preset") then
+		if Gui.button("Apply Post Processing to Preset") then
 			bloomIntensity = postProcessSettings.bloomIntensity
 			bloomThreshold = postProcessSettings.bloomThreshold
 			depthOfFieldFstop = postProcessSettings.depthOfFieldFstop
@@ -2689,7 +2688,6 @@ function readOtherInputs()
 			speedLastGearBuffer = true
 		end
 		targetSpeedIndex = math.min(targetSpeedIndex + 1, #speedGears - 1)
-		print(tostring(targetSpeedIndex) .. " | " .. tostring(#speedGears))
 	end
 	if getCasterKey(inputs.keyboard.speedDown).down or getCasterKey(inputs.gamepad.speedDown).down then
 		targetSpeedIndex = math.max(targetSpeedIndex - 1, 1)
@@ -3483,7 +3481,6 @@ function ballInCenterCheck()
 			GameStartEffect()
 			if usingOverlay then
 				local startTimestamp = os.date("%H:%M:%S", os.time())
-				print(startTimestamp)
 				sendMessage(overlayCamera, {
 					info = "startTime",
 					value = startTimestamp,
@@ -3568,7 +3565,6 @@ function saveKeybinds()
 	local keybindsSerilazied = SerializeKeybinds()
 	config.keyboardKeybinds = keybindsSerilazied.keybord
 	config.gamepadKeybinds = keybindsSerilazied.gamepad
-	print(keybindsSerilazied.gamepad)
 	saveConfig()
 end
 
@@ -3705,17 +3701,6 @@ function tick(dt)
 
 	if keyToBeRebinded.key ~= "" then
 		doRebind()
-	end
-
-	if Input.getKey(Input.Key.N) then
-		local test: Key
-
-		test = Input.Key["Å"]
-		if test == nil then
-			test = Input.Gamepad["LeftShoulder"]
-		end
-
-		print(Input.getKey(test))
 	end
 
 	deltaTime = dt
