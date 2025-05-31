@@ -10,370 +10,6 @@ metadata = {
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
 
-local function parseBallJSON(str)
-	-- Table to store the parsed data
-	local result = {}
-
-	-- Parse type
-	local typeVal = string.match(str, '"type"%s*:%s*([%d]+)')
-	result.type = tonumber(typeVal)
-
-	return result
-end
-
-function getDictSize(dict): number
-	local i = 0
-	for _, _ in dict do
-		i += 1
-	end
-
-	return i
-end
-
--- math.lerp is nil for some reason
-function lerp(a: number, b: number, t: number): number
-	if a == nil then
-		return b
-	end
-	if b == nil then
-		return a
-	end
-	return a * (1.0 - t) + b * t
-end
-
-function keyToString(key: Key): string
-	return string.gsub(tostring(key), "Gamepad_", "")
-end
-
-local deltaTime: number = 0
-
-local loadTime: number
-local transitionTime: number
-local firstTransition: boolean
-local defaultPosition = Vec3.new(0, -3000, -27700)
-local defaultRotation = Quat.fromEuler(0, 0, 90)
-
-local TeamIndex = {
-	NoTeam = -1,
-	homeTeam = 0,
-	awayTeam = 1,
-}
-local CameraMode = {
-	FirstPerson = 1,
-	HeadRotation = 2,
-	VelocityRotation = 3,
-	FaceTheBall = 4,
-}
-local CAMERA_MODE_NAMES = {
-	[1] = "First Person",
-	[2] = "Head Rotation",
-	[3] = "Velocity Rotation",
-	[4] = "Face The Ball",
-}
-
--- Bounding Box start
-
-type BoxType = {
-	__index: BoxType,
-	position: Vec3,
-	size: Vec3,
-	rotation: Vec3,
-	vertexLocations: { Vec3 },
-
-	__tostring: (self: BoxType) -> string,
-	new: (inputPosition: Vec3, inputSize: Vec3, inputRotation: Vec3) -> BoxType,
-	setPosition: (self: BoxType, inputPosition: Vec3) -> (),
-	setSize: (self: BoxType, inputPosition: Vec3) -> (),
-	setRotation: (self: BoxType, inputPosition: Vec3) -> (),
-	setRotationDeg: (self: BoxType, inputRotation: Vec3) -> (),
-	getPosition: (self: BoxType) -> Vec3,
-	getSize: (self: BoxType) -> Vec3,
-	getRotation: (self: BoxType) -> Vec3,
-	getRotationDeg: (self: BoxType) -> Vec3,
-	generatePoints: (self: BoxType) -> (),
-	multiplyMatrices: (self: BoxType, matrix1: { { number } }, matrix2: { { number } }) -> { { number } },
-	applyRotationMatrix: (self: BoxType, vec: Vec3, matrix: { { number } }) -> Vec3,
-	render: (self: BoxType, r: number, g: number, b: number) -> (),
-	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
-}
-
-local Box: BoxType = {} :: BoxType
-Box.__index = Box
-
-function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Vec3): BoxType
-	local self: BoxType = setmetatable({}, Box) :: any
-
-	self.position = inputPosition
-	self.size = inputSize
-	self.rotation = Vec3.new(math.rad(inputRotation.x), math.rad(inputRotation.y), math.rad(inputRotation.z))
-
-	self.vertexLocations = {}
-	self:generatePoints()
-	return self
-end
-
-function Box:setPosition(inputPosition: Vec3): ()
-	self.position = inputPosition
-	self:generatePoints()
-end
-
-function Box:setSize(inputSize: Vec3): ()
-	self.size = inputSize
-	self:generatePoints()
-end
-
-function Box:setRotation(inputRotation: Vec3): ()
-	self.rotation = inputRotation
-	self:generatePoints()
-end
-
-function Box:setRotationDeg(inputRotation: Vec3): ()
-	inputRotation.x = (inputRotation.x * math.pi) / 180
-	inputRotation.y = (inputRotation.y * math.pi) / 180
-	inputRotation.z = (inputRotation.z * math.pi) / 180
-	self.rotation = inputRotation
-	self:generatePoints()
-end
-
-function Box:getPosition(): Vec3
-	return Vec3.new(self.position.x, self.position.y, self.position.z)
-end
-
-function Box:getSize(): Vec3
-	return Vec3.new(self.size.x, self.size.y, self.size.z)
-end
-
-function Box:getRotation(): Vec3
-	return Vec3.new(self.rotation.x, self.rotation.y, self.rotation.z)
-end
-
-function Box:getRotationDeg(): Vec3
-	return Vec3.new(
-		(self.rotation.x * 180) / math.pi,
-		(self.rotation.y * 180) / math.pi,
-		(self.rotation.z * 180) / math.pi
-	)
-end
-
-function Box:generatePoints(): ()
-	local shift = { x = self.size.x / 2, y = self.size.y / 2, z = self.size.z / 2 }
-	local newVertexLocations = {
-		Vec3.new(shift.x, shift.y, shift.z),
-		Vec3.new(shift.x, shift.y, -shift.z),
-		Vec3.new(shift.x, -shift.y, shift.z),
-		Vec3.new(shift.x, -shift.y, -shift.z),
-		Vec3.new(-shift.x, shift.y, shift.z),
-		Vec3.new(-shift.x, shift.y, -shift.z),
-		Vec3.new(-shift.x, -shift.y, shift.z),
-		Vec3.new(-shift.x, -shift.y, -shift.z),
-	}
-
-	local rotationQuat = Quat.fromEuler(math.deg(self.rotation.x), math.deg(self.rotation.y), math.deg(self.rotation.z))
-
-	for i = 1, #newVertexLocations do
-		newVertexLocations[i] = rotationQuat:rotateVector(newVertexLocations[i])
-	end
-
-	-- Translate the vertices by the box position.
-	for i = 1, #newVertexLocations do
-		newVertexLocations[i].x = newVertexLocations[i].x + self.position.x
-		newVertexLocations[i].y = newVertexLocations[i].y + self.position.y
-		newVertexLocations[i].z = newVertexLocations[i].z + self.position.z
-	end
-
-	self.vertexLocations = newVertexLocations
-end
-
-function Box:multiplyMatrices(matrix1: { { number } }, matrix2: { { number } }): { { number } }
-	local result: { { number } } = {}
-	for i = 1, 3 do
-		result[i] = {}
-		for j = 1, 3 do
-			result[i][j] = 0
-			for k = 1, 3 do
-				result[i][j] = result[i][j] + matrix1[i][k] * matrix2[k][j]
-			end
-		end
-	end
-	return result
-end
-
-function Box:applyRotationMatrix(vec: Vec3, matrix: { { number } }): Vec3
-	local x = vec.x * matrix[1][1] + vec.y * matrix[1][2] + vec.z * matrix[1][3]
-	local y = vec.x * matrix[2][1] + vec.y * matrix[2][2] + vec.z * matrix[2][3]
-	local z = vec.x * matrix[3][1] + vec.y * matrix[3][2] + vec.z * matrix[3][3]
-	return Vec3.new(x, y, z)
-end
-
-function Box:render(r: number, g: number, b: number): ()
-	local lines: { { start: Vec3, finish: Vec3 } } = {
-		{ start = self.vertexLocations[1], finish = self.vertexLocations[2] },
-		{ start = self.vertexLocations[1], finish = self.vertexLocations[3] },
-		{ start = self.vertexLocations[1], finish = self.vertexLocations[5] },
-		{ start = self.vertexLocations[4], finish = self.vertexLocations[2] },
-		{ start = self.vertexLocations[4], finish = self.vertexLocations[3] },
-		{ start = self.vertexLocations[4], finish = self.vertexLocations[8] },
-		{ start = self.vertexLocations[7], finish = self.vertexLocations[8] },
-		{ start = self.vertexLocations[7], finish = self.vertexLocations[3] },
-		{ start = self.vertexLocations[7], finish = self.vertexLocations[5] },
-		{ start = self.vertexLocations[6], finish = self.vertexLocations[5] },
-		{ start = self.vertexLocations[6], finish = self.vertexLocations[2] },
-		{ start = self.vertexLocations[6], finish = self.vertexLocations[8] },
-	}
-
-	WorldDraw.drawPoint(self.position, 0.2, 3, 0.2, 5, 0)
-	for i: number, line: { start: Vec3, finish: Vec3 } in lines do
-		WorldDraw.drawLine(line.start, line.finish, r, g, b, 4, 0)
-	end
-
-	local rotationQuat = Quat.fromEuler(math.deg(self.rotation.x), math.deg(self.rotation.y), math.deg(self.rotation.z))
-	WorldDraw.drawLine(self.position, self.position + rotationQuat:getForwardVector() * 100, 1, 0, 0, 10, 0)
-	WorldDraw.drawLine(self.position, self.position + rotationQuat:getUpVector() * 100, 0, 1, 0, 10, 0)
-	WorldDraw.drawLine(self.position, self.position + rotationQuat:getRightVector() * 100, 0, 0, 1, 10, 0)
-end
-
-function Box:checkPointIntersect(point: Vec3): boolean
-	if point == nil then
-		return false
-	end
-
-	local zeroPoint: Vec3 = self.vertexLocations[1]
-	local fullPoint: Vec3 = self.vertexLocations[8]
-	local centerPoint: Vec3 = (zeroPoint + fullPoint) / 2
-
-	local projectionVector: Vec3 = point - centerPoint
-
-	-- Thanks to MrStick, Brick_Rage, and RAD_David
-	local xLocal = self.vertexLocations[5] - self.vertexLocations[1]
-	local yLocal = self.vertexLocations[3] - self.vertexLocations[1]
-	local zLocal = self.vertexLocations[2] - self.vertexLocations[1]
-
-	local pX: number = math.abs(Vec3.dot(projectionVector, xLocal:getSafeNormal()))
-	local pY: number = math.abs(Vec3.dot(projectionVector, yLocal:getSafeNormal()))
-	local pZ: number = math.abs(Vec3.dot(projectionVector, zLocal:getSafeNormal()))
-
-	if 2 * pX <= xLocal:length() and 2 * pY <= yLocal:length() and 2 * pZ <= zLocal:length() then
-		return true
-	else
-		return false
-	end
-end
-
-type MessageValues = {
-	readLocation: number?,
-	showNameTags: boolean?,
-	isLeftHanded: boolean?,
-	muteSelf: boolean?,
-	targetPlayerName: string?,
-	targetPlayerId: number?,
-	positionSmoothing: number?,
-	cameraFOV: number?,
-	cameraMode: number?,
-	radius: number?,
-	threshold: number?,
-	cameraPositionOffset: string?,
-	cameraEulerOffset: string?,
-	gestureControls: boolean?,
-	forwardGestureMode: number?,
-	upGestureMode: number?,
-	backwardsGestureMode: number?,
-	autoBall: boolean?,
-	autoBallThreshold: number?,
-	autoGoalCam: boolean?,
-	ballGoalMode: number?,
-	goalMode: number?,
-}
-
-type Color = {
-	r: number,
-	g: number,
-	b: number,
-}
-
-type Particle = {
-	position: Vec3,
-	rotation: Vec3,
-	scale: number,
-	velocity: Vec3,
-	Color: Color,
-	variant: string,
-	lifespan: number,
-	aliveTime: number,
-}
-
-local ParticleVariant = {
-	Embers = "embers",
-	Rings = "rings",
-	GoalRing = "goalring",
-	Rocket = "rocket",
-}
-
-type Arena = {
-	name: string,
-	position: Vec3,
-	rotation: Quat, -- Rotated Towards Home
-	box: BoxType,
-	home: {
-		overview: {
-			{
-				position: Vec3,
-				rotation: Vec3,
-			}
-		},
-		goal: {
-			position: Vec3,
-			rotation: Quat,
-		},
-		midfield: {
-			position: Vec3,
-		},
-		players: { ReplayPlayer },
-	},
-	away: {
-		overview: {
-			{
-				position: Vec3,
-				rotation: Quat,
-			}
-		},
-		goal: {
-			position: Vec3,
-			rotation: Quat,
-		},
-		midfield: {
-			position: Vec3,
-		},
-		players: { ReplayPlayer },
-	},
-	players: { ReplayPlayer },
-}
-
-function createArena(name: string, position: Vec3, rotation: Quat): Arena
-	return {
-		name = name,
-		position = position,
-		rotation = rotation,
-		box = nil,
-		home = {
-			overview = {},
-			goal = nil,
-			midfield = {
-				position = nil,
-			},
-			players = {},
-		},
-		away = {
-			overview = {},
-			goal = nil,
-			midfield = {
-				position = nil,
-			},
-			players = {},
-		},
-		players = {},
-	}
-end
-
 local defaultKeybinds = {
 	keyboard = {
 		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
@@ -509,48 +145,530 @@ end
 
 initializeConfig()
 
--- goal
-local goalPositionOffset = 3150
-local goalHeightOffset = Vec3.new(0, 0, -50)
-local homeGoalRotationOffset = Quat.fromEuler(0, 0, 180)
-local awayGoalRotationOffset = Quat.fromEuler(0, 0, 0)
+local function parseBallJSON(str)
+	-- Table to store the parsed data
+	local result = {}
 
---arena
+	-- Parse type
+	local typeVal = string.match(str, '"type"%s*:%s*([%d]+)')
+	result.type = tonumber(typeVal)
+
+	return result
+end
+
+function getDictSize(dict): number
+	local i = 0
+	for _, _ in dict do
+		i += 1
+	end
+
+	return i
+end
+
+-- math.lerp is nil for some reason
+function lerp(a: number, b: number, t: number): number
+	if a == nil then
+		return b
+	end
+	if b == nil then
+		return a
+	end
+	return a * (1.0 - t) + b * t
+end
+
+function keyToString(key: Key): string
+	return string.gsub(tostring(key), "Gamepad_", "")
+end
+
+local deltaTime: number = 0
+
+local loadTime: number
+local transitionTime: number
+local firstTransition: boolean
+local defaultPosition = Vec3.new(0, -3000, -27700)
+local defaultRotation = Quat.fromEuler(0, 0, 90)
+
+local TeamIndex = {
+	NoTeam = -1,
+	homeTeam = 0,
+	awayTeam = 1,
+}
+local CameraMode = {
+	FirstPerson = 1,
+	HeadRotation = 2,
+	VelocityRotation = 3,
+	FaceTheBall = 4,
+}
+local CAMERA_MODE_NAMES = {
+	[1] = "First Person",
+	[2] = "Head Rotation",
+	[3] = "Velocity Rotation",
+	[4] = "Face The Ball",
+}
+
+-- Bounding Box start
+
+type BoxType = {
+	__index: BoxType,
+	position: Vec3,
+	size: Vec3,
+	rotation: Quat,
+	vertexLocations: { Vec3 },
+
+	__tostring: (self: BoxType) -> string,
+	new: (inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat) -> BoxType,
+	setPosition: (self: BoxType, inputPosition: Vec3) -> (),
+	setSize: (self: BoxType, inputPosition: Vec3) -> (),
+	setRotation: (self: BoxType, inputPosition: Quat) -> (),
+	setRotationDeg: (self: BoxType, inputRotation: Vec3) -> (),
+	generatePoints: (self: BoxType) -> (),
+	render: (self: BoxType, r: number, g: number, b: number) -> (),
+	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
+}
+
+local Box: BoxType = {} :: BoxType
+Box.__index = Box
+
+function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat): BoxType
+	local self: BoxType = setmetatable({}, Box) :: any
+
+	self.position = inputPosition
+	self.size = inputSize
+	self.rotation = inputRotation
+
+	self.vertexLocations = {}
+	self:generatePoints()
+	return self
+end
+
+function Box:setPosition(inputPosition: Vec3): ()
+	self.position = inputPosition
+	self:generatePoints()
+end
+
+function Box:setSize(inputSize: Vec3): ()
+	self.size = inputSize
+	self:generatePoints()
+end
+
+function Box:setRotation(inputRotation: Quat): ()
+	self.rotation = inputRotation
+	self:generatePoints()
+end
+
+function Box:setRotationDeg(inputRotation: Vec3): ()
+	self.rotation = Quat.fromEuler(inputRotation.x, inputRotation.y, inputRotation.z)
+	self:generatePoints()
+end
+
+function Box:generatePoints(): ()
+	local shift = { x = self.size.x / 2, y = self.size.y / 2, z = self.size.z / 2 }
+	local newVertexLocations = {
+		Vec3.new(shift.x, shift.y, shift.z),
+		Vec3.new(shift.x, shift.y, -shift.z),
+		Vec3.new(shift.x, -shift.y, shift.z),
+		Vec3.new(shift.x, -shift.y, -shift.z),
+		Vec3.new(-shift.x, shift.y, shift.z),
+		Vec3.new(-shift.x, shift.y, -shift.z),
+		Vec3.new(-shift.x, -shift.y, shift.z),
+		Vec3.new(-shift.x, -shift.y, -shift.z),
+	}
+
+	for i = 1, #newVertexLocations do
+		newVertexLocations[i] = self.rotation:rotateVector(newVertexLocations[i])
+	end
+
+	-- Translate the vertices by the box position.
+	for i = 1, #newVertexLocations do
+		newVertexLocations[i].x = newVertexLocations[i].x + self.position.x
+		newVertexLocations[i].y = newVertexLocations[i].y + self.position.y
+		newVertexLocations[i].z = newVertexLocations[i].z + self.position.z
+	end
+
+	self.vertexLocations = newVertexLocations
+end
+
+function Box:render(r: number, g: number, b: number): ()
+	local lines: { { start: Vec3, finish: Vec3 } } = {
+		{ start = self.vertexLocations[1], finish = self.vertexLocations[2] },
+		{ start = self.vertexLocations[1], finish = self.vertexLocations[3] },
+		{ start = self.vertexLocations[1], finish = self.vertexLocations[5] },
+		{ start = self.vertexLocations[4], finish = self.vertexLocations[2] },
+		{ start = self.vertexLocations[4], finish = self.vertexLocations[3] },
+		{ start = self.vertexLocations[4], finish = self.vertexLocations[8] },
+		{ start = self.vertexLocations[7], finish = self.vertexLocations[8] },
+		{ start = self.vertexLocations[7], finish = self.vertexLocations[3] },
+		{ start = self.vertexLocations[7], finish = self.vertexLocations[5] },
+		{ start = self.vertexLocations[6], finish = self.vertexLocations[5] },
+		{ start = self.vertexLocations[6], finish = self.vertexLocations[2] },
+		{ start = self.vertexLocations[6], finish = self.vertexLocations[8] },
+	}
+
+	WorldDraw.drawPoint(self.position, 0.2, 3, 0.2, 5, 0)
+	for i: number, line: { start: Vec3, finish: Vec3 } in lines do
+		WorldDraw.drawLine(line.start, line.finish, r, g, b, 4, 0)
+	end
+
+	WorldDraw.drawLine(self.position, self.position + self.rotation:getForwardVector() * 100, 1, 0, 0, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + self.rotation:getUpVector() * 100, 0, 1, 0, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + self.rotation:getRightVector() * 100, 0, 0, 1, 10, 0)
+end
+
+function Box:checkPointIntersect(point: Vec3): boolean
+	if point == nil then
+		return false
+	end
+
+	local zeroPoint: Vec3 = self.vertexLocations[1]
+	local fullPoint: Vec3 = self.vertexLocations[8]
+	local centerPoint: Vec3 = (zeroPoint + fullPoint) / 2
+
+	local projectionVector: Vec3 = point - centerPoint
+
+	-- Thanks to MrStick, Brick_Rage, and RAD_David
+	local xLocal = self.vertexLocations[5] - self.vertexLocations[1]
+	local yLocal = self.vertexLocations[3] - self.vertexLocations[1]
+	local zLocal = self.vertexLocations[2] - self.vertexLocations[1]
+
+	local pX: number = math.abs(Vec3.dot(projectionVector, xLocal:getSafeNormal()))
+	local pY: number = math.abs(Vec3.dot(projectionVector, yLocal:getSafeNormal()))
+	local pZ: number = math.abs(Vec3.dot(projectionVector, zLocal:getSafeNormal()))
+
+	if 2 * pX <= xLocal:length() and 2 * pY <= yLocal:length() and 2 * pZ <= zLocal:length() then
+		return true
+	else
+		return false
+	end
+end
+
+type MessageValues = {
+	readLocation: number?,
+	showNameTags: boolean?,
+	isLeftHanded: boolean?,
+	muteSelf: boolean?,
+	targetPlayerName: string?,
+	targetPlayerId: number?,
+	positionSmoothing: number?,
+	cameraFOV: number?,
+	cameraMode: number?,
+	radius: number?,
+	threshold: number?,
+	cameraPositionOffset: string?,
+	cameraEulerOffset: string?,
+	gestureControls: boolean?,
+	forwardGestureMode: number?,
+	upGestureMode: number?,
+	backwardsGestureMode: number?,
+	autoBall: boolean?,
+	autoBallThreshold: number?,
+	autoGoalCam: boolean?,
+	ballGoalMode: number?,
+	goalMode: number?,
+}
+
+type Color = {
+	r: number,
+	g: number,
+	b: number,
+}
+
+type Particle = {
+	position: Vec3,
+	rotation: Vec3,
+	scale: number,
+	velocity: Vec3,
+	Color: Color,
+	variant: string,
+	lifespan: number,
+	aliveTime: number,
+}
+
+local ParticleVariant = {
+	Embers = "embers",
+	Rings = "rings",
+	GoalRing = "goalring",
+	Rocket = "rocket",
+}
+
+type Old_Arena = {
+	name: string,
+	position: Vec3,
+	rotation: Quat, -- Rotated Towards Home
+	box: BoxType,
+	home: {
+		overview: {
+			{
+				position: Vec3,
+				rotation: Vec3,
+			}
+		},
+		goal: {
+			position: Vec3,
+			rotation: Quat,
+		},
+		midfield: {
+			position: Vec3,
+		},
+		players: { ReplayPlayer },
+	},
+	away: {
+		overview: {
+			{
+				position: Vec3,
+				rotation: Quat,
+			}
+		},
+		goal: {
+			position: Vec3,
+			rotation: Quat,
+		},
+		midfield: {
+			position: Vec3,
+		},
+		players: { ReplayPlayer },
+	},
+	players: { ReplayPlayer },
+}
+
+function createOldArena(name: string, position: Vec3, rotation: Quat): Old_Arena
+	return {
+		name = name,
+		position = position,
+		rotation = rotation,
+		box = nil,
+		home = {
+			overview = {},
+			goal = nil,
+			midfield = {
+				position = nil,
+			},
+			players = {},
+		},
+		away = {
+			overview = {},
+			goal = nil,
+			midfield = {
+				position = nil,
+			},
+			players = {},
+		},
+		players = {},
+	}
+end
+
+type AreanTeam = {
+	score: number,
+	rounds: number,
+	goal: {
+		position: Vec3,
+		rotation: Quat,
+		box: BoxType,
+	},
+	overview: { { position: Vec3, rotation: Quat } },
+	players: { ReplayPlayer },
+}
+
+-- these arenas are lower by 225cm
+type Arena = {
+	__index: Arena,
+
+	slotId: string,
+	gamemode: ModuleStateSpectatorLuaApi,
+	name: string,
+	transform: Transform,
+	box: BoxType,
+	centerBox: BoxType,
+	home: AreanTeam,
+	away: AreanTeam,
+	players: { ReplayPlayer },
+
+	isGameActive: boolean,
+	gameTimeSeconds: number,
+	actionTimerSeconds: number,
+
+	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
+	tick: (self: Arena) -> (),
+}
+
+local Arena: Arena = {} :: Arena
+Arena.__index = Arena
+
+local arenaBoxPositionOffset = Vec3.new(0, 0, 650)
+local arenaBoxSize = Vec3.new(5100, 6750, 1440)
+
+local goalPositionOffset = Vec3.new(3285, 0, 175)
+local goalBoxSize = Vec3.new(100, 500, 225)
+local homeRotationOffset = Quat.fromEuler(0, 0, 90)
+local awayRotationOffset = Quat.fromEuler(0, 0, -90)
+
+local centerBoxPositionOffset = Vec3.new(0, 0, 300)
+local centerBoxSize = Vec3.new(50, 50, 125)
+
 local overviewOffsets = {}
 for _, overview in config.overviewOffsets do
 	table.insert(overviewOffsets, overview)
 end
 
-local midfieldOffset = 840
+local midfieldPositionOffset = Vec3.new(840, 0, 0)
+
+function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
+	local self: Arena = setmetatable({}, Arena) :: any
+
+	self.slotId = gamemode:getSlotId()
+	self.gamemode = gamemode
+	self.name = self.slotId:gsub("TKB_", "")
+	self.transform = gamemode:getTransform()
+	self.box = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(arenaBoxPositionOffset),
+		arenaBoxSize,
+		self.transform.rotation
+	)
+	self.players = {}
+
+	self.centerBox = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(centerBoxPositionOffset),
+		centerBoxSize,
+		self.transform.rotation
+	)
+
+	self.home = {
+		score = 0,
+		rounds = 0,
+		goal = {
+			position = self.transform.position
+				+ (self.transform.rotation * homeRotationOffset):rotateVector(goalPositionOffset),
+			rotation = self.transform.rotation * homeRotationOffset,
+			box = nil,
+		},
+		overview = {},
+		midfield = {
+			position = self.transform.position
+				+ (self.transform.rotation * homeRotationOffset):rotateVector(midfieldPositionOffset),
+		},
+		players = {},
+	}
+	self.home.goal.box = Box.new(self.home.goal.position, goalBoxSize, self.home.goal.rotation)
+
+	self.away = {
+		score = 0,
+		rounds = 0,
+		goal = {
+			position = self.transform.position
+				+ (self.transform.rotation * awayRotationOffset):rotateVector(goalPositionOffset),
+			rotation = self.transform.rotation * awayRotationOffset,
+			box = nil,
+		},
+		overview = {},
+		midfield = {
+			position = self.transform.position
+				+ (self.transform.rotation * awayRotationOffset):rotateVector(midfieldPositionOffset),
+		},
+		players = {},
+	}
+	self.away.goal.box = Box.new(self.away.goal.position, goalBoxSize, self.away.goal.rotation)
+
+	-- Overviews
+	for _, overview in overviewOffsets do
+		local homeOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * homeRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * homeRotationOffset * overview.rotation),
+		}
+		local awayOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * awayRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * awayRotationOffset * overview.rotation),
+		}
+
+		table.insert(self.home.overview, homeOverview)
+		table.insert(self.away.overview, awayOverview)
+	end
+	return self
+end
+
+function Arena:tick()
+	local gameTimeSeconds = self.gamemode:getGameTimeComponent():getTimeSeconds()
+	local actionTimerSeconds = self.gamemode:getGameTimeComponent():getSecondaryTimeSeconds()
+
+	self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+	self.home.rounds = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
+	self.away.rounds = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
+	self.isGameActive = self.gamemode:getIsGameRunning()
+	self.gameTimeSeconds = gameTimeSeconds
+	self.actionTimerSeconds = actionTimerSeconds
+end
+
+function getArenas(): { [any]: Arena }
+	local arenas: { [any]: Arena } = {}
+	local gamemodes = SpectatorGamemodes.listGamemodes()
+	for _, gamemode in gamemodes do
+		local slotId = gamemode:getSlotId()
+		if slotId:find("TKB") and not slotId:find("Full") then
+			local arena = Arena.new(gamemode)
+			arenas[arena.name] = arena
+		end
+	end
+
+	return arenas
+end
+
+-- goal
+local goalPositionOffsetOld = 3150
+local goalHeightOffsetOld = Vec3.new(0, 0, -50)
+local homeGoalRotationOffsetOld = Quat.fromEuler(0, 0, 180)
+local awayGoalRotationOffsetOld = Quat.fromEuler(0, 0, 0)
+
+--arena
+
 local midfieldMaxTime = 20
 local midfieldTimePassed: number = 0
 
 local requiredBallCenterTime: number = 5
 local ballCenterTime: number = 0
 
-local boxPositionOffset = Vec3.new(0, 0, 425)
-local boxSize = Vec3.new(6750, 5100, 1440)
+local boxSizeOld = Vec3.new(6750, 5100, 1440)
+local boxPositionOffsetOld = Vec3.new(0, 0, 650)
 
-local arenas: { [any]: Arena } = {
-	gatewayArena = createArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
-	plazaEast = createArena("Plaza East", Vec3.new(-4425, 18550, -29650), Quat.fromEuler(0, 0, 90)),
-	plazaWest = createArena("Plaza West", Vec3.new(4425, 18550, -29650), Quat.fromEuler(0, 0, -90)),
-	stadiumPrime = createArena("Stadium Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
-	theBunker = createArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
-	fieldhouseEast = createArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
-	fieldhouseWest = createArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
-	driftplex1 = createArena("Driftplex 01", Vec3.new(12799.231, 13600.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplex2 = createArena("Driftplex 02", Vec3.new(17475.770, 13600.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex3 = createArena("Driftplex 03", Vec3.new(12799.231, 6400.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplex4 = createArena("Driftplex 04", Vec3.new(17475.770, 6400.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex5 = createArena("Driftplex 05", Vec3.new(17475.770, 23200.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex6 = createArena("Driftplex 06", Vec3.new(12799.231, 23200.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplexLab = createArena("Driftplex Lab", Vec3.new(15137.500, 29200.000, -26218.920), Quat.fromEuler(0, 30, 0)),
+local arenas: { [any]: Arena } = getArenas()
+
+for _, arena in arenas do
+	print(arena.slotId)
+	print(arena.name)
+	print(arena.transform)
+end
+
+local old_arenas: { [any]: Old_Arena } = {
+	gatewayArena = createOldArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
+	plazaEast = createOldArena("Plaza East", Vec3.new(-4425, 18550, -29650), Quat.fromEuler(0, 0, 90)),
+	plazaWest = createOldArena("Plaza West", Vec3.new(4425, 18550, -29650), Quat.fromEuler(0, 0, -90)),
+	stadiumPrime = createOldArena("Stadium Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
+	theBunker = createOldArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
+	fieldhouseEast = createOldArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
+	fieldhouseWest = createOldArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
+	driftplex1 = createOldArena("Driftplex 01", Vec3.new(12799.231, 13600.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplex2 = createOldArena(
+		"Driftplex 02",
+		Vec3.new(17475.770, 13600.000, -24868.920),
+		Quat.fromEuler(-30, 0, -90)
+	),
+	driftplex3 = createOldArena("Driftplex 03", Vec3.new(12799.231, 6400.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplex4 = createOldArena("Driftplex 04", Vec3.new(17475.770, 6400.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
+	driftplex5 = createOldArena(
+		"Driftplex 05",
+		Vec3.new(17475.770, 23200.000, -24868.920),
+		Quat.fromEuler(-30, 0, -90)
+	),
+	driftplex6 = createOldArena("Driftplex 06", Vec3.new(12799.231, 23200.000, -27568.920), Quat.fromEuler(30, 0, 90)),
+	driftplexLab = createOldArena(
+		"Driftplex Lab",
+		Vec3.new(15137.500, 29200.000, -26218.920),
+		Quat.fromEuler(0, 30, 0)
+	),
 }
 
-for _, arena in pairs(arenas) do
-	arena.box =
-		Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffset), boxSize, arena.rotation:euler())
+for _, arena in pairs(old_arenas) do
+	arena.box = Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffsetOld), boxSizeOld, arena.rotation)
 
 	for _, overview in overviewOffsets do
 		local homeOverview = {
@@ -568,22 +686,15 @@ for _, arena in pairs(arenas) do
 
 	arena.home.goal = {
 		position = arena.position
-			+ arena.rotation:rotateVector(goalHeightOffset)
-			+ arena.rotation:getForwardVector() * goalPositionOffset,
-		rotation = arena.rotation * homeGoalRotationOffset,
+			+ arena.rotation:rotateVector(goalHeightOffsetOld)
+			+ arena.rotation:getForwardVector() * goalPositionOffsetOld,
+		rotation = arena.rotation * homeGoalRotationOffsetOld,
 	}
 	arena.away.goal = {
 		position = arena.position
-			+ arena.rotation:rotateVector(goalHeightOffset)
-			+ arena.rotation:getForwardVector() * -goalPositionOffset,
-		rotation = arena.rotation * awayGoalRotationOffset,
-	}
-
-	arena.home.midfield = {
-		position = arena.position + arena.rotation:getForwardVector() * midfieldOffset,
-	}
-	arena.away.midfield = {
-		position = arena.position + arena.rotation:getForwardVector() * -midfieldOffset,
+			+ arena.rotation:rotateVector(goalHeightOffsetOld)
+			+ arena.rotation:getForwardVector() * -goalPositionOffsetOld,
+		rotation = arena.rotation * awayGoalRotationOffsetOld,
 	}
 end
 
@@ -593,7 +704,7 @@ function updateArenaOverviews()
 		table.insert(overviewOffsets, overview)
 	end
 
-	for _, arena in arenas do
+	for _, arena in old_arenas do
 		arena.home.overview = {}
 		arena.away.overview = {}
 
@@ -614,7 +725,7 @@ function updateArenaOverviews()
 	end
 end
 
-local selectedArena: Arena = arenas.gatewayArena
+local selectedArena: Arena = arenas.Gateway or arenas[1]
 
 -- Particles
 local homeGoalEnter: boolean = false
@@ -1550,21 +1661,21 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 		return "Overviews cannot be outside an arena!"
 	end
 
-	local isOnHomeSide = closestArena.rotation
+	local isOnHomeSide = closestArena.transform.rotation
 		:getForwardVector()
-		:dot(getForward(closestArena.position, globalOverviewPosition)) >= 0
+		:dot(getForward(closestArena.transform.position, globalOverviewPosition)) >= 0
 
 	local translatedOverviewPosition
 	local translatedOverviewRotation
+	local flipQuat
 	if isOnHomeSide then
-		translatedOverviewPosition =
-			closestArena.rotation:inverse():rotateVector(globalOverviewPosition - closestArena.position)
-		translatedOverviewRotation = closestArena.rotation:inverse() * globalOverviewRotation
+		flipQuat = closestArena.transform.rotation:inverse() * homeRotationOffset
 	else
-		local flipQuat = closestArena.rotation:inverse() * Quat.fromEuler(0, 0, 180)
-		translatedOverviewPosition = flipQuat:rotateVector(globalOverviewPosition - closestArena.position)
-		translatedOverviewRotation = flipQuat * globalOverviewRotation
+		flipQuat = closestArena.transform.rotation:inverse() * awayRotationOffset
 	end
+
+	translatedOverviewPosition = flipQuat:rotateVector(globalOverviewPosition - closestArena.transform.position)
+	translatedOverviewRotation = flipQuat * globalOverviewRotation
 
 	config.overviewOffsets[overviewKey] = {
 		position = translatedOverviewPosition,
@@ -1773,7 +1884,7 @@ function onGui()
 	Gui.setItemTooltip("Gets the closest arena | For most accuracy be inside the arena when pressing")
 
 	if Gui.beginCombo("Selected Arena", selectedArena.name) then
-		for _, arena in arenas do
+		for _, arena: Arena in arenas do
 			if Gui.selectable(arena.name, arena.name == selectedArena.name) then
 				selectedArena = arena
 			end
@@ -2041,18 +2152,22 @@ function onGui()
 		if Gui.button("Print Gamemode Slots") then
 			local gamemodes = SpectatorGamemodes.listGamemodes()
 			for _, gamemode in gamemodes do
-				print(gamemode:getSlotId() .. " | " .. tostring(gamemode:getBoolConfigVariable("bkicklosingteam")))
+				local slotId = gamemode:getSlotId()
+				if slotId:find("TKB") then
+					print(`{slotId} | {gamemode.transform.position} - {gamemode.transform.rotation:euler()}`)
+				end
 			end
 		end
 		if Gui.button("Set Orientation to Arena") then
-			camera.position = selectedArena.position
-			rotEuler = selectedArena.rotation:euler()
-			camera.rotation = selectedArena.rotation
+			camera.position = selectedArena.transform.position
+			rotEuler = selectedArena.transform.rotation:euler()
+			camera.rotation = selectedArena.transform.rotation
 		end
 		Gui.sameLine()
 		if Gui.button("Print Relative Orientation") then
-			local RelativeLocation = selectedArena.rotation:rotateVector(camera.position - selectedArena.position)
-			local RelativeRotation = camera.rotation * selectedArena.rotation:inverse()
+			local RelativeLocation =
+				selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
+			local RelativeRotation = camera.rotation * selectedArena.transform.rotation:inverse()
 			print(`Relative Position ({selectedArena.name}):`)
 			print(RelativeLocation)
 			print(`Relative Rotation ({selectedArena.name}):`)
@@ -2199,11 +2314,11 @@ end
 function getClosestArena(targetPosition: Vec3): Arena -- Remove this function when/if we get the arena from the player
 	local closestArenaDistance = math.huge
 	local closestArena = nil
-	for _, arena in pairs(arenas) do
-		local distance = getDist(targetPosition, arena.position)
+	for _, arena: Arena in pairs(arenas) do
+		local distance = getDist(targetPosition, arena.transform.position)
 		-- because some arenas are directly above others
 		-- we limit the arenas to those where the player is between the arenas floor and roof position
-		if not selectedArena.box:checkPointIntersect(targetPosition) then
+		if not arena.box:checkPointIntersect(targetPosition) then
 			continue
 		end
 		if distance < closestArenaDistance then
@@ -2214,8 +2329,8 @@ function getClosestArena(targetPosition: Vec3): Arena -- Remove this function wh
 
 	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
 	if closestArena == nil then
-		for _, arena in pairs(arenas) do
-			local distance = getDist(targetPosition, arena.position)
+		for _, arena: Arena in pairs(arenas) do
+			local distance = getDist(targetPosition, arena.transform.position)
 			if distance < closestArenaDistance then
 				closestArenaDistance = distance
 				closestArena = arena
@@ -2414,6 +2529,14 @@ function particleAffect()
 		return
 	end
 
+	local replay = Replay.getByIndex(readLocation)
+
+	if replay then
+		if not replay.isPlaying then
+			return
+		end
+	end
+
 	for i, particle: Particle in ipairs(particlesTable) do
 		--LIFE DURATION
 		particle.aliveTime -= 1 * particleSimSpeed
@@ -2551,7 +2674,7 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 	end
 	createParticle(
 		goalPosition,
-		selectedArena.rotation:euler(),
+		selectedArena.transform.rotation:euler(),
 		0.9,
 		Vec3.zeroVector,
 		particleColor,
@@ -2562,7 +2685,7 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 	--rings
 	createParticle(
 		goalPosition,
-		selectedArena.rotation:euler(),
+		selectedArena.transform.rotation:euler(),
 		1,
 		Vec3.zeroVector,
 		particleColor,
@@ -2571,7 +2694,7 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 	)
 	createParticle(
 		goalPosition,
-		selectedArena.rotation:euler(),
+		selectedArena.transform.rotation:euler(),
 		1,
 		Vec3.zeroVector,
 		particleColor,
@@ -2584,9 +2707,9 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 	for i = 1, 3 do
 		createParticle(
 			goalPosition,
-			selectedArena.rotation:euler(),
+			selectedArena.transform.rotation:euler(),
 			1,
-			(selectedArena.position - goalPosition):normalize() * goalSpeed,
+			(selectedArena.transform.position - goalPosition):normalize() * goalSpeed,
 			particleColor,
 			ParticleVariant.GoalRing,
 			400
@@ -2602,7 +2725,7 @@ function GameStartEffect()
 		b = homeTeamPrimaryColor.b + awayTeamPrimaryColor.b / 2,
 	}
 	createParticle(
-		selectedArena.position + Vec3.new(0, 0, 100),
+		selectedArena.transform.position + Vec3.new(0, 0, 100),
 		Vec3.zeroVector,
 		0.9,
 		Vec3.zeroVector,
@@ -2611,7 +2734,7 @@ function GameStartEffect()
 		150
 	)
 	createParticle(
-		selectedArena.position + Vec3.new(0, 0, 100),
+		selectedArena.transform.position + Vec3.new(0, 0, 100),
 		Vec3.zeroVector,
 		0.7,
 		Vec3.new(0, 0, 10),
@@ -2620,7 +2743,7 @@ function GameStartEffect()
 		600
 	)
 	createParticle(
-		selectedArena.position + Vec3.new(0, 0, 100),
+		selectedArena.transform.position + Vec3.new(0, 0, 100),
 		Vec3.zeroVector,
 		0.7,
 		Vec3.new(0, 0, 2),
@@ -2631,7 +2754,7 @@ function GameStartEffect()
 	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
 	for i = 1, math.random(50, 80) do
 		createParticle(
-			selectedArena.position - Vec3.new(0, 0, 100),
+			selectedArena.transform.position - Vec3.new(0, 0, 100),
 			Vec3.zeroVector,
 			0.5,
 			Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80)),
@@ -2644,8 +2767,8 @@ end
 --effects end
 
 function ballIsOnHomeSide(): boolean
-	local arenaForward = selectedArena.rotation:getForwardVector()
-	local ballRelativePosition = ball.transform.position - selectedArena.position
+	local arenaForward = selectedArena.transform.rotation:getForwardVector()
+	local ballRelativePosition = ball.transform.position - selectedArena.transform.position
 	if arenaForward:dot(ballRelativePosition) >= 0 then -- ball is in front of arena
 		return true
 	else
@@ -3066,55 +3189,6 @@ function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boo
 	return sameTeam
 end
 
-function goalExitCheck()
-	if not homeGoalEnter and not awayGoalEnter then
-		return
-	end
-
-	local isHomeGoal: boolean
-	if homeGoalEnter and not awayGoalEnter then
-		isHomeGoal = true
-	else
-		isHomeGoal = false
-	end
-	local ballPosition = ball.transform.position
-	local midfieldPosition
-
-	if isHomeGoal then
-		midfieldPosition = selectedArena.home.midfield.position
-	else
-		midfieldPosition = selectedArena.away.midfield.position
-	end
-
-	local baseAxis = Vec3.new(1, 0, 0)
-	local crossingAxis = selectedArena.rotation:rotateVector(baseAxis)
-
-	local relativePosition = ballPosition - midfieldPosition
-	local projection = Vec3.dot(relativePosition, crossingAxis)
-
-	if (isHomeGoal and projection < 0) or (not isHomeGoal and projection > 0) then
-		isSafeTime = false
-		if isHomeGoal then
-			homeGoalEnter = false
-		else
-			awayGoalEnter = false
-		end
-		return
-	end
-
-	midfieldTimePassed += deltaTime
-
-	if midfieldTimePassed >= midfieldMaxTime then
-		isSafeTime = false
-		if isHomeGoal then
-			homeGoalEnter = false
-		else
-			awayGoalEnter = false
-		end
-		return
-	end
-end
-
 function sendArenaInfo()
 	if not usingOverlay or not sendOverlayInfo then
 		return
@@ -3351,31 +3425,25 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 end
 
 function goalScoreCheck()
-	local homeGoalBox: BoxType = Box.new(
-		selectedArena.home.goal.position + (selectedArena.rotation:getForwardVector() * 135),
-		Vec3.new(100, 500, 225),
-		selectedArena.home.goal.rotation:euler()
-	)
+	local homeGoalBox: BoxType = selectedArena.home.goal.box
 	if boundingBoxDebug then
-		homeGoalBox:render(0, 1, 0)
+		homeGoalBox:render(1, 0, 0)
 	end
-	local awayGoalBox: BoxType = Box.new(
-		selectedArena.away.goal.position - (selectedArena.rotation:getForwardVector() * 135),
-		Vec3.new(100, 500, 225),
-		selectedArena.away.goal.rotation:euler()
-	)
+	local awayGoalBox: BoxType = selectedArena.away.goal.box
 	if boundingBoxDebug then
-		awayGoalBox:render(0, 1, 0)
+		awayGoalBox:render(0, 0, 1)
 	end
 
 	checkPotentialStatChange(homeGoalBox, awayGoalBox)
 
-	if homeGoalBox:checkPointIntersect(ball.transform.position) then
-		homeGoalEnter = true
-	end
+	homeGoalEnter = homeGoalBox:checkPointIntersect(ball.transform.position)
+	awayGoalEnter = awayGoalBox:checkPointIntersect(ball.transform.position)
 
-	if awayGoalBox:checkPointIntersect(ball.transform.position) then
-		awayGoalEnter = true
+	local isGameActive = selectedArena.isGameActive
+	local actionTimerSeconds = selectedArena.actionTimerSeconds
+
+	if not isGameActive or actionTimerSeconds > 0 then
+		return
 	end
 
 	-- the ball has newely scored
@@ -3455,20 +3523,14 @@ function goalScoreCheck()
 		end
 	end
 
-	goalExitCheck()
-
 	previousHomeGoalEnter = homeGoalEnter
 	previousAwayGoalEnter = awayGoalEnter
 end
 
 function ballInCenterCheck()
-	local centerBox: BoxType = Box.new(
-		selectedArena.position + selectedArena.rotation:rotateVector(Vec3.new(0, 0, 75)),
-		Vec3.new(50, 50, 125),
-		selectedArena.rotation:euler()
-	)
+	local centerBox: BoxType = selectedArena.centerBox
 	if boundingBoxDebug then
-		centerBox:render(0, 0, 1)
+		centerBox:render(0, 1, 0)
 	end
 
 	if centerBox:checkPointIntersect(ball.transform.position) then
@@ -3697,6 +3759,10 @@ function tick(dt)
 	setNewInputTimes(getAnyKeyboardKeyDown())
 	setNewInputTimes(getAnyGamepadKeyDown())
 
+	if Input.getKeyDown(Input.Key.N) then
+		arenas = getArenas()
+	end
+
 	if keyToBeRebinded.key ~= "" then
 		doRebind()
 	end
@@ -3704,8 +3770,12 @@ function tick(dt)
 	deltaTime = dt
 	camera.fieldOfView = cameraFOV
 
+	for _, arena: Arena in arenas do
+		arena:tick()
+	end
+
 	gameData = getReplayFrameFromIndex(readLocation)
-	ball = getClosestArenaBall(selectedArena.position, gameData)
+	ball = getClosestArenaBall(selectedArena.transform.position, gameData)
 	teamLists()
 
 	getTeamColors()
