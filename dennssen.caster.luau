@@ -2416,56 +2416,63 @@ function particleAffect()
 		return
 	end
 
+	local replay = Replay.getByIndex(readLocation)
+
 	for i, particle: Particle in ipairs(particlesTable) do
 		--LIFE DURATION
-		particle.aliveTime -= 1 * particleSimSpeed
+
+		if not replay or replay.isPlaying then
+			particle.aliveTime -= 1 * particleSimSpeed
+		end
 
 		if particle.aliveTime < 0 then
 			table.remove(particlesTable, i)
 		end
 
-		--affect position
-		local emberDrag = 0.95
-		local gravityMultiplier = 0.8
-		if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
-			particle.velocity -= (gravity.upDirection * gravityMultiplier * particleSimSpeed)
+		if not replay or replay.isPlaying then
+			--affect position
+			local emberDrag = 0.95
+			local gravityMultiplier = 0.8
+			if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
+				particle.velocity -= (gravity.upDirection * gravityMultiplier * particleSimSpeed)
 
-			--ember drag
-			if particle.variant ~= ParticleVariant.Rocket then
-				particle.velocity = particle.velocity * (emberDrag ^ particleSimSpeed)
+				--ember drag
+				if particle.variant ~= ParticleVariant.Rocket then
+					particle.velocity = particle.velocity * (emberDrag ^ particleSimSpeed)
+				end
 			end
-		end
 
-		--collision
-		local function dot(v1: Vec3, v2: Vec3): number
-			return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
-		end
-
-		if particle.variant == ParticleVariant.Embers then
-			local hit = camera:castRay(particle.position, particle.velocity + particle.position)
-			if hit.successful then
-				local dotProduct = dot(particle.velocity, hit.normal)
-				local reflection = particle.velocity - (hit.normal * (2 * dotProduct))
-
-				particle.velocity = reflection --bounce embers
+			--collision
+			local function dot(v1: Vec3, v2: Vec3): number
+				return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 			end
-		end
 
-		--update position
-		particle.position += (particle.velocity * particleSimSpeed)
+			if particle.variant == ParticleVariant.Embers then
+				local hit = camera:castRay(particle.position, particle.velocity + particle.position)
+				if hit.successful then
+					local dotProduct = dot(particle.velocity, hit.normal)
+					local reflection = particle.velocity - (hit.normal * (2 * dotProduct))
 
-		--affect scale
-		if
-			particle.variant == ParticleVariant.Embers
-			or particle.variant == ParticleVariant.Rings
-			or particle.variant == ParticleVariant.GoalRing
-		then
-			particle.scale *= ((particle.aliveTime / particle.lifespan) ^ particleSimSpeed)
-		end
+					particle.velocity = reflection --bounce embers
+				end
+			end
 
-		--remove tiny particles
-		if particle.scale < 0.01 then
-			table.remove(particlesTable, i)
+			--update position
+			particle.position += (particle.velocity * particleSimSpeed)
+
+			--affect scale
+			if
+				particle.variant == ParticleVariant.Embers
+				or particle.variant == ParticleVariant.Rings
+				or particle.variant == ParticleVariant.GoalRing
+			then
+				particle.scale *= ((particle.aliveTime / particle.lifespan) ^ particleSimSpeed)
+			end
+
+			--remove tiny particles
+			if particle.scale < 0.01 then
+				table.remove(particlesTable, i)
+			end
 		end
 
 		--draw parts
