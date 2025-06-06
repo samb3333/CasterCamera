@@ -221,15 +221,15 @@ function Box:render(r: number, g: number, b: number): ()
 		{ start = self.vertexLocations[6], finish = self.vertexLocations[8] },
 	}
 
-	World.drawPoint(self.position, 0.2, 3, 0.2, 5, 0)
+	WorldDraw.drawPoint(self.position, 0.2, 3, 0.2, 5, 0)
 	for i: number, line: { start: Vec3, finish: Vec3 } in lines do
-		World.drawLine(line.start, line.finish, r, g, b, 4, 0)
+		WorldDraw.drawLine(line.start, line.finish, r, g, b, 4, 0)
 	end
 
 	local rotationQuat = Quat.fromEuler(math.deg(self.rotation.x), math.deg(self.rotation.y), math.deg(self.rotation.z))
-	World.drawLine(self.position, self.position + rotationQuat:getForwardVector() * 100, 1, 0, 0, 10, 0)
-	World.drawLine(self.position, self.position + rotationQuat:getUpVector() * 100, 0, 1, 0, 10, 0)
-	World.drawLine(self.position, self.position + rotationQuat:getRightVector() * 100, 0, 0, 1, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + rotationQuat:getForwardVector() * 100, 1, 0, 0, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + rotationQuat:getUpVector() * 100, 0, 1, 0, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + rotationQuat:getRightVector() * 100, 0, 0, 1, 10, 0)
 end
 
 function Box:checkPointIntersect(point: Vec3): boolean
@@ -2411,7 +2411,7 @@ function transformRot(vertices, origin, angle)
 end
 
 function particleAffect()
-	World.clear()
+	WorldDraw.clear()
 	if #particlesTable < 1 then
 		return
 	end
@@ -2477,7 +2477,7 @@ function particleAffect()
 
 		--draw parts
 		if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
-			World.drawLine(
+			WorldDraw.drawLine(
 				particle.position,
 				particle.position - particle.velocity,
 				particle.Color.r,
@@ -2503,7 +2503,7 @@ function particleAffect()
 				local currentX = r * math.cos(i * theta) + particle.position.x
 				local currentY = r * math.sin(i * theta) + particle.position.y
 
-				World.drawLine(
+				WorldDraw.drawLine(
 					Vec3.new(prevX, prevY, z),
 					Vec3.new(currentX, currentY, z),
 					particle.Color.r,
@@ -2529,7 +2529,7 @@ function particleAffect()
 				Vec3.new(0, 248.905, -52.404),
 			}
 			for i = 1, 5 do
-				World.drawLine(
+				WorldDraw.drawLine(
 					transformRot(goalOutline[i] + particle.position, particle.position, particle.rotation.z),
 					transformRot(goalOutline[i + 1] + particle.position, particle.position, particle.rotation.z),
 					particle.Color.r,
@@ -3736,7 +3736,7 @@ function tick(dt)
 	end
 
 	if playerFollow then
-		World.clear()
+		WorldDraw.clear()
 		readOtherInputs()
 	else
 		toggleSmoothing(true, true)
