@@ -183,6 +183,7 @@ end
 local deltaTime: number = 0
 
 local loadTime: number
+local getArenaDelay: number = 7
 local transitionTime: number
 local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
@@ -630,13 +631,7 @@ local ballCenterTime: number = 0
 local boxSizeOld = Vec3.new(6750, 5100, 1440)
 local boxPositionOffsetOld = Vec3.new(0, 0, 650)
 
-local arenas: { [any]: Arena } = getArenas()
-
-for _, arena in arenas do
-	print(arena.slotId)
-	print(arena.name)
-	print(arena.transform)
-end
+local arenas: { [any]: Arena }
 
 local old_arenas: { [any]: Old_Arena } = {
 	gatewayArena = createOldArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
@@ -725,7 +720,7 @@ function updateArenaOverviews()
 	end
 end
 
-local selectedArena: Arena = arenas.Gateway or arenas[1]
+local selectedArena: Arena
 
 -- Particles
 local homeGoalEnter: boolean = false
@@ -1687,6 +1682,11 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 end
 
 function onGui()
+	if selectedArena == nil then
+		Gui.text("Loading arenas...")
+		return
+	end
+
 	if followPlussCamera == nil then
 		Gui.text(
 			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
@@ -3754,12 +3754,22 @@ function tick(dt)
 		return
 	end
 
-	setNewInputTimes(getAnyKeyboardKeyDown())
-	setNewInputTimes(getAnyGamepadKeyDown())
+	if arenas == nil then
+		local currentTime = os.clock()
+		if currentTime >= loadTime + getArenaDelay then
+			arenas = getArenas()
+			selectedArena = arenas.Gateway or arenas[1]
+		else
+			return
+		end
+	end
 
 	if Input.getKeyDown(Input.Key.N) then
-		arenas = getArenas()
+		print(selectedArena)
 	end
+
+	setNewInputTimes(getAnyKeyboardKeyDown())
+	setNewInputTimes(getAnyGamepadKeyDown())
 
 	if keyToBeRebinded.key ~= "" then
 		doRebind()
