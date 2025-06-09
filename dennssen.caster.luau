@@ -10,6 +10,16 @@ metadata = {
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
 
+-- New API stuff:
+--[[
+	- use new api for kickoff particle
+	- send last goal info (who scored, who assisted, how fast, etc.)
+	- update overlay website to use:
+	- - gamemode api instead of overlay json
+	- - fetch camera config api instead of websocket
+	- - 
+]]
+
 -- GameData
 local readLocation = 0
 local gameData: ReplayFrame
