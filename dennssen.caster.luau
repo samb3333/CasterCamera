@@ -10,6 +10,10 @@ metadata = {
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
 
+-- GameData
+local readLocation = 0
+local gameData: ReplayFrame
+
 local defaultKeybinds = {
 	keyboard = {
 		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
@@ -158,11 +162,37 @@ end
 
 function getDictSize(dict): number
 	local i = 0
+
+	if dict == nil then
+		return i
+	end
+
 	for _, _ in dict do
 		i += 1
 	end
 
 	return i
+end
+
+function getDictIndex(dict, index: number)
+	local i = 0
+	local dictSize = getDictSize(dict)
+	local dictItem = nil
+
+	if index < 0 or index > dictSize then
+		return dictItem
+	end
+
+	for _, item in dict do
+		if i == index then
+			dictItem = item
+			break
+		end
+
+		i += 1
+	end
+
+	return dictItem
 end
 
 -- math.lerp is nil for some reason
@@ -182,7 +212,8 @@ end
 
 local deltaTime: number = 0
 
-local loadTime: number
+local loadTime: number = 0
+local arenaLoadTime: number = 0
 local getArenaDelay: number = 7
 local transitionTime: number
 local firstTransition: boolean
@@ -342,6 +373,29 @@ function Box:checkPointIntersect(point: Vec3): boolean
 	end
 end
 
+-- Overlay Camera
+local overlayCamera: SpectatorCamera = nil
+local usingOverlay: boolean = false
+local sendOverlayInfo: boolean = config.sendOverlayInfo
+local homeTeam: string = ""
+local awayTeam: string = ""
+
+-- Follow Camera
+local followPlussCamera: SpectatorCamera = nil
+local playerFollow = false
+local currentPlayerName: string = ""
+local currentPlayerId: number = -1
+local currentPlayerIndex: number = 1
+local followFOV: number = config.followFOV
+local followPosititonSmoothing: number = config.followPosititonSmoothing
+local followRadius: number = config.followRadius
+local thirdPersonMode: number = config.thirdPersonMode
+local THIRD_PERSON_MODES = {
+	HeadRotation = 2,
+	VelocityRotation = 3,
+	FaceTheBall = 4,
+}
+
 type MessageValues = {
 	readLocation: number?,
 	showNameTags: boolean?,
@@ -375,7 +429,7 @@ type Color = {
 
 type Particle = {
 	position: Vec3,
-	rotation: Vec3,
+	rotation: Quat,
 	scale: number,
 	velocity: Vec3,
 	Color: Color,
@@ -457,8 +511,10 @@ function createOldArena(name: string, position: Vec3, rotation: Quat): Old_Arena
 	}
 end
 
-type AreanTeam = {
+type ArenaTeam = {
+	previousScore: number,
 	score: number,
+	scoreIncrease: boolean,
 	rounds: number,
 	goal: {
 		position: Vec3,
@@ -479,16 +535,24 @@ type Arena = {
 	transform: Transform,
 	box: BoxType,
 	centerBox: BoxType,
-	home: AreanTeam,
-	away: AreanTeam,
+	home: ArenaTeam,
+	away: ArenaTeam,
 	players: { ReplayPlayer },
 
+	lastIsGameActive: boolean,
 	isGameActive: boolean,
+	isKickoff: boolean,
+
 	gameTimeSeconds: number,
 	actionTimerSeconds: number,
+	isSafeTime: boolean,
+	bestOfAmount: number,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
+	setTeams: (self: Arena) -> (),
+	sendInfoMessage: (self: Arena) -> (),
+	checkStatReset: (self: Arena) -> (),
 }
 
 local Arena: Arena = {} :: Arena
@@ -533,7 +597,9 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	)
 
 	self.home = {
+		previousScore = 0,
 		score = 0,
+		scoreIncrease = false,
 		rounds = 0,
 		goal = {
 			position = self.transform.position
@@ -551,7 +617,9 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	self.home.goal.box = Box.new(self.home.goal.position, goalBoxSize, self.home.goal.rotation)
 
 	self.away = {
+		previousScore = 0,
 		score = 0,
+		scoreIncrease = false,
 		rounds = 0,
 		goal = {
 			position = self.transform.position
@@ -567,6 +635,8 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		players = {},
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, goalBoxSize, self.away.goal.rotation)
+
+	self.isKickoff = false
 
 	-- Overviews
 	for _, overview in overviewOffsets do
@@ -584,25 +654,146 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		table.insert(self.home.overview, homeOverview)
 		table.insert(self.away.overview, awayOverview)
 	end
+
+	print(`made arena {self.slotId}`)
+
 	return self
 end
 
 function Arena:tick()
-	local gameTimeSeconds = self.gamemode:getGameTimeComponent():getTimeSeconds()
-	local actionTimerSeconds = self.gamemode:getGameTimeComponent():getSecondaryTimeSeconds()
+	if self.gamemode == nil then
+		print("gamemode is nil")
+		return
+	end
 
+	local gameTimeComponent = self.gamemode:getGameTimeComponent()
+
+	if gameTimeComponent then
+		local gameTimeSeconds = gameTimeComponent:getTimeSeconds()
+		local actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
+		self.gameTimeSeconds = gameTimeSeconds
+		self.actionTimerSeconds = actionTimerSeconds
+	else
+		self.gameTimeSeconds = 0
+		self.actionTimerSeconds = 0
+	end
+
+	self.home.previousScore = self.home.score
 	self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	self.away.previousScore = self.away.score
 	self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+
 	self.home.rounds = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
 	self.away.rounds = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
+
+	self.lastIsGameActive = self.isGameActive
 	self.isGameActive = self.gamemode:getIsGameRunning()
-	self.gameTimeSeconds = gameTimeSeconds
-	self.actionTimerSeconds = actionTimerSeconds
+	self.isSafeTime = self.actionTimerSeconds > 0
+
+	if self.gamemode:getBoolConfigVariable("busebestof") then
+		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
+	else
+		self.bestOfAmount = 0
+	end
+
+	self.home.scoreIncrease = self.home.previousScore < self.home.score
+	self.away.scoreIncrease = self.away.previousScore < self.away.score
+
+	if not self.isKickoff and not self.lastIsGameActive and self.isGameActive then
+		self.isKickoff = true
+	end
+
+	self:checkStatReset()
+	self:setTeams()
+	self:sendInfoMessage()
+end
+
+function Arena:setTeams()
+	local tempHome = {}
+	local tempAway = {}
+
+	for _, player in gameData.players do
+		if player.teamIndex == TeamIndex.NoTeam then
+			continue
+		end
+
+		if not self.box:checkPointIntersect(player.root.position) then
+			continue
+		end
+
+		if player.teamIndex == TeamIndex.homeTeam then
+			table.insert(tempHome, player)
+		elseif player.teamIndex == TeamIndex.awayTeam then
+			table.insert(tempAway, player)
+		end
+	end
+
+	self.home.players = tempHome
+	self.away.players = tempAway
+
+	local allPlayers = {}
+	for _, player in self.home.players do
+		table.insert(allPlayers, player)
+	end
+	for _, player in self.away.players do
+		table.insert(allPlayers, player)
+	end
+	self.players = allPlayers
+end
+
+function Arena:sendInfoMessage()
+	if not usingOverlay or not sendOverlayInfo then
+		return
+	end
+
+	local homePlayerNames = {}
+	local awayPlayerNames = {}
+	for _, player in self.home.players do
+		table.insert(homePlayerNames, player.playerName)
+	end
+	for _, player in self.away.players do
+		table.insert(awayPlayerNames, player.playerName)
+	end
+
+	sendMessage(overlayCamera, {
+		info = "players",
+		value = {
+			team = "home",
+			players = homePlayerNames,
+		},
+	})
+	sendMessage(overlayCamera, {
+		info = "players",
+		value = {
+			team = "away",
+			players = awayPlayerNames,
+		},
+	})
+
+	sendMessage(overlayCamera, {
+		info = "followedPlayer",
+		value = currentPlayerName,
+	})
+end
+
+function Arena:checkStatReset()
+	local homeRounds = self.home.rounds
+	local awayRounds = self.away.rounds
+	local started = self.isGameActive and not self.lastIsGameActive
+
+	if started and homeRounds == 0 and awayRounds == 0 then
+		--new game, reset stats
+		sendMessage(overlayCamera, {
+			info = "clearStats",
+			value = "",
+		})
+	end
 end
 
 function getArenas(): { [any]: Arena }
 	local arenas: { [any]: Arena } = {}
 	local gamemodes = SpectatorGamemodes.listGamemodes()
+	print("got gamemodes in getArenas")
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
 		if slotId:find("TKB") and not slotId:find("Full") then
@@ -610,6 +801,8 @@ function getArenas(): { [any]: Arena }
 			arenas[arena.name] = arena
 		end
 	end
+
+	print("got arenas")
 
 	return arenas
 end
@@ -621,9 +814,6 @@ local homeGoalRotationOffsetOld = Quat.fromEuler(0, 0, 180)
 local awayGoalRotationOffsetOld = Quat.fromEuler(0, 0, 0)
 
 --arena
-
-local midfieldMaxTime = 20
-local midfieldTimePassed: number = 0
 
 local requiredBallCenterTime: number = 5
 local ballCenterTime: number = 0
@@ -720,13 +910,9 @@ function updateArenaOverviews()
 	end
 end
 
-local selectedArena: Arena
+local selectedArena: Arena = nil
 
 -- Particles
-local homeGoalEnter: boolean = false
-local previousHomeGoalEnter: boolean = false
-local awayGoalEnter: boolean = false
-local previousAwayGoalEnter: boolean = false
 local homeTeamDefaultColor: Color = config.homeTeamDefaultColor
 local awayTeamDefaultColor: Color = config.awayTeamDefaultColor
 local homeTeamPrimaryColor: Color = homeTeamDefaultColor
@@ -750,7 +936,6 @@ local exposureBias = config.postProcessing.exposureBias
 -- Stats
 local lastPlayerWithBall: ReplayPlayer? = nil
 local previousLastPlayerWithBall: ReplayPlayer? = nil
-local isSafeTime: boolean = false
 local homeGoalPotentialEnter: boolean = false
 local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
@@ -764,10 +949,6 @@ local goalPlayer: ReplayPlayer? = nil
 
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
-
--- GameData
-local readLocation = 0
-local gameData: ReplayFrame
 
 -- Caster Camera
 local cameraFOV = config.cameraFOV
@@ -788,29 +969,6 @@ local gearShiftTime: number = 0
 local gearShiftTimeRequired: number = 0.3
 local speedLastGearBuffer = false
 local turnVelocity: Vec2 = Vec2.zeroVector
-
--- Follow Camera
-local followPlussCamera: SpectatorCamera = nil
-local playerFollow = false
-local currentPlayerName: string = ""
-local currentPlayerId: number = -1
-local currentPlayerIndex: number = 1
-local followFOV: number = config.followFOV
-local followPosititonSmoothing: number = config.followPosititonSmoothing
-local followRadius: number = config.followRadius
-local thirdPersonMode: number = config.thirdPersonMode
-local THIRD_PERSON_MODES = {
-	HeadRotation = 2,
-	VelocityRotation = 3,
-	FaceTheBall = 4,
-}
-
--- Overlay Camera
-local overlayCamera: SpectatorCamera = nil
-local usingOverlay: boolean = false
-local sendOverlayInfo: boolean = config.sendOverlayInfo
-local homeTeam: string = ""
-local awayTeam: string = ""
 
 -- Ball
 local ball: ReplayBall
@@ -1628,6 +1786,7 @@ local overviewMessage = {
 
 function main()
 	loadTime = os.clock()
+	arenaLoadTime = os.clock()
 	camera.position = defaultPosition
 	camera.rotation = defaultRotation
 	rotEuler = defaultRotation:euler()
@@ -1681,9 +1840,25 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 	return `Succesfully set Overview #{overviewKey} to Camera`
 end
 
+function setSelectedArena(arena: Arena)
+	selectedArena = arena
+	selectedArena.home.previousScore = selectedArena.home.score
+	selectedArena.away.previousScore = selectedArena.away.score
+
+	if not usingOverlay or not sendOverlayInfo then
+		return
+	end
+
+	sendMessage(overlayCamera, {
+		info = "slotId",
+		value = selectedArena.slotId,
+	})
+end
+
 function onGui()
-	if selectedArena == nil then
-		Gui.text("Loading arenas...")
+	if getDictSize(arenas) == 0 or selectedArena == nil then
+		local currentTime = os.clock()
+		Gui.text(`Loading gamemodes... ({math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100)}%)`)
 		return
 	end
 
@@ -1861,9 +2036,9 @@ function onGui()
 		end
 		for i = 1, #Replay.listLoaded() do
 			if Gui.selectable("Replay " .. i, i == readLocation) then
-				if readLocation ~= i then
-					selectedArena.home.players = {}
-					selectedArena.away.players = {}
+				if i ~= readLocation then
+					arenas = {}
+					arenaLoadTime = os.clock()
 				end
 				readLocation = i
 			end
@@ -1877,16 +2052,14 @@ function onGui()
 	Gui.indent()
 
 	if Gui.button("Get Closest Arena") then
-		selectedArena = getClosestArena(camera.position)
-		selectedArena.home.players = {}
-		selectedArena.away.players = {}
+		setSelectedArena(getClosestArena(camera.position))
 	end
 	Gui.setItemTooltip("Gets the closest arena | For most accuracy be inside the arena when pressing")
 
 	if Gui.beginCombo("Selected Arena", selectedArena.name) then
 		for _, arena: Arena in arenas do
 			if Gui.selectable(arena.name, arena.name == selectedArena.name) then
-				selectedArena = arena
+				setSelectedArena(arena)
 			end
 		end
 		Gui.endCombo()
@@ -2784,9 +2957,7 @@ function readOtherInputs()
 	end
 
 	if getCasterKey(inputs.keyboard.getClosestArena).down or getCasterKey(inputs.gamepad.getClosestArena).down then
-		selectedArena = getClosestArena(camera.position)
-		selectedArena.home.players = {}
-		selectedArena.away.players = {}
+		setSelectedArena(getClosestArena(camera.position))
 	end
 
 	if getCasterKey(inputs.keyboard.clearOverlayInfo).down or getCasterKey(inputs.gamepad.clearOverlayInfo).down then
@@ -3064,39 +3235,6 @@ function rotateCamera()
 	camera.rotation = gravityChaser * Quat.fromEuler(rotEuler.x, rotEuler.y, rotEuler.z)
 end
 
-function teamLists()
-	local tempHome = {}
-	local tempAway = {}
-
-	for _, player in gameData.players do
-		if player.teamIndex == TeamIndex.NoTeam then
-			continue
-		end
-
-		if not selectedArena.box:checkPointIntersect(player.root.position) then
-			continue
-		end
-
-		if player.teamIndex == TeamIndex.homeTeam then
-			table.insert(tempHome, player)
-		elseif player.teamIndex == TeamIndex.awayTeam then
-			table.insert(tempAway, player)
-		end
-	end
-
-	selectedArena.home.players = tempHome
-	selectedArena.away.players = tempAway
-
-	local allPlayers = {}
-	for _, player in selectedArena.home.players do
-		table.insert(allPlayers, player)
-	end
-	for _, player in selectedArena.away.players do
-		table.insert(allPlayers, player)
-	end
-	selectedArena.players = allPlayers
-end
-
 -- Custom function to extract the primary color
 function extractPrimaryColor(json)
 	local r = json:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)')
@@ -3148,56 +3286,6 @@ function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boo
 	return sameTeam
 end
 
-function sendArenaInfo()
-	if not usingOverlay or not sendOverlayInfo then
-		return
-	end
-
-	local homePlayerNames = {}
-	local awayPlayerNames = {}
-	for _, player in selectedArena.home.players do
-		table.insert(homePlayerNames, player.playerName)
-	end
-	for _, player in selectedArena.away.players do
-		table.insert(awayPlayerNames, player.playerName)
-	end
-
-	sendMessage(overlayCamera, {
-		info = "players",
-		value = {
-			team = "home",
-			players = homePlayerNames,
-		},
-	})
-	sendMessage(overlayCamera, {
-		info = "players",
-		value = {
-			team = "away",
-			players = awayPlayerNames,
-		},
-	})
-
-	sendMessage(overlayCamera, {
-		info = "color",
-		value = {
-			team = "home",
-			color = homeTeamPrimaryColor,
-		},
-	})
-	sendMessage(overlayCamera, {
-		info = "color",
-		value = {
-			team = "away",
-			color = awayTeamPrimaryColor,
-		},
-	})
-
-	sendMessage(overlayCamera, {
-		info = "followedPlayer",
-		value = currentPlayerName,
-	})
-end
-
 function resetPlayersWithBall()
 	lastPlayerWithBall = nil
 	previousLastPlayerWithBall = nil
@@ -3214,7 +3302,7 @@ function checkForPlayerBallContact(): ReplayPlayer?
 	return lastPlayerWithBall
 end
 
-function checkForAssist()
+function getAssistPlayer()
 	if lastPlayerWithBall == nil or previousLastPlayerWithBall == nil then
 		return
 	end
@@ -3319,7 +3407,7 @@ function earlyStatChangeReturn(ballExit: boolean)
 end
 
 function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
-	if isSafeTime then
+	if selectedArena.isSafeTime then
 		earlyStatChangeReturn(true)
 		return
 	end
@@ -3366,7 +3454,7 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 
 	lastPlayerWithBall = checkForPlayerBallContact()
 
-	checkForAssist()
+	getAssistPlayer()
 
 	if checkForGoalPotential() then
 		earlyStatChangeReturn(false)
@@ -3393,30 +3481,15 @@ function goalScoreCheck()
 		awayGoalBox:render(0, 0, 1)
 	end
 
-	checkPotentialStatChange(homeGoalBox, awayGoalBox)
-
-	homeGoalEnter = homeGoalBox:checkPointIntersect(ball.transform.position)
-	awayGoalEnter = awayGoalBox:checkPointIntersect(ball.transform.position)
-
-	local isGameActive = selectedArena.isGameActive
-	local actionTimerSeconds = selectedArena.actionTimerSeconds
-
-	if not isGameActive or actionTimerSeconds > 0 then
+	if not selectedArena.isGameActive or selectedArena.actionTimerSeconds > 0 then
 		return
 	end
 
-	-- the ball has newely scored
-	if homeGoalEnter and not previousHomeGoalEnter then
-		isSafeTime = true
-		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
-		midfieldTimePassed = 0
+	checkPotentialStatChange(homeGoalBox, awayGoalBox)
 
-		sendMessage(overlayCamera, {
-			info = "score",
-			value = {
-				team = "away",
-			},
-		})
+	-- the ball has newely scored
+	if selectedArena.away.scoreIncrease then
+		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 
 		if goalPlayer then
 			resetPlayersWithBall()
@@ -3445,17 +3518,8 @@ function goalScoreCheck()
 		end
 	end
 
-	if awayGoalEnter and not previousAwayGoalEnter then
-		isSafeTime = true
+	if selectedArena.home.scoreIncrease then
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
-		midfieldTimePassed = 0
-
-		sendMessage(overlayCamera, {
-			info = "score",
-			value = {
-				team = "home",
-			},
-		})
 
 		if goalPlayer then
 			resetPlayersWithBall()
@@ -3481,9 +3545,6 @@ function goalScoreCheck()
 			end
 		end
 	end
-
-	previousHomeGoalEnter = homeGoalEnter
-	previousAwayGoalEnter = awayGoalEnter
 end
 
 function ballInCenterCheck()
@@ -3715,14 +3776,21 @@ function tick(dt)
 		return
 	end
 
-	if arenas == nil then
+	if arenas == nil or getDictSize(arenas) == 0 then
 		local currentTime = os.clock()
-		if currentTime >= loadTime + getArenaDelay then
+		if currentTime >= arenaLoadTime + getArenaDelay then
 			arenas = getArenas()
-			selectedArena = arenas.Gateway or arenas[1]
-		else
-			return
+			if getDictSize(arenas) > 0 then
+				print("checked dict size")
+
+				setSelectedArena(getDictIndex(arenas, 1))
+				print("set selected arena")
+			end
 		end
+	end
+
+	if getDictSize(arenas) == 0 or selectedArena == nil then
+		return
 	end
 
 	if Input.getKeyDown(Input.Key.N) then
@@ -3739,13 +3807,9 @@ function tick(dt)
 	deltaTime = dt
 	camera.fieldOfView = cameraFOV
 
-	for _, arena: Arena in arenas do
-		arena:tick()
-	end
-
 	gameData = getReplayFrameFromIndex(readLocation)
 	ball = getClosestArenaBall(selectedArena.transform.position, gameData)
-	teamLists()
+	selectedArena:tick()
 
 	getTeamColors()
 
@@ -3781,7 +3845,6 @@ function tick(dt)
 		goalScoreCheck()
 		ballInCenterCheck()
 	end
-	sendArenaInfo()
 
 	removeOldInputTimes()
 
