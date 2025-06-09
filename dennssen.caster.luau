@@ -2677,9 +2677,9 @@ function GameStartEffect()
 		+ selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 100))
 
 	local colourAverage = {
-		r = homeTeamPrimaryColor.r + awayTeamPrimaryColor.r / 2,
-		g = homeTeamPrimaryColor.g + awayTeamPrimaryColor.g / 2,
-		b = homeTeamPrimaryColor.b + awayTeamPrimaryColor.b / 2,
+		r = (homeTeamPrimaryColor.r + awayTeamPrimaryColor.r) / 2,
+		g = (homeTeamPrimaryColor.g + awayTeamPrimaryColor.g) / 2,
+		b = (homeTeamPrimaryColor.b + awayTeamPrimaryColor.b) / 2,
 	}
 	createParticle(
 		particlePosition,
