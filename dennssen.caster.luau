@@ -2149,13 +2149,15 @@ function onGui()
 	if Gui.treeNode("Debug") then
 		Gui.text(`Version: {version}`)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
-		if Gui.button("Print Gamemode Slots") then
-			local gamemodes = SpectatorGamemodes.listGamemodes()
-			for _, gamemode in gamemodes do
-				local slotId = gamemode:getSlotId()
-				if slotId:find("TKB") then
-					print(`{slotId} | {gamemode.transform.position} - {gamemode.transform.rotation:euler()}`)
-				end
+		if Gui.button("Print Arenas") then
+			for _, arena in arenas do
+				print(arena.slotId)
+			end
+		end
+		Gui.sameLine()
+		if Gui.button("Print Gamemode Ids") then
+			for _, gamemodeId in SpectatorGamemodes.listGamemodes() do
+				print(gamemodeId)
 			end
 		end
 		if Gui.button("Set Orientation to Arena") then
