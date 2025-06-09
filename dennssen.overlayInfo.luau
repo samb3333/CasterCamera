@@ -107,9 +107,9 @@ function onMessageReceived(messageTable: { info: string, value: any })
 	if info == "slotId" then
 		currentConfig.gamemodeSlotId = value
 	elseif info == "players" then
-		currentConfig.arenaInfo[value.team].players = value.players
+		currentConfig.extraArenaInfo[value.team].players = value.players
 	elseif info == "followedPlayer" then
-		currentConfig.arenaInfo.followedPlayer = value
+		currentConfig.extraArenaInfo.followedPlayer = value
 	elseif info == "stats" then
 		local statsPlayer = currentConfig.statsInfo[value.team][value.player]
 		if statsPlayer == nil then
@@ -124,7 +124,7 @@ function onMessageReceived(messageTable: { info: string, value: any })
 		currentConfig.statsInfo.home = {}
 		currentConfig.statsInfo.away = {}
 	elseif info == "teamNames" then
-		currentConfig.arenaInfo.home.name = value.home
-		currentConfig.arenaInfo.away.name = value.away
+		currentConfig.extraArenaInfo.home.name = value.home
+		currentConfig.extraArenaInfo.away.name = value.away
 	end
 end
