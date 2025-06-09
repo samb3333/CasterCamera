@@ -2472,7 +2472,7 @@ end
 -- particle start
 function createParticle(
 	position: Vec3,
-	rotation: Vec3,
+	rotation: Quat,
 	scale: number,
 	velocity: Vec3,
 	Color: Color,
@@ -2498,29 +2498,13 @@ function createParticle(
 		position = position,
 		rotation = rotation,
 		scale = scale,
-		velocity = velocity,
+		velocity = rotation:rotateVector(velocity),
 		Color = Color,
 		variant = variant,
 		lifespan = lifespan,
 		aliveTime = lifespan,
 	}
 	table.insert(particlesTable, newParticle)
-end
-
-function transformRot(vertices, origin, angle)
-	local cosTheta = math.cos(math.rad(angle))
-	local sinTheta = math.sin(math.rad(angle))
-
-	local translatedX = vertices.x - origin.x
-	local translatedY = vertices.y - origin.y
-
-	local rotatedX = translatedX * cosTheta - translatedY * sinTheta
-	local rotatedY = translatedX * sinTheta + translatedY * cosTheta
-
-	local finalX = rotatedX + origin.x
-	local finalY = rotatedY + origin.y
-
-	return Vec3.new(finalX, finalY, vertices.z)
 end
 
 function particleAffect()
@@ -2603,21 +2587,17 @@ function particleAffect()
 		--generate rings
 		if particle.variant == ParticleVariant.Rings then
 			local r = (1 - particle.aliveTime / particle.lifespan) * 6000
-			--local r = 100
 			local resolution = 90
 			local theta = 2 * math.pi / resolution
-			local z = particle.position.z - 40
 
-			local prevX = r * math.cos(0) + particle.position.x
-			local prevY = r * math.sin(0) + particle.position.y
+			local previousRingOffset = Vec3.new(r * math.cos(0), r * math.sin(0), -40)
 
 			for i = 1, resolution do
-				local currentX = r * math.cos(i * theta) + particle.position.x
-				local currentY = r * math.sin(i * theta) + particle.position.y
+				local currentRingOffset = Vec3.new(r * math.cos(i * theta), r * math.sin(i * theta), -40)
 
 				WorldDraw.drawLine(
-					Vec3.new(prevX, prevY, z),
-					Vec3.new(currentX, currentY, z),
+					particle.rotation:rotateVector(previousRingOffset) + particle.position,
+					particle.rotation:rotateVector(currentRingOffset) + particle.position,
 					particle.Color.r,
 					particle.Color.g,
 					particle.Color.b,
@@ -2625,8 +2605,7 @@ function particleAffect()
 					0
 				)
 
-				prevX = currentX
-				prevY = currentY
+				previousRingOffset = currentRingOffset
 			end
 
 			--generate goal ring
@@ -2642,8 +2621,8 @@ function particleAffect()
 			}
 			for i = 1, 5 do
 				WorldDraw.drawLine(
-					transformRot(goalOutline[i] + particle.position, particle.position, particle.rotation.z),
-					transformRot(goalOutline[i + 1] + particle.position, particle.position, particle.rotation.z),
+					particle.rotation:rotateVector(goalOutline[i]) + particle.position,
+					particle.rotation:rotateVector(goalOutline[i + 1]) + particle.position,
 					particle.Color.r,
 					particle.Color.g,
 					particle.Color.b,
@@ -2658,11 +2637,12 @@ end
 
 --effects start
 function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
+	local particleRotation = selectedArena.transform.rotation * Quat.fromEuler(0, 0, 90)
 	for i = 1, 300 do
 		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
 		createParticle(
 			goalPosition,
-			Vec3.zeroVector,
+			Quat.identity,
 			0.3,
 			velocityVector,
 			particleColor,
@@ -2670,42 +2650,18 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 			math.random(800, 1300)
 		)
 	end
-	createParticle(
-		goalPosition,
-		selectedArena.transform.rotation:euler(),
-		0.9,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleVariant.Rings,
-		150
-	)
+	createParticle(goalPosition, particleRotation, 0.9, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 150)
 
 	--rings
-	createParticle(
-		goalPosition,
-		selectedArena.transform.rotation:euler(),
-		1,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleVariant.Rings,
-		200
-	)
-	createParticle(
-		goalPosition,
-		selectedArena.transform.rotation:euler(),
-		1,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleVariant.Rings,
-		400
-	)
+	createParticle(goalPosition, particleRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 200)
+	createParticle(goalPosition, particleRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 400)
 
 	--goal outline
 	local goalSpeed = 20
 	for i = 1, 3 do
 		createParticle(
 			goalPosition,
-			selectedArena.transform.rotation:euler(),
+			particleRotation,
 			1,
 			(selectedArena.transform.position - goalPosition):normalize() * goalSpeed,
 			particleColor,
@@ -2717,14 +2673,17 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 end
 
 function GameStartEffect()
+	local particlePosition = selectedArena.transform.position
+		+ selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 100))
+
 	local colourAverage = {
 		r = homeTeamPrimaryColor.r + awayTeamPrimaryColor.r / 2,
 		g = homeTeamPrimaryColor.g + awayTeamPrimaryColor.g / 2,
 		b = homeTeamPrimaryColor.b + awayTeamPrimaryColor.b / 2,
 	}
 	createParticle(
-		selectedArena.transform.position + Vec3.new(0, 0, 100),
-		Vec3.zeroVector,
+		particlePosition,
+		selectedArena.transform.rotation,
 		0.9,
 		Vec3.zeroVector,
 		colourAverage,
@@ -2732,8 +2691,8 @@ function GameStartEffect()
 		150
 	)
 	createParticle(
-		selectedArena.transform.position + Vec3.new(0, 0, 100),
-		Vec3.zeroVector,
+		particlePosition,
+		selectedArena.transform.rotation,
 		0.7,
 		Vec3.new(0, 0, 10),
 		colourAverage,
@@ -2741,8 +2700,8 @@ function GameStartEffect()
 		600
 	)
 	createParticle(
-		selectedArena.transform.position + Vec3.new(0, 0, 100),
-		Vec3.zeroVector,
+		particlePosition,
+		selectedArena.transform.rotation,
 		0.7,
 		Vec3.new(0, 0, 2),
 		colourAverage,
@@ -2752,8 +2711,8 @@ function GameStartEffect()
 	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
 	for i = 1, math.random(50, 80) do
 		createParticle(
-			selectedArena.transform.position - Vec3.new(0, 0, 100),
-			Vec3.zeroVector,
+			particlePosition,
+			selectedArena.transform.rotation,
 			0.5,
 			Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80)),
 			colourPallette[math.random(1, 2)],
