@@ -12,7 +12,6 @@ metadata = {
 
 -- New API stuff:
 --[[
-	- use new api for kickoff particle
 	- send last goal info (who scored, who assisted, how fast, etc.)
 	- update overlay website to use:
 	- - gamemode api instead of overlay json
@@ -3558,26 +3557,11 @@ function goalScoreCheck()
 end
 
 function ballInCenterCheck()
-	local centerBox: BoxType = selectedArena.centerBox
-	if boundingBoxDebug then
-		centerBox:render(0, 1, 0)
-	end
-
-	if centerBox:checkPointIntersect(ball.transform.position) then
-		ballCenterTime += deltaTime
-	else
-		if ballCenterTime > requiredBallCenterTime then
-			resetPlayersWithBall()
-			GameStartEffect()
-			if usingOverlay then
-				local startTimestamp = os.date("%H:%M:%S", os.time())
-				sendMessage(overlayCamera, {
-					info = "startTime",
-					value = startTimestamp,
-				})
-			end
-		end
-		ballCenterTime = 0
+	local isKickoff = selectedArena.isKickoff
+	if isKickoff and selectedArena.actionTimerSeconds == 0 then
+		resetPlayersWithBall()
+		GameStartEffect()
+		selectedArena.isKickoff = false
 	end
 end
 
@@ -3791,10 +3775,7 @@ function tick(dt)
 		if currentTime >= arenaLoadTime + getArenaDelay then
 			arenas = getArenas()
 			if getDictSize(arenas) > 0 then
-				print("checked dict size")
-
 				setSelectedArena(getDictIndex(arenas, 1))
-				print("set selected arena")
 			end
 		end
 	end
@@ -3851,9 +3832,9 @@ function tick(dt)
 	end
 
 	particleAffect()
+	ballInCenterCheck()
 	if ball ~= nil then
 		goalScoreCheck()
-		ballInCenterCheck()
 	end
 
 	removeOldInputTimes()
