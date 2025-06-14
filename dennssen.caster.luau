@@ -454,72 +454,6 @@ local ParticleVariant = {
 	Rocket = "rocket",
 }
 
-type Old_Arena = {
-	name: string,
-	position: Vec3,
-	rotation: Quat, -- Rotated Towards Home
-	box: BoxType,
-	home: {
-		overview: {
-			{
-				position: Vec3,
-				rotation: Vec3,
-			}
-		},
-		goal: {
-			position: Vec3,
-			rotation: Quat,
-		},
-		midfield: {
-			position: Vec3,
-		},
-		players: { ReplayPlayer },
-	},
-	away: {
-		overview: {
-			{
-				position: Vec3,
-				rotation: Quat,
-			}
-		},
-		goal: {
-			position: Vec3,
-			rotation: Quat,
-		},
-		midfield: {
-			position: Vec3,
-		},
-		players: { ReplayPlayer },
-	},
-	players: { ReplayPlayer },
-}
-
-function createOldArena(name: string, position: Vec3, rotation: Quat): Old_Arena
-	return {
-		name = name,
-		position = position,
-		rotation = rotation,
-		box = nil,
-		home = {
-			overview = {},
-			goal = nil,
-			midfield = {
-				position = nil,
-			},
-			players = {},
-		},
-		away = {
-			overview = {},
-			goal = nil,
-			midfield = {
-				position = nil,
-			},
-			players = {},
-		},
-		players = {},
-	}
-end
-
 type ArenaTeam = {
 	previousScore: number,
 	score: number,
@@ -816,81 +750,8 @@ function getArenas(): { [any]: Arena }
 	return arenas
 end
 
--- goal
-local goalPositionOffsetOld = 3150
-local goalHeightOffsetOld = Vec3.new(0, 0, -50)
-local homeGoalRotationOffsetOld = Quat.fromEuler(0, 0, 180)
-local awayGoalRotationOffsetOld = Quat.fromEuler(0, 0, 0)
-
---arena
-
-local requiredBallCenterTime: number = 5
-local ballCenterTime: number = 0
-
-local boxSizeOld = Vec3.new(6750, 5100, 1440)
-local boxPositionOffsetOld = Vec3.new(0, 0, 650)
-
+-- arena
 local arenas: { [any]: Arena }
-
-local old_arenas: { [any]: Old_Arena } = {
-	gatewayArena = createOldArena("Gateway Arena", Vec3.new(0, 9900, -29650), Quat.fromEuler(0, 0, 0)),
-	plazaEast = createOldArena("Plaza East", Vec3.new(-4425, 18550, -29650), Quat.fromEuler(0, 0, 90)),
-	plazaWest = createOldArena("Plaza West", Vec3.new(4425, 18550, -29650), Quat.fromEuler(0, 0, -90)),
-	stadiumPrime = createOldArena("Stadium Prime", Vec3.new(0, 27250, -28050), Quat.fromEuler(0, 0, 0)),
-	theBunker = createOldArena("The Bunker", Vec3.new(-112.6, 24944.6, -31545), Quat.fromEuler(0, 0, 180)),
-	fieldhouseEast = createOldArena("Fieldhouse East", Vec3.new(-4500, 27100, -29850), Quat.fromEuler(0, 0, 90)),
-	fieldhouseWest = createOldArena("Fieldhouse West", Vec3.new(4500, 27100, -29850), Quat.fromEuler(0, 0, -90)),
-	driftplex1 = createOldArena("Driftplex 01", Vec3.new(12799.231, 13600.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplex2 = createOldArena(
-		"Driftplex 02",
-		Vec3.new(17475.770, 13600.000, -24868.920),
-		Quat.fromEuler(-30, 0, -90)
-	),
-	driftplex3 = createOldArena("Driftplex 03", Vec3.new(12799.231, 6400.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplex4 = createOldArena("Driftplex 04", Vec3.new(17475.770, 6400.000, -24868.920), Quat.fromEuler(-30, 0, -90)),
-	driftplex5 = createOldArena(
-		"Driftplex 05",
-		Vec3.new(17475.770, 23200.000, -24868.920),
-		Quat.fromEuler(-30, 0, -90)
-	),
-	driftplex6 = createOldArena("Driftplex 06", Vec3.new(12799.231, 23200.000, -27568.920), Quat.fromEuler(30, 0, 90)),
-	driftplexLab = createOldArena(
-		"Driftplex Lab",
-		Vec3.new(15137.500, 29200.000, -26218.920),
-		Quat.fromEuler(0, 30, 0)
-	),
-}
-
-for _, arena in pairs(old_arenas) do
-	arena.box = Box.new(arena.position + arena.rotation:rotateVector(boxPositionOffsetOld), boxSizeOld, arena.rotation)
-
-	for _, overview in overviewOffsets do
-		local homeOverview = {
-			position = arena.position + arena.rotation:rotateVector(overview.position),
-			rotation = (arena.rotation * overview.rotation),
-		}
-		local awayOverview = {
-			position = arena.position + (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(overview.position),
-			rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * overview.rotation),
-		}
-
-		table.insert(arena.home.overview, homeOverview)
-		table.insert(arena.away.overview, awayOverview)
-	end
-
-	arena.home.goal = {
-		position = arena.position
-			+ arena.rotation:rotateVector(goalHeightOffsetOld)
-			+ arena.rotation:getForwardVector() * goalPositionOffsetOld,
-		rotation = arena.rotation * homeGoalRotationOffsetOld,
-	}
-	arena.away.goal = {
-		position = arena.position
-			+ arena.rotation:rotateVector(goalHeightOffsetOld)
-			+ arena.rotation:getForwardVector() * -goalPositionOffsetOld,
-		rotation = arena.rotation * awayGoalRotationOffsetOld,
-	}
-end
 
 function updateArenaOverviews()
 	overviewOffsets = {}
@@ -898,7 +759,7 @@ function updateArenaOverviews()
 		table.insert(overviewOffsets, overview)
 	end
 
-	for _, arena in old_arenas do
+	for _, arena in arenas do
 		arena.home.overview = {}
 		arena.away.overview = {}
 
