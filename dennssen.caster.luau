@@ -15,7 +15,6 @@ metadata = {
 	- update overlay website to use:
 	- - gamemode api instead of overlay json
 	- - fetch camera config api instead of websocket
-	- - 
 ]]
 
 -- GameData
@@ -997,7 +996,7 @@ local keyboardKeys: { string } = {
 	"RightMouseButton",
 }
 
-function getAnyGamepadKeyDown(): Key?
+function getGamepadKeysDown(): { Key }
 	local bannedInputs =
 		{ -- values to be ignored because their apperances are not predictable or should not be accepted
 			Input.Gamepad.Left2D,
@@ -1027,6 +1026,8 @@ function getAnyGamepadKeyDown(): Key?
 		end
 	end
 
+	local pressedKeys: { Key } = {}
+
 	for key, _ in pairs(inputTable) do
 		if Input.getKeyDown(Input.Gamepad[key]) then
 			local banned = false
@@ -1041,14 +1042,15 @@ function getAnyGamepadKeyDown(): Key?
 				continue
 			end
 
-			return Input.Gamepad[key]
+			table.insert(pressedKeys, Input.Gamepad[key])
 		end
 	end
-	return nil
+	return pressedKeys
 end
 
-function getAnyKeyboardKeyDown()
+function getKeyboardKeysDown(): { Key }
 	local bannedInputs = {}
+	local pressedKeys: { Key } = {}
 
 	for _, key in pairs(keyboardKeys) do
 		if Input.getKeyDown(Input.Key[key]) then
@@ -1064,10 +1066,10 @@ function getAnyKeyboardKeyDown()
 				continue
 			end
 
-			return Input.Key[key]
+			table.insert(pressedKeys, Input.Key[key])
 		end
 	end
-	return nil
+	return pressedKeys
 end
 
 local Vertical: number = 0
@@ -2221,6 +2223,13 @@ function onGui()
 			sendMessage(overlayCamera, {
 				info = "clearStats",
 			})
+		end
+		if Gui.button("Print Pressed Keys") then
+			print(pressedInputKeys)
+		end
+		Gui.sameLine()
+		if Gui.button("Print Selected Arena") then
+			print(selectedArena)
 		end
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
@@ -3491,25 +3500,27 @@ function getTeamColors()
 	end
 end
 
-function setNewInputTimes(newInput: Key?)
-	if newInput then
-		local newInputString = keyToString(newInput)
+function setNewInputTimes(newInputs: { Key })
+	for _, newInput in newInputs do
+		if newInput then
+			local newInputString = keyToString(newInput)
 
-		local conciderModifier = true
-		if table.find(modifierKeys, newInputString) ~= nil then
-			for key, pressedInput in pressedInputKeys do
-				if table.find(modifierKeys, key) == nil then
-					conciderModifier = false
+			local conciderModifier = true
+			if table.find(modifierKeys, newInputString) ~= nil then
+				for key, pressedInput in pressedInputKeys do
+					if table.find(modifierKeys, key) == nil then
+						conciderModifier = false
+					end
 				end
+			else
+				conciderModifier = false
 			end
-		else
-			conciderModifier = false
-		end
 
-		pressedInputKeys[newInputString] = {
-			time = os.clock(),
-			isModifier = conciderModifier,
-		}
+			pressedInputKeys[newInputString] = {
+				time = os.clock(),
+				isModifier = conciderModifier,
+			}
+		end
 	end
 end
 
@@ -3688,8 +3699,8 @@ function tick(dt)
 		print(selectedArena)
 	end
 
-	setNewInputTimes(getAnyKeyboardKeyDown())
-	setNewInputTimes(getAnyGamepadKeyDown())
+	setNewInputTimes(getKeyboardKeysDown())
+	setNewInputTimes(getGamepadKeysDown())
 
 	if keyToBeRebinded.key ~= "" then
 		doRebind()
