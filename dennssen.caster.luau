@@ -12,7 +12,6 @@ metadata = {
 
 -- New API stuff:
 --[[
-	- send last goal info (who scored, who assisted, how fast, etc.)
 	- update overlay website to use:
 	- - gamemode api instead of overlay json
 	- - fetch camera config api instead of websocket
@@ -2219,11 +2218,9 @@ function onGui()
 			print(RelativeRotation:euler())
 		end
 		if Gui.button("Reset All Stats") then
-			sendMessage(overlayCamera, { resetAllStats = true })
-		end
-		Gui.sameLine()
-		if Gui.button("Reset Inactive Stats") then
-			sendMessage(overlayCamera, { resetInactiveStats = true })
+			sendMessage(overlayCamera, {
+				info = "clearStats",
+			})
 		end
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
@@ -3361,6 +3358,27 @@ function goalScoreCheck()
 	if selectedArena.away.scoreIncrease then
 		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
 
+		local shooterName = ""
+		local assistName = ""
+
+		if lastPlayerWithBall then
+			shooterName = lastPlayerWithBall.playerName
+		end
+
+		if assistPlayer then
+			assistName = assistPlayer.playerName
+		end
+
+		sendMessage(overlayCamera, {
+			info = "shot",
+			value = {
+				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
+				assister = assistName,
+				team = "away",
+				shotSpeed = ball.velocity:length() / 100,
+			},
+		})
+
 		if goalPlayer then
 			resetPlayersWithBall()
 
@@ -3390,6 +3408,27 @@ function goalScoreCheck()
 
 	if selectedArena.home.scoreIncrease then
 		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
+
+		local shooterName = ""
+		local assistName = ""
+
+		if lastPlayerWithBall then
+			shooterName = lastPlayerWithBall.playerName
+		end
+
+		if assistPlayer then
+			assistName = assistPlayer.playerName
+		end
+
+		sendMessage(overlayCamera, {
+			info = "shot",
+			value = {
+				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
+				assister = assistName,
+				team = "away",
+				shotSpeed = ball.velocity:length() / 100,
+			},
+		})
 
 		if goalPlayer then
 			resetPlayersWithBall()
@@ -3682,7 +3721,6 @@ function tick(dt)
 	end
 
 	if playerFollow then
-		WorldDraw.clear()
 		readOtherInputs()
 	else
 		toggleSmoothing(true, true)

@@ -5,7 +5,7 @@ metadata = {
 	defaultKeybind = "",
 }
 
-local saveInterval = 1 -- 1 is good middle ground between safe and efficiency
+local saveInterval = 0.5 -- 1 is good middle ground between safe and efficiency
 local saveTime = 0
 local currentConfig
 local lastConfig
@@ -26,6 +26,12 @@ local configStructure = {
 			players = {},
 		},
 		followedPlayer = "",
+		lastShotInfo = {
+			shooter = "",
+			assister = "",
+			team = "",
+			shotSpeed = 0,
+		},
 	},
 }
 
@@ -110,6 +116,13 @@ function onMessageReceived(messageTable: { info: string, value: any })
 		currentConfig.extraArenaInfo[value.team].players = value.players
 	elseif info == "followedPlayer" then
 		currentConfig.extraArenaInfo.followedPlayer = value
+	elseif info == "shot" then
+		currentConfig.extraArenaInfo.lastShotInfo = {
+			shooter = value.shooter,
+			assister = value.assister,
+			team = value.team,
+			shotSpeed = value.shotSpeed,
+		}
 	elseif info == "stats" then
 		local statsPlayer = currentConfig.statsInfo[value.team][value.player]
 		if statsPlayer == nil then
