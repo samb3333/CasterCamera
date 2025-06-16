@@ -18,11 +18,9 @@ local configStructure = {
 	gamemodeSlotId = "",
 	extraArenaInfo = {
 		home = {
-			name = "",
 			players = {},
 		},
 		away = {
-			name = "",
 			players = {},
 		},
 		followedPlayer = "",
@@ -90,15 +88,12 @@ function main()
 end
 
 function tick(dt)
-	if Input.getKeyDown(Input.Key.N) then
-		print(currentConfig)
-		print(lastConfig)
-	end
-
 	if saveTime < saveInterval then
 		saveTime += dt
 		return
 	end
+
+	saveTime = 0
 
 	if not compareTwoTables(currentConfig, lastConfig, false) then
 		config = currentConfig
