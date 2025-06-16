@@ -18,9 +18,11 @@ local configStructure = {
 	gamemodeSlotId = "",
 	extraArenaInfo = {
 		home = {
+			name = "",
 			players = {},
 		},
 		away = {
+			name = "",
 			players = {},
 		},
 		followedPlayer = "",
