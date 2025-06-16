@@ -2200,7 +2200,7 @@ function onGui()
 		end
 		Gui.sameLine()
 		if Gui.button("Print Gamemode Ids") then
-			for _, gamemodeId in SpectatorGamemodes.listGamemodes() do
+			for _, gamemodeId in SpectatorGamemodes.listGamemodeIds() do
 				print(gamemodeId)
 			end
 		end
