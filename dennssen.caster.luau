@@ -715,6 +715,11 @@ function Arena:sendInfoMessage()
 		info = "followedPlayer",
 		value = currentPlayerName,
 	})
+
+	sendMessage(overlayCamera, {
+		info = "bestOf",
+		value = self.bestOfAmount,
+	})
 end
 
 function Arena:checkStatReset()
