@@ -33,6 +33,7 @@ local configStructure = {
 			shotSpeed = 0,
 		},
 		bestOf = 0,
+		matchLengthSeconds = 0,
 	},
 }
 
@@ -123,6 +124,8 @@ function onMessageReceived(messageTable: { info: string, value: any })
 		}
 	elseif info == "bestOf" then
 		currentConfig.extraArenaInfo.bestOf = value
+	elseif info == "matchLength" then
+		currentConfig.extraArenaInfo.matchLengthSeconds = value
 	elseif info == "stats" then
 		local statsPlayer = currentConfig.statsInfo[value.team][value.player]
 		if statsPlayer == nil then

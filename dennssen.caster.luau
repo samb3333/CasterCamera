@@ -92,7 +92,7 @@ local function initializeConfig()
 		particleSimSpeed = 1,
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
-		sendOverlayInfo = false,
+		sendOverlayInfo = true,
 		thirdPersonMode = 2,
 		homeTeamDefaultColor = {
 			r = 0,
@@ -488,6 +488,7 @@ type Arena = {
 	actionTimerSeconds: number,
 	isSafeTime: boolean,
 	bestOfAmount: number,
+	matchLengthSeconds: number,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
@@ -634,8 +635,10 @@ function Arena:tick()
 	if self.gamemode:getBoolConfigVariable("busebestof") then
 		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
 	else
-		self.bestOfAmount = 0
+		self.bestOfAmount = 1
 	end
+
+	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
 
 	self.home.scoreIncrease = self.home.previousScore < self.home.score
 	self.away.scoreIncrease = self.away.previousScore < self.away.score
@@ -719,6 +722,11 @@ function Arena:sendInfoMessage()
 	sendMessage(overlayCamera, {
 		info = "bestOf",
 		value = self.bestOfAmount,
+	})
+
+	sendMessage(overlayCamera, {
+		info = "matchLength",
+		value = self.matchLengthSeconds,
 	})
 end
 
