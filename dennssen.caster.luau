@@ -822,6 +822,7 @@ local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
 local previousAwayGoalPotentialEnter: boolean = false
 
+local lastPlayerBallContactPoint: Vec3 = Vec3.zeroVector
 local maximumTimeSincePass: number = 5
 local timeSincePass: number = 0
 
@@ -3183,6 +3184,7 @@ end
 function checkForPlayerBallContact(): ReplayPlayer?
 	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(30)
 	if contactPlayer ~= nil then
+		lastPlayerBallContactPoint = contactPlayer.root.position
 		if lastPlayerWithBall ~= nil and contactPlayer.playerId == lastPlayerWithBall.playerId then
 			return lastPlayerWithBall
 		end
@@ -3398,6 +3400,7 @@ function goalScoreCheck()
 				assister = assistName,
 				team = "away",
 				shotSpeed = ball.velocity:length() / 100,
+				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
 			},
 		})
 
@@ -3449,6 +3452,7 @@ function goalScoreCheck()
 				assister = assistName,
 				team = "away",
 				shotSpeed = ball.velocity:length() / 100,
+				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
 			},
 		})
 

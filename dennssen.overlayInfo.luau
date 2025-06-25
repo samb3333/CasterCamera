@@ -31,6 +31,7 @@ local configStructure = {
 			assister = "",
 			team = "",
 			shotSpeed = 0,
+			shotDistanceMeters = 0,
 		},
 		bestOf = 0,
 		matchLengthSeconds = 0,
@@ -121,6 +122,7 @@ function onMessageReceived(messageTable: { info: string, value: any })
 			assister = value.assister,
 			team = value.team,
 			shotSpeed = value.shotSpeed,
+			shotDistanceMeters = value.shotDistanceMeters,
 		}
 	elseif info == "bestOf" then
 		currentConfig.extraArenaInfo.bestOf = value
