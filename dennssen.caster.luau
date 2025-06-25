@@ -10,12 +10,8 @@ metadata = {
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
 
--- New API stuff:
---[[
-	- update overlay website to use:
-	- - gamemode api instead of overlay json
-	- - fetch camera config api instead of websocket
-]]
+--Fix:
+-- Double click right click while not moving mouse makes you unable to rotate the camera.
 
 -- GameData
 local readLocation = 0
@@ -486,7 +482,7 @@ type Arena = {
 
 	gameTimeSeconds: number,
 	actionTimerSeconds: number,
-	isSafeTime: boolean,
+	isGracePeriod: boolean,
 	bestOfAmount: number,
 	matchLengthSeconds: number,
 
@@ -510,6 +506,7 @@ local awayRotationOffset = Quat.fromEuler(0, 0, -90)
 
 local centerBoxPositionOffset = Vec3.new(0, 0, 300)
 local centerBoxSize = Vec3.new(50, 50, 125)
+local timeSinceLastGracePeriod: number = 0
 
 local overviewOffsets = {}
 for _, overview in config.overviewOffsets do
@@ -643,6 +640,28 @@ function Arena:tick()
 	self.home.scoreIncrease = self.home.previousScore < self.home.score
 	self.away.scoreIncrease = self.away.previousScore < self.away.score
 
+	if self.home.scoreIncrease or self.away.scoreIncrease then
+		timeSinceLastGracePeriod = 0
+		self.isGracePeriod = true
+	end
+
+	if not self.isGracePeriod and self.actionTimerSeconds > 0 and self.gameTimeSeconds < self.matchLengthSeconds then
+		timeSinceLastGracePeriod = 0
+		self.isGracePeriod = true
+	end
+
+	if
+		self.isGracePeriod
+		and (
+			(timeSinceLastGracePeriod > 6 and self.actionTimerSeconds == 0)
+			or self.gameTimeSeconds == self.matchLengthSeconds
+		)
+	then
+		self.isGracePeriod = false
+	end
+
+	timeSinceLastGracePeriod += deltaTime
+
 	if not self.isKickoff and not self.lastIsGameActive and self.isGameActive then
 		self.isKickoff = true
 	end
@@ -719,6 +738,10 @@ function Arena:sendInfoMessage()
 		value = currentPlayerName,
 	})
 
+	sendMessage(overlayCamera, {
+		info = "grace",
+		value = self.isGracePeriod,
+	})
 	sendMessage(overlayCamera, {
 		info = "bestOf",
 		value = self.bestOfAmount,
@@ -3298,7 +3321,7 @@ function earlyStatChangeReturn(ballExit: boolean)
 end
 
 function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
-	if selectedArena.isSafeTime then
+	if selectedArena.isGracePeriod then
 		earlyStatChangeReturn(true)
 		return
 	end
@@ -3450,7 +3473,7 @@ function goalScoreCheck()
 			value = {
 				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
 				assister = assistName,
-				team = "away",
+				team = "home",
 				shotSpeed = ball.velocity:length() / 100,
 				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
 			},

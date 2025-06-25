@@ -33,6 +33,7 @@ local configStructure = {
 			shotSpeed = 0,
 			shotDistanceMeters = 0,
 		},
+		isGracePeriod = false,
 		bestOf = 0,
 		matchLengthSeconds = 0,
 	},
@@ -124,6 +125,8 @@ function onMessageReceived(messageTable: { info: string, value: any })
 			shotSpeed = value.shotSpeed,
 			shotDistanceMeters = value.shotDistanceMeters,
 		}
+	elseif info == "grace" then
+		currentConfig.extraArenaInfo.isGracePeriod = value
 	elseif info == "bestOf" then
 		currentConfig.extraArenaInfo.bestOf = value
 	elseif info == "matchLength" then
