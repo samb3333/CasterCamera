@@ -496,6 +496,8 @@ type Arena = {
 local Arena: Arena = {} :: Arena
 Arena.__index = Arena
 
+local arenaSwitch: boolean = false
+
 local arenaBoxPositionOffset = Vec3.new(0, 0, 650)
 local arenaBoxSize = Vec3.new(5100, 6750, 1440)
 
@@ -627,7 +629,15 @@ function Arena:tick()
 
 	self.lastIsGameActive = self.isGameActive
 	self.isGameActive = self.gamemode:getIsGameRunning()
-	self.isSafeTime = self.actionTimerSeconds > 0
+
+	if arenaSwitch then
+		self.home.previousScore = self.home.score
+		self.away.previousScore = self.away.score
+
+		self.lastIsGameActive = self.isGameActive
+
+		arenaSwitch = false
+	end
 
 	if self.gamemode:getBoolConfigVariable("busebestof") then
 		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
@@ -1750,8 +1760,7 @@ end
 
 function setSelectedArena(arena: Arena)
 	selectedArena = arena
-	selectedArena.home.previousScore = selectedArena.home.score
-	selectedArena.away.previousScore = selectedArena.away.score
+	arenaSwitch = true
 
 	if not usingOverlay or not sendOverlayInfo then
 		return
