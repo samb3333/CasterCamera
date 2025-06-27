@@ -2172,7 +2172,13 @@ function onGui()
 			Gui.newLine()
 
 			homeTeam = Gui.inputText("Home Team Name", homeTeam)
+			Gui.setItemTooltip(
+				"The team name for the home side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
+			)
 			awayTeam = Gui.inputText("Away Team Name", awayTeam)
+			Gui.setItemTooltip(
+				"The team name for the away side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
+			)
 
 			if Gui.button(Icon.Upload .. "Send Teams to Overlay") then
 				sendMessage(overlayCamera, {
@@ -2182,6 +2188,8 @@ function onGui()
 						away = awayTeam,
 					},
 				})
+				homeTeam = ""
+				awayTeam = ""
 			end
 			Gui.unindent()
 		end
