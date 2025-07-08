@@ -1,4 +1,4 @@
-local version: string = "1.3.1"
+local version: string = "1.3.2"
 metadata = {
 	name = "Caster",
 	description = "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
@@ -264,8 +264,8 @@ type MessageValues = {
 	showNameTags: boolean?,
 	isLeftHanded: boolean?,
 	muteSelf: boolean?,
+	targetPlayer: ReplayPlayer?,
 	targetPlayerName: string?,
-	targetPlayerId: number?,
 	positionSmoothing: number?,
 	cameraFOV: number?,
 	cameraMode: number?,
@@ -2136,8 +2136,9 @@ end
 
 function getReplayFrameFromIndex(replayIndex)
 	replayIndex = math.clamp(replayIndex, 0, #Replay.listLoaded())
-	if replayIndex > 0 and Replay.getByIndex(replayIndex) then
-		return Replay.getByIndex(replayIndex):getCurrentFrame(true)
+	local replay = Replay.getByIndex(replayIndex)
+	if replay then
+		return replay:getCurrentFrame(true)
 	else
 		-- 0 = live game
 		return getGameData()
@@ -3039,7 +3040,7 @@ function followPlayer()
 		readLocation = readLocation,
 		showNameTags = true,
 		muteSelf = false,
-		targetPlayerId = currentPlayerId,
+		targetPlayer = getReplayFrameFromIndex(readLocation):getPlayerById(currentPlayerId),
 		positionSmoothing = followPosititonSmoothing,
 		cameraFOV = followFOV,
 		cameraMode = cameraMode,
