@@ -260,6 +260,7 @@ function Box:checkPointIntersect(point: Vec3): boolean
 end
 
 type MessageValues = {
+	callback: (() -> ()) -> ()?,
 	readLocation: number?,
 	showNameTags: boolean?,
 	isLeftHanded: boolean?,
@@ -282,6 +283,8 @@ type MessageValues = {
 	autoGoalCam: boolean?,
 	ballGoalMode: number?,
 	goalMode: number?,
+	hideNearestHead: boolean?,
+	showQuests: boolean?,
 }
 
 type Color = {
@@ -3051,6 +3054,7 @@ function followPlayer()
 		gestureControls = false,
 		autoBall = false,
 		autoGoalCam = false,
+		showQuests = false,
 	}
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
