@@ -386,8 +386,7 @@ local awayTeam: string = ""
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
 local playerFollow = false
-local currentPlayerName: string = ""
-local currentPlayerId: number = -1
+local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
 local followFOV: number = config.followFOV
 local followPosititonSmoothing: number = config.followPosititonSmoothing
@@ -400,12 +399,13 @@ local THIRD_PERSON_MODES = {
 }
 
 type MessageValues = {
+	callback: (() -> ()) -> ()?,
 	readLocation: number?,
 	showNameTags: boolean?,
 	isLeftHanded: boolean?,
 	muteSelf: boolean?,
+	targetPlayer: ReplayPlayer?,
 	targetPlayerName: string?,
-	targetPlayerId: number?,
 	positionSmoothing: number?,
 	cameraFOV: number?,
 	cameraMode: number?,
@@ -422,6 +422,8 @@ type MessageValues = {
 	autoGoalCam: boolean?,
 	ballGoalMode: number?,
 	goalMode: number?,
+	hideNearestHead: boolean?,
+	showQuests: boolean?,
 }
 
 type Color = {
@@ -743,9 +745,14 @@ function Arena:sendInfoMessage()
 		},
 	})
 
+	local followedPlayerName = ""
+	if currentPlayer then
+		followedPlayerName = currentPlayer.playerName
+	end
+
 	sendMessage(overlayCamera, {
 		info = "followedPlayer",
-		value = currentPlayerName,
+		value = followedPlayerName,
 	})
 
 	sendMessage(overlayCamera, {
@@ -2548,8 +2555,7 @@ function getPlayer()
 	end
 
 	if tryGetPlayer then
-		currentPlayerName = tryGetPlayer.playerName
-		currentPlayerId = tryGetPlayer.playerId
+		currentPlayer = tryGetPlayer
 	else
 		return
 	end
@@ -2569,7 +2575,7 @@ function stopFollow()
 	camera.position = followPlussCamera:getSmoothedPosition()
 	rotEuler = followPlussCamera:getSmoothedRotation():euler()
 	rotEuler.x = 0
-	currentPlayerName = ""
+	currentPlayer = nil
 	camera.fieldOfView = cameraFOV
 	camera.hideNearestHead = false
 end
@@ -2955,7 +2961,7 @@ function readOtherInputs()
 	end
 
 	if getCasterKey(inputs.keyboard.thirdPerson).down or getCasterKey(inputs.gamepad.thirdPerson).down then
-		if currentPlayerName == "" or cameraMode == thirdPersonMode then
+		if currentPlayer == nil or cameraMode == thirdPersonMode then
 			cameraMode = thirdPersonMode
 			getPlayer()
 		else
@@ -2965,7 +2971,7 @@ function readOtherInputs()
 	end
 
 	if getCasterKey(inputs.keyboard.firstPerson).down or getCasterKey(inputs.gamepad.firstPerson).down then
-		if currentPlayerName == "" or cameraMode == CameraMode.FirstPerson then
+		if currentPlayer == nil or cameraMode == CameraMode.FirstPerson then
 			cameraMode = CameraMode.FirstPerson
 			getPlayer()
 		else
@@ -2988,8 +2994,7 @@ function readOtherInputs()
 		if currentPlayerIndex < 1 then
 			currentPlayerIndex = #selectedArena.players
 		end
-		currentPlayerName = selectedArena.players[currentPlayerIndex].playerName
-		currentPlayerId = selectedArena.players[currentPlayerIndex].playerId
+		currentPlayer = selectedArena.players[currentPlayerIndex]
 		followPlayer()
 	end
 	if
@@ -3000,8 +3005,7 @@ function readOtherInputs()
 		if currentPlayerIndex > #selectedArena.players then
 			currentPlayerIndex = 1
 		end
-		currentPlayerName = selectedArena.players[currentPlayerIndex].playerName
-		currentPlayerId = selectedArena.players[currentPlayerIndex].playerId
+		currentPlayer = selectedArena.players[currentPlayerIndex]
 		followPlayer()
 	end
 end
@@ -3180,7 +3184,7 @@ function followPlayer()
 		readLocation = readLocation,
 		showNameTags = true,
 		muteSelf = false,
-		targetPlayerId = currentPlayerId,
+		targetPlayer = currentPlayer,
 		positionSmoothing = followPosititonSmoothing,
 		cameraFOV = followFOV,
 		cameraMode = cameraMode,
