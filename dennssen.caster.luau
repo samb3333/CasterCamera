@@ -1,4 +1,4 @@
-local version: string = "1.3.0"
+local version: string = "1.4.0"
 metadata = {
 	name = "Caster",
 	description = "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
@@ -12,6 +12,14 @@ metadata = {
 
 --Fix:
 -- Double click right click while not moving mouse makes you unable to rotate the camera.
+
+--Add:
+-- Black box behind player names to make it easier to read
+-- White circle around ball to see it behind walls
+-- Support for driftblitz and 4v4
+
+-- Future ideas:
+-- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
 
 -- GameData
 local readLocation = 0
@@ -376,12 +384,23 @@ function Box:checkPointIntersect(point: Vec3): boolean
 	end
 end
 
+-- Ball
+local ball: ReplayBall
+local ballRotation: Quat = Quat.identity
+local GetBallVariant = {
+	PlayerBallDistance = "PlayerBallDistance",
+	LineOfSight = "LineOfSight",
+}
+local getBallVariant = config.getBallVariant
+
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
 local usingOverlay: boolean = false
 local sendOverlayInfo: boolean = config.sendOverlayInfo
 local homeTeam: string = ""
 local awayTeam: string = ""
+local homePreviousRoundScore: number = 0
+local awayPreviousRoundScore: number = 0
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
@@ -450,11 +469,20 @@ local ParticleVariant = {
 	Rocket = "rocket",
 }
 
+type Round = {
+	home: {
+		score: number,
+	},
+	away: {
+		score: number,
+	},
+}
+
 type ArenaTeam = {
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
-	rounds: number,
+	roundsWon: number,
 	goal: {
 		position: Vec3,
 		rotation: Quat,
@@ -464,7 +492,6 @@ type ArenaTeam = {
 	players: { ReplayPlayer },
 }
 
--- these arenas are lower by 225cm
 type Arena = {
 	__index: Arena,
 
@@ -490,9 +517,10 @@ type Arena = {
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
+	onRoundEnd: (self: Arena) -> (),
+	onGameStart: (self: Arena) -> (),
 	setTeams: (self: Arena) -> (),
 	sendInfoMessage: (self: Arena) -> (),
-	checkStatReset: (self: Arena) -> (),
 }
 
 local Arena: Arena = {} :: Arena
@@ -543,7 +571,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
-		rounds = 0,
+		roundsWon = 0,
 		goal = {
 			position = self.transform.position
 				+ (self.transform.rotation * homeRotationOffset):rotateVector(goalPositionOffset),
@@ -563,7 +591,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
-		rounds = 0,
+		roundsWon = 0,
 		goal = {
 			position = self.transform.position
 				+ (self.transform.rotation * awayRotationOffset):rotateVector(goalPositionOffset),
@@ -621,16 +649,20 @@ function Arena:tick()
 		self.actionTimerSeconds = 0
 	end
 
+	self.lastIsGameActive = self.isGameActive
+	self.isGameActive = self.gamemode:getIsGameRunning()
+
+	if not self.isGameActive and self.lastIsGameActive then
+		self:onRoundEnd()
+	end
+
 	self.home.previousScore = self.home.score
 	self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
 	self.away.previousScore = self.away.score
 	self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
 
-	self.home.rounds = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
-	self.away.rounds = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
-
-	self.lastIsGameActive = self.isGameActive
-	self.isGameActive = self.gamemode:getIsGameRunning()
+	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
+	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
 
 	if arenaSwitch then
 		self.home.previousScore = self.home.score
@@ -678,9 +710,54 @@ function Arena:tick()
 		self.isKickoff = true
 	end
 
-	self:checkStatReset()
+	local started = self.isGameActive and not self.lastIsGameActive
+
+	if started and self.home.roundsWon == 0 and self.away.roundsWon == 0 then
+		self:onGameStart()
+	end
+
 	self:setTeams()
 	self:sendInfoMessage()
+end
+
+function Arena:onRoundEnd()
+	if self.home.score == self.away.score then -- find who scored in overtime
+		local homeDirection = getForward(self.transform.position, self.home.goal.position)
+		local ballDirection = getForward(self.transform.position, ball.transform.position)
+		local isHomePoint = homeDirection:dot(ballDirection) > 0
+
+		if isHomePoint then
+			self.home.score += 1
+		else
+			self.away.score += 1
+		end
+	end
+
+	local round: Round = {
+		home = {
+			score = self.home.score,
+		},
+		away = {
+			score = self.away.score,
+		},
+	}
+
+	sendMessage(overlayCamera, {
+		info = "rounds",
+		value = round,
+	})
+end
+
+function Arena:onGameStart()
+	sendMessage(overlayCamera, {
+		info = "clearStats",
+		value = "",
+	})
+
+	sendMessage(overlayCamera, {
+		info = "rounds",
+		value = "clear",
+	})
 end
 
 function Arena:setTeams()
@@ -768,20 +845,6 @@ function Arena:sendInfoMessage()
 		info = "matchLength",
 		value = self.matchLengthSeconds,
 	})
-end
-
-function Arena:checkStatReset()
-	local homeRounds = self.home.rounds
-	local awayRounds = self.away.rounds
-	local started = self.isGameActive and not self.lastIsGameActive
-
-	if started and homeRounds == 0 and awayRounds == 0 then
-		--new game, reset stats
-		sendMessage(overlayCamera, {
-			info = "clearStats",
-			value = "",
-		})
-	end
 end
 
 function getArenas(): { [any]: Arena }
@@ -891,15 +954,6 @@ local gearShiftTime: number = 0
 local gearShiftTimeRequired: number = 0.3
 local speedLastGearBuffer = false
 local turnVelocity: Vec2 = Vec2.zeroVector
-
--- Ball
-local ball: ReplayBall
-local ballRotation: Quat = Quat.identity
-local GetBallVariant = {
-	PlayerBallDistance = "PlayerBallDistance",
-	LineOfSight = "LineOfSight",
-}
-local getBallVariant = config.getBallVariant
 
 -- Input
 function DeserializeKeybinds(string: string)
@@ -1704,6 +1758,7 @@ local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
+local addRound: boolean = false
 local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
@@ -1766,8 +1821,14 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 end
 
 function setSelectedArena(arena: Arena)
+	if selectedArena and arena.name ~= selectedArena.name then -- new arena
+		sendMessage(overlayCamera, {
+			info = "rounds",
+			value = "clear",
+		})
+		arenaSwitch = true
+	end
 	selectedArena = arena
-	arenaSwitch = true
 
 	if not usingOverlay or not sendOverlayInfo then
 		return
@@ -2197,6 +2258,37 @@ function onGui()
 				})
 				homeTeam = ""
 				awayTeam = ""
+			end
+
+			Gui.newLine()
+
+			if not addRound then
+				if Gui.button("Add Previous Round") then
+					addRound = true
+				end
+			else
+				Gui.text("Previous Round Info")
+				homePreviousRoundScore = Gui.dragInt("Home Score", homePreviousRoundScore, 1, 0, math.huge)
+				homePreviousRoundScore = math.max(0, homePreviousRoundScore)
+				Gui.sameLine()
+				awayPreviousRoundScore = Gui.dragInt("Away Score", awayPreviousRoundScore, 1, 0, math.huge)
+				awayPreviousRoundScore = math.max(0, awayPreviousRoundScore)
+
+				if Gui.button(Icon.Plus .. " Add Round") then
+					local round: Round = {
+						home = {
+							score = homePreviousRoundScore,
+						},
+						away = {
+							score = awayPreviousRoundScore,
+						},
+					}
+					sendMessage(overlayCamera, {
+						info = "rounds",
+						value = round,
+					})
+					addRound = false
+				end
 			end
 			Gui.unindent()
 		end

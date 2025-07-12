@@ -25,6 +25,7 @@ local configStructure = {
 			name = "",
 			players = {},
 		},
+		rounds = {},
 		followedPlayer = "",
 		lastShotInfo = {
 			shooter = "",
@@ -115,6 +116,12 @@ function onMessageReceived(messageTable: { info: string, value: any })
 		currentConfig.gamemodeSlotId = value
 	elseif info == "players" then
 		currentConfig.extraArenaInfo[value.team].players = value.players
+	elseif info == "rounds" then
+		if value == "clear" then
+			currentConfig.extraArenaInfo.rounds = {}
+		else
+			table.insert(currentConfig.extraArenaInfo.rounds, value)
+		end
 	elseif info == "followedPlayer" then
 		currentConfig.extraArenaInfo.followedPlayer = value
 	elseif info == "shot" then
