@@ -402,6 +402,14 @@ local awayTeam: string = ""
 local homePreviousRoundScore: number = 0
 local awayPreviousRoundScore: number = 0
 
+function sendSafeMessage(camera: SpectatorCamera, message)
+	if not usingOverlay or not sendOverlayInfo then
+		return
+	end
+
+	sendMessage(camera, message)
+end
+
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
 local playerFollow = false
@@ -742,19 +750,19 @@ function Arena:onRoundEnd()
 		},
 	}
 
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "rounds",
 		value = round,
 	})
 end
 
 function Arena:onGameStart()
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "clearStats",
 		value = "",
 	})
 
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "rounds",
 		value = "clear",
 	})
@@ -794,10 +802,6 @@ function Arena:setTeams()
 end
 
 function Arena:sendInfoMessage()
-	if not usingOverlay or not sendOverlayInfo then
-		return
-	end
-
 	local homePlayerNames = {}
 	local awayPlayerNames = {}
 	for _, player in self.home.players do
@@ -807,14 +811,14 @@ function Arena:sendInfoMessage()
 		table.insert(awayPlayerNames, player.playerName)
 	end
 
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "players",
 		value = {
 			team = "home",
 			players = homePlayerNames,
 		},
 	})
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "players",
 		value = {
 			team = "away",
@@ -827,21 +831,21 @@ function Arena:sendInfoMessage()
 		followedPlayerName = currentPlayer.playerName
 	end
 
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "followedPlayer",
 		value = followedPlayerName,
 	})
 
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "grace",
 		value = self.isGracePeriod,
 	})
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "bestOf",
 		value = self.bestOfAmount,
 	})
 
-	sendMessage(overlayCamera, {
+	sendSafeMessage(overlayCamera, {
 		info = "matchLength",
 		value = self.matchLengthSeconds,
 	})
@@ -1822,22 +1826,17 @@ end
 
 function setSelectedArena(arena: Arena)
 	if selectedArena and arena.name ~= selectedArena.name then -- new arena
-		sendMessage(overlayCamera, {
+		sendSafeMessage(overlayCamera, {
 			info = "rounds",
 			value = "clear",
+		})
+		sendSafeMessage(overlayCamera, {
+			info = "slotId",
+			value = arena.slotId,
 		})
 		arenaSwitch = true
 	end
 	selectedArena = arena
-
-	if not usingOverlay or not sendOverlayInfo then
-		return
-	end
-
-	sendMessage(overlayCamera, {
-		info = "slotId",
-		value = selectedArena.slotId,
-	})
 end
 
 function onGui()
@@ -3388,7 +3387,7 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 
 				resetPlayersWithBall()
 
-				sendMessage(overlayCamera, {
+				sendSafeMessage(overlayCamera, {
 					info = "stats",
 					value = {
 						team = "home",
@@ -3407,7 +3406,7 @@ function checkForSave(homeDist: number, awayDist: number): boolean
 
 				resetPlayersWithBall()
 
-				sendMessage(overlayCamera, {
+				sendSafeMessage(overlayCamera, {
 					info = "stats",
 					value = {
 						team = "away",
@@ -3529,7 +3528,7 @@ function goalScoreCheck()
 			assistName = assistPlayer.playerName
 		end
 
-		sendMessage(overlayCamera, {
+		sendSafeMessage(overlayCamera, {
 			info = "shot",
 			value = {
 				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
@@ -3543,7 +3542,7 @@ function goalScoreCheck()
 		if goalPlayer then
 			resetPlayersWithBall()
 
-			sendMessage(overlayCamera, {
+			sendSafeMessage(overlayCamera, {
 				info = "stats",
 				value = {
 					team = "away",
@@ -3553,7 +3552,7 @@ function goalScoreCheck()
 			})
 
 			if assistPlayer then
-				sendMessage(overlayCamera, {
+				sendSafeMessage(overlayCamera, {
 					info = "stats",
 					value = {
 						team = "away",
@@ -3581,7 +3580,7 @@ function goalScoreCheck()
 			assistName = assistPlayer.playerName
 		end
 
-		sendMessage(overlayCamera, {
+		sendSafeMessage(overlayCamera, {
 			info = "shot",
 			value = {
 				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
@@ -3595,7 +3594,7 @@ function goalScoreCheck()
 		if goalPlayer then
 			resetPlayersWithBall()
 
-			sendMessage(overlayCamera, {
+			sendSafeMessage(overlayCamera, {
 				info = "stats",
 				value = {
 					team = "home",
@@ -3604,7 +3603,7 @@ function goalScoreCheck()
 				},
 			})
 			if assistPlayer then
-				sendMessage(overlayCamera, {
+				sendSafeMessage(overlayCamera, {
 					info = "stats",
 					value = {
 						team = "home",
