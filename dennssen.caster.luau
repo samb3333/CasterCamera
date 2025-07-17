@@ -7,8 +7,6 @@ metadata = {
 }
 
 --TODO:
--- Ask Franz for permission to publicise the overlay template
--- Add inheritance approach for arenas
 -- Add 4v4 arenas so VRML falls in love
 -- Create release message for caster update:
 -- - Include info about the update
