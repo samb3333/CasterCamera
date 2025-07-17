@@ -2513,9 +2513,7 @@ function onGui()
 		if Gui.collapsingHeader("Overlay") then
 			Gui.indent()
 			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
-			Gui.setItemTooltip(
-				"Toggle this off to stop the camera from sending info to the overlay even if you have the overlay script \nThis is useful if you don't want the script to reload because you have pressed F5 (spectator bug)"
-			)
+			Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
 
 			Gui.newLine()
 
@@ -2528,7 +2526,7 @@ function onGui()
 				"The team name for the away side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
 			)
 
-			if Gui.button(Icon.Upload .. "Send Teams to Overlay") then
+			if Gui.button(Icon.Upload .. " Send Teams to Overlay") then
 				sendMessage(overlayCamera, {
 					info = "teamNames",
 					value = {
@@ -2546,12 +2544,15 @@ function onGui()
 				if Gui.button("Add Previous Round") then
 					addRound = true
 				end
+				Gui.setItemTooltip("Add info about a round that ended before you started casting")
 			else
 				Gui.text("Previous Round Info")
 				homePreviousRoundScore = Gui.dragInt("Home Score", homePreviousRoundScore, 1, 0, 100)
 				homePreviousRoundScore = math.max(0, homePreviousRoundScore)
+				Gui.setItemTooltip("The score for the home team in the pervious round")
 				awayPreviousRoundScore = Gui.dragInt("Away Score", awayPreviousRoundScore, 1, 0, 100)
 				awayPreviousRoundScore = math.max(0, awayPreviousRoundScore)
+				Gui.setItemTooltip("The score for the away team in the pervious round")
 
 				if Gui.button(Icon.Plus .. " Add Round") then
 					local round: Round = {
