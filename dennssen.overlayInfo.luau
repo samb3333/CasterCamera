@@ -1,3 +1,4 @@
+local _version: string = "1.0.0"
 metadata = {
 	name = "Overlay Info",
 	description = "TBD",
@@ -112,7 +113,9 @@ function onMessageReceived(messageTable: { info: string, value: any })
 	local info = messageTable.info
 	local value = messageTable.value
 
-	if info == "slotId" then
+	if info == "version" then
+		value(_version)
+	elseif info == "slotId" then
 		currentConfig.gamemodeSlotId = value
 	elseif info == "players" then
 		currentConfig.extraArenaInfo[value.team].players = value.players

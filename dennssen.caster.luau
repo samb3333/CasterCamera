@@ -443,6 +443,7 @@ local getBallVariant = config.getBallVariant
 
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
+local overlayVersion: string = ""
 local usingOverlay: boolean = false
 local sendOverlayInfo: boolean = config.sendOverlayInfo
 local homeTeam: string = ""
@@ -456,6 +457,10 @@ function sendSafeMessage(camera: SpectatorCamera, message)
 	end
 
 	sendMessage(camera, message)
+end
+
+function getOverlayVersion(version: string)
+	overlayVersion = version
 end
 
 -- Follow Camera
@@ -2060,6 +2065,10 @@ function main()
 	overlayCamera = getCameraById("dennssen.overlayInfo")
 	if overlayCamera ~= nil then
 		usingOverlay = true
+		sendMessage(overlayCamera, {
+			info = "version",
+			value = getOverlayVersion,
+		})
 	end
 end
 
@@ -2512,6 +2521,7 @@ function onGui()
 	if usingOverlay then
 		if Gui.collapsingHeader("Overlay") then
 			Gui.indent()
+			Gui.text(`Overlay version: {overlayVersion}`)
 			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
 			Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
 
