@@ -2281,10 +2281,9 @@ function onGui()
 				end
 			else
 				Gui.text("Previous Round Info")
-				homePreviousRoundScore = Gui.dragInt("Home Score", homePreviousRoundScore, 1, 0, math.huge)
+				homePreviousRoundScore = Gui.dragInt("Home Score", homePreviousRoundScore, 1, 0, 100)
 				homePreviousRoundScore = math.max(0, homePreviousRoundScore)
-				Gui.sameLine()
-				awayPreviousRoundScore = Gui.dragInt("Away Score", awayPreviousRoundScore, 1, 0, math.huge)
+				awayPreviousRoundScore = Gui.dragInt("Away Score", awayPreviousRoundScore, 1, 0, 100)
 				awayPreviousRoundScore = math.max(0, awayPreviousRoundScore)
 
 				if Gui.button(Icon.Plus .. " Add Round") then
