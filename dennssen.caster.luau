@@ -123,17 +123,47 @@ local function initializeConfig()
 			b = 0.1,
 		},
 		overviewOffsets = {
-			{
-				position = Vec3.new(1300, -2200, 950),
-				rotation = Quat.fromEuler(0, -20, 60),
+			_3v3 = {
+				{
+					position = Vec3.new(1300, -2200, 950),
+					rotation = Quat.fromEuler(0, -20, 60),
+				},
+				{
+					position = Vec3.new(1000, 0, 1000),
+					rotation = Quat.fromEuler(0, -35, 0),
+				},
+				{
+					position = Vec3.new(1300, 2200, 950),
+					rotation = Quat.fromEuler(0, -20, -60),
+				},
 			},
-			{
-				position = Vec3.new(1000, 0, 1000),
-				rotation = Quat.fromEuler(0, -35, 0),
+			_4v4 = {
+				{
+					position = Vec3.new(1300, -2200, 950),
+					rotation = Quat.fromEuler(0, -20, 60),
+				},
+				{
+					position = Vec3.new(1000, 0, 1000),
+					rotation = Quat.fromEuler(0, -35, 0),
+				},
+				{
+					position = Vec3.new(1300, 2200, 950),
+					rotation = Quat.fromEuler(0, -20, -60),
+				},
 			},
-			{
-				position = Vec3.new(1300, 2200, 950),
-				rotation = Quat.fromEuler(0, -20, -60),
+			_driftblitz = {
+				{
+					position = Vec3.new(1300, -2200, 950),
+					rotation = Quat.fromEuler(0, -20, 60),
+				},
+				{
+					position = Vec3.new(1000, 0, 1000),
+					rotation = Quat.fromEuler(0, -35, 0),
+				},
+				{
+					position = Vec3.new(1300, 2200, 950),
+					rotation = Quat.fromEuler(0, -20, -60),
+				},
 			},
 		},
 		keyboardKeybinds = "",
@@ -218,6 +248,12 @@ function getDictIndex(dict, index: number)
 	end
 
 	return dictItem
+end
+
+function capitalize(s: string): string
+	local firstLetter = s:sub(1, 1):upper()
+	s = s:sub(2)
+	return `{firstLetter}{s}`
 end
 
 -- math.lerp is nil for some reason
@@ -491,6 +527,11 @@ local ParticleVariant = {
 	Rocket = "rocket",
 }
 
+type Overview = {
+	position: Vec3,
+	rotation: Quat,
+}
+
 type Round = {
 	home: {
 		score: number,
@@ -516,6 +557,7 @@ type ArenaTeam = {
 
 type Arena = {
 	__index: Arena,
+	type: string,
 
 	slotId: string,
 	gamemode: ModuleStateSpectatorLuaApi,
@@ -543,6 +585,12 @@ type Arena = {
 	onGameStart: (self: Arena) -> (),
 	setTeams: (self: Arena) -> (),
 	sendInfoMessage: (self: Arena) -> (),
+
+	-- Overrides
+	setupDimensions: (self: Arena) -> (),
+	setupOverviews: (self: Arena) -> (),
+
+	GUIChangeDimensions: (self: Arena) -> (), -- Debuging
 }
 
 local Arena: Arena = {} :: Arena
@@ -550,44 +598,21 @@ Arena.__index = Arena
 
 local arenaSwitch: boolean = false
 
-local arenaBoxPositionOffset = Vec3.new(0, 0, 650)
-local arenaBoxSize = Vec3.new(5100, 6750, 1440)
-
-local goalPositionOffset = Vec3.new(3285, 0, 175)
-local goalBoxSize = Vec3.new(100, 500, 225)
 local homeRotationOffset = Quat.fromEuler(0, 0, 90)
 local awayRotationOffset = Quat.fromEuler(0, 0, -90)
 
-local centerBoxPositionOffset = Vec3.new(0, 0, 300)
 local centerBoxSize = Vec3.new(50, 50, 125)
 local timeSinceLastGracePeriod: number = 0
 
-local overviewOffsets = {}
-for _, overview in config.overviewOffsets do
-	table.insert(overviewOffsets, overview)
-end
-
-local midfieldPositionOffset = Vec3.new(840, 0, 0)
+local overviewOffsets = config.overviewOffsets
 
 function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	local self: Arena = setmetatable({}, Arena) :: any
 
 	self.slotId = gamemode:getSlotId()
 	self.gamemode = gamemode
-	self.name = self.slotId:gsub("TKB_", "")
 	self.transform = gamemode:getTransform()
-	self.box = Box.new(
-		self.transform.position + self.transform.rotation:rotateVector(arenaBoxPositionOffset),
-		arenaBoxSize,
-		self.transform.rotation
-	)
 	self.players = {}
-
-	self.centerBox = Box.new(
-		self.transform.position + self.transform.rotation:rotateVector(centerBoxPositionOffset),
-		centerBoxSize,
-		self.transform.rotation
-	)
 
 	self.home = {
 		previousScore = 0,
@@ -595,19 +620,13 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		scoreIncrease = false,
 		roundsWon = 0,
 		goal = {
-			position = self.transform.position
-				+ (self.transform.rotation * homeRotationOffset):rotateVector(goalPositionOffset),
-			rotation = self.transform.rotation * homeRotationOffset,
+			position = nil,
+			rotation = nil,
 			box = nil,
 		},
 		overview = {},
-		midfield = {
-			position = self.transform.position
-				+ (self.transform.rotation * homeRotationOffset):rotateVector(midfieldPositionOffset),
-		},
 		players = {},
 	}
-	self.home.goal.box = Box.new(self.home.goal.position, goalBoxSize, self.home.goal.rotation)
 
 	self.away = {
 		previousScore = 0,
@@ -615,38 +634,15 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		scoreIncrease = false,
 		roundsWon = 0,
 		goal = {
-			position = self.transform.position
-				+ (self.transform.rotation * awayRotationOffset):rotateVector(goalPositionOffset),
-			rotation = self.transform.rotation * awayRotationOffset,
+			position = nil,
+			rotation = nil,
 			box = nil,
 		},
 		overview = {},
-		midfield = {
-			position = self.transform.position
-				+ (self.transform.rotation * awayRotationOffset):rotateVector(midfieldPositionOffset),
-		},
 		players = {},
 	}
-	self.away.goal.box = Box.new(self.away.goal.position, goalBoxSize, self.away.goal.rotation)
 
 	self.isKickoff = false
-
-	-- Overviews
-	for _, overview in overviewOffsets do
-		local homeOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * homeRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * homeRotationOffset * overview.rotation),
-		}
-		local awayOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * awayRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * awayRotationOffset * overview.rotation),
-		}
-
-		table.insert(self.home.overview, homeOverview)
-		table.insert(self.away.overview, awayOverview)
-	end
 
 	print(`made arena {self.slotId}`)
 
@@ -865,6 +861,293 @@ function Arena:sendInfoMessage()
 	})
 end
 
+local Arena3v3 = {} :: Arena & {
+	boxSize: Vec3,
+	boxOffset: Vec3,
+	centerBoxOffset: Vec3,
+	goalBoxSize: Vec3,
+	goalPositionOffset: Vec3,
+}
+Arena3v3.__index = Arena3v3
+setmetatable(Arena3v3, { __index = Arena })
+
+Arena3v3.boxSize = Vec3.new(5100, 6750, 1440)
+Arena3v3.boxOffset = Vec3.new(0, 0, 650)
+Arena3v3.centerBoxOffset = Vec3.new(0, 0, 300)
+Arena3v3.goalBoxSize = Vec3.new(100, 500, 225)
+Arena3v3.goalPositionOffset = Vec3.new(3285, 0, 175)
+
+function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi): Arena
+	local self = setmetatable(Arena.new(gamemode), Arena3v3)
+	self.type = "3v3"
+	self.name = self.slotId:gsub("TKB_", "")
+	self:setupDimensions()
+	self:setupOverviews()
+	return self
+end
+
+function Arena3v3:setupDimensions()
+	self.box = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(Arena3v3.boxOffset),
+		Arena3v3.boxSize,
+		self.transform.rotation
+	)
+
+	self.centerBox = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(Arena3v3.centerBoxOffset),
+		centerBoxSize,
+		self.transform.rotation
+	)
+
+	self.home.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * homeRotationOffset):rotateVector(Arena3v3.goalPositionOffset),
+		rotation = self.transform.rotation * homeRotationOffset,
+		box = nil,
+	}
+
+	self.home.goal.box = Box.new(self.home.goal.position, Arena3v3.goalBoxSize, self.home.goal.rotation)
+
+	self.away.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * awayRotationOffset):rotateVector(Arena3v3.goalPositionOffset),
+		rotation = self.transform.rotation * awayRotationOffset,
+		box = nil,
+	}
+	self.away.goal.box = Box.new(self.away.goal.position, Arena3v3.goalBoxSize, self.away.goal.rotation)
+end
+
+function Arena3v3:setupOverviews()
+	for _, overview in overviewOffsets._3v3 do
+		local homeOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * homeRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * homeRotationOffset * overview.rotation),
+		}
+		local awayOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * awayRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * awayRotationOffset * overview.rotation),
+		}
+
+		table.insert(self.home.overview, homeOverview)
+		table.insert(self.away.overview, awayOverview)
+	end
+end
+
+function Arena3v3:GUIChangeDimensions()
+	Arena3v3.boxSize = Gui.dragFloat3("Arena3v3 Arena Size", Arena3v3.boxSize, 1, -math.huge, math.huge)
+	Arena3v3.boxOffset = Gui.dragFloat3("Arena3v3 Position Offset", Arena3v3.boxOffset, 1, -math.huge, math.huge)
+	Arena3v3.centerBoxOffset =
+		Gui.dragFloat3("Arena3v3 Place Ball Box Position Offset", Arena3v3.centerBoxOffset, 1, -math.huge, math.huge)
+	Arena3v3.goalBoxSize = Gui.dragFloat3("Arena3v3 Goal Size", Arena3v3.goalBoxSize, 1, -math.huge, math.huge)
+	Arena3v3.goalPositionOffset =
+		Gui.dragFloat3("Arena3v3 Goal Position Offset", Arena3v3.goalPositionOffset, 1, -math.huge, math.huge)
+
+	if Gui.button("Print Dimensions") then
+		print(`boxSize: {Arena3v3.boxSize}`)
+		print(`boxOffset: {Arena3v3.boxOffset}`)
+		print(`centerBoxOffset: {Arena3v3.centerBoxOffset}`)
+		print(`goalBoxSize: {Arena3v3.goalBoxSize}`)
+		print(`goalPositionOffset: {Arena3v3.goalPositionOffset}`)
+	end
+
+	self:setupDimensions()
+end
+
+local Arena4v4 = {} :: Arena & {
+	boxSize: Vec3,
+	boxOffset: Vec3,
+	centerBoxOffset: Vec3,
+	goalBoxSize: Vec3,
+	goalPositionOffset: Vec3,
+}
+Arena4v4.__index = Arena4v4
+setmetatable(Arena4v4, { __index = Arena })
+
+Arena4v4.boxSize = Vec3.new(5100, 6750, 1440)
+Arena4v4.boxOffset = Vec3.new(0, 0, 650)
+Arena4v4.centerBoxOffset = Vec3.new(0, 0, 300)
+Arena4v4.goalBoxSize = Vec3.new(100, 500, 225)
+Arena4v4.goalPositionOffset = Vec3.new(3285, 0, 175)
+
+function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi): Arena
+	local self = setmetatable(Arena.new(gamemode), Arena4v4)
+	self.type = "4v4"
+	self.name = self.slotId:gsub("TKB_", "")
+	self:setupDimensions()
+	self:setupOverviews()
+	return self
+end
+
+function Arena4v4:setupDimensions()
+	self.box = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(Arena4v4.boxOffset),
+		Arena4v4.boxSize,
+		self.transform.rotation
+	)
+
+	self.centerBox = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(Arena4v4.centerBoxOffset),
+		centerBoxSize,
+		self.transform.rotation
+	)
+
+	self.home.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * homeRotationOffset):rotateVector(Arena4v4.goalPositionOffset),
+		rotation = self.transform.rotation * homeRotationOffset,
+		box = nil,
+	}
+
+	self.home.goal.box = Box.new(self.home.goal.position, Arena4v4.goalBoxSize, self.home.goal.rotation)
+
+	self.away.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * awayRotationOffset):rotateVector(Arena4v4.goalPositionOffset),
+		rotation = self.transform.rotation * awayRotationOffset,
+		box = nil,
+	}
+	self.away.goal.box = Box.new(self.away.goal.position, Arena4v4.goalBoxSize, self.away.goal.rotation)
+end
+
+function Arena4v4:setupOverviews()
+	for _, overview in overviewOffsets._4v4 do
+		local homeOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * homeRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * homeRotationOffset * overview.rotation),
+		}
+		local awayOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * awayRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * awayRotationOffset * overview.rotation),
+		}
+
+		table.insert(self.home.overview, homeOverview)
+		table.insert(self.away.overview, awayOverview)
+	end
+end
+
+function Arena4v4:GUIChangeDimensions()
+	Arena4v4.boxSize = Gui.dragFloat3("Arena4v4 Arena Size", Arena4v4.boxSize, 1, -math.huge, math.huge)
+	Arena4v4.boxOffset = Gui.dragFloat3("Arena4v4 Position Offset", Arena4v4.boxOffset, 1, -math.huge, math.huge)
+	Arena4v4.centerBoxOffset =
+		Gui.dragFloat3("Arena4v4 Place Ball Box Position Offset", Arena4v4.centerBoxOffset, 1, -math.huge, math.huge)
+	Arena4v4.goalBoxSize = Gui.dragFloat3("Arena4v4 Goal Size", Arena4v4.goalBoxSize, 1, -math.huge, math.huge)
+	Arena4v4.goalPositionOffset =
+		Gui.dragFloat3("Arena4v4 Goal Position Offset", Arena4v4.goalPositionOffset, 1, -math.huge, math.huge)
+
+	if Gui.button("Print Dimensions") then
+		print(`boxSize: {Arena4v4.boxSize}`)
+		print(`boxOffset: {Arena4v4.boxOffset}`)
+		print(`centerBoxOffset: {Arena4v4.centerBoxOffset}`)
+		print(`goalBoxSize: {Arena4v4.goalBoxSize}`)
+		print(`goalPositionOffset: {Arena4v4.goalPositionOffset}`)
+	end
+
+	self:setupDimensions()
+end
+
+local Driftblitz = {} :: Arena & {
+	boxSize: Vec3,
+	boxOffset: Vec3,
+	centerBoxOffset: Vec3,
+	goalBoxSize: Vec3,
+	goalPositionOffset: Vec3,
+}
+Driftblitz.__index = Driftblitz
+setmetatable(Driftblitz, { __index = Arena })
+
+Driftblitz.boxSize = Vec3.new(7270, 11825, 1440)
+Driftblitz.boxOffset = Vec3.new(0, 0, 740)
+Driftblitz.centerBoxOffset = Vec3.new(0, 0, 100)
+Driftblitz.goalBoxSize = Vec3.new(100, 890, 300)
+Driftblitz.goalPositionOffset = Vec3.new(5295, 0, 175)
+
+function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi): Arena
+	local self = setmetatable(Arena.new(gamemode), Driftblitz)
+	self.name = self.slotId
+	self.type = "driftblitz"
+	self:setupDimensions()
+	self:setupOverviews()
+	return self
+end
+
+function Driftblitz:setupDimensions()
+	self.box = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(Driftblitz.boxOffset),
+		Driftblitz.boxSize,
+		self.transform.rotation
+	)
+
+	self.centerBox = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(Driftblitz.centerBoxOffset),
+		centerBoxSize,
+		self.transform.rotation
+	)
+
+	self.home.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * homeRotationOffset):rotateVector(Driftblitz.goalPositionOffset),
+		rotation = self.transform.rotation * homeRotationOffset,
+		box = nil,
+	}
+
+	self.home.goal.box = Box.new(self.home.goal.position, Driftblitz.goalBoxSize, self.home.goal.rotation)
+
+	self.away.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * awayRotationOffset):rotateVector(Driftblitz.goalPositionOffset),
+		rotation = self.transform.rotation * awayRotationOffset,
+		box = nil,
+	}
+	self.away.goal.box = Box.new(self.away.goal.position, Driftblitz.goalBoxSize, self.away.goal.rotation)
+end
+
+function Driftblitz:setupOverviews()
+	for _, overview in overviewOffsets._driftblitz do
+		local homeOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * homeRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * homeRotationOffset * overview.rotation),
+		}
+		local awayOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * awayRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * awayRotationOffset * overview.rotation),
+		}
+
+		table.insert(self.home.overview, homeOverview)
+		table.insert(self.away.overview, awayOverview)
+	end
+end
+
+function Driftblitz:GUIChangeDimensions()
+	Driftblitz.boxSize = Gui.dragFloat3("Driftblitz Arena Size", Driftblitz.boxSize, 1, -math.huge, math.huge)
+	Driftblitz.boxOffset = Gui.dragFloat3("Driftblitz Position Offset", Driftblitz.boxOffset, 1, -math.huge, math.huge)
+	Driftblitz.centerBoxOffset = Gui.dragFloat3(
+		"Driftblitz Place Ball Box Position Offset",
+		Driftblitz.centerBoxOffset,
+		1,
+		-math.huge,
+		math.huge
+	)
+	Driftblitz.goalBoxSize = Gui.dragFloat3("Driftblitz Goal Size", Driftblitz.goalBoxSize, 1, -math.huge, math.huge)
+	Driftblitz.goalPositionOffset =
+		Gui.dragFloat3("Driftblitz Goal Position Offset", Driftblitz.goalPositionOffset, 1, -math.huge, math.huge)
+
+	if Gui.button("Print Dimensions") then
+		print(`boxSize: {Driftblitz.boxSize}`)
+		print(`boxOffset: {Driftblitz.boxOffset}`)
+		print(`centerBoxOffset: {Driftblitz.centerBoxOffset}`)
+		print(`goalBoxSize: {Driftblitz.goalBoxSize}`)
+		print(`goalPositionOffset: {Driftblitz.goalPositionOffset}`)
+	end
+
+	self:setupDimensions()
+end
+
 function getArenas(): { [any]: Arena }
 	local arenas: { [any]: Arena } = {}
 	local gamemodes = SpectatorGamemodes.listGamemodes()
@@ -872,7 +1155,10 @@ function getArenas(): { [any]: Arena }
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
 		if slotId:find("TKB") and not slotId:find("Full") then
-			local arena = Arena.new(gamemode)
+			local arena = Arena3v3.new(gamemode)
+			arenas[arena.name] = arena
+		elseif slotId:find("Soccer") then
+			local arena = Driftblitz.new(gamemode)
 			arenas[arena.name] = arena
 		end
 	end
@@ -886,29 +1172,13 @@ end
 local arenas: { [any]: Arena }
 
 function updateArenaOverviews()
-	overviewOffsets = {}
-	for _, overview in config.overviewOffsets do
-		table.insert(overviewOffsets, overview)
-	end
+	overviewOffsets = config.overviewOffsets
 
 	for _, arena in arenas do
 		arena.home.overview = {}
 		arena.away.overview = {}
 
-		for _, overview in overviewOffsets do
-			local homeOverview = {
-				position = arena.position + arena.rotation:rotateVector(overview.position),
-				rotation = (arena.rotation * overview.rotation),
-			}
-			local awayOverview = {
-				position = arena.position
-					+ (arena.rotation * Quat.fromEuler(0, 0, 180)):rotateVector(overview.position),
-				rotation = (arena.rotation * Quat.fromEuler(0, 0, 180) * overview.rotation),
-			}
-
-			table.insert(arena.home.overview, homeOverview)
-			table.insert(arena.away.overview, awayOverview)
-		end
+		arena:setupOverviews()
 	end
 end
 
@@ -1807,29 +2077,27 @@ function getLastEnumValue(enum): number
 end
 
 function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globalOverviewRotation: Quat): string
-	local closestArena: Arena = getClosestArena(globalOverviewPosition)
-
-	if not closestArena.box:checkPointIntersect(globalOverviewPosition) then
+	if not selectedArena.box:checkPointIntersect(globalOverviewPosition) then
 		return "Overviews cannot be outside an arena!"
 	end
 
-	local isOnHomeSide = closestArena.transform.rotation
-		:getForwardVector()
-		:dot(getForward(closestArena.transform.position, globalOverviewPosition)) >= 0
+	local isOnHomeSide = selectedArena.transform.rotation
+		:getRightVector()
+		:dot(getForward(selectedArena.transform.position, globalOverviewPosition)) >= 0
 
 	local translatedOverviewPosition
 	local translatedOverviewRotation
 	local flipQuat
 	if isOnHomeSide then
-		flipQuat = closestArena.transform.rotation:inverse() * homeRotationOffset
+		flipQuat = (selectedArena.transform.rotation * homeRotationOffset):inverse()
 	else
-		flipQuat = closestArena.transform.rotation:inverse() * awayRotationOffset
+		flipQuat = (selectedArena.transform.rotation * awayRotationOffset):inverse()
 	end
 
-	translatedOverviewPosition = flipQuat:rotateVector(globalOverviewPosition - closestArena.transform.position)
+	translatedOverviewPosition = flipQuat:rotateVector(globalOverviewPosition - selectedArena.transform.position)
 	translatedOverviewRotation = flipQuat * globalOverviewRotation
 
-	config.overviewOffsets[overviewKey] = {
+	config.overviewOffsets[`_{selectedArena.type}`][overviewKey] = {
 		position = translatedOverviewPosition,
 		rotation = translatedOverviewRotation,
 	}
@@ -2216,8 +2484,9 @@ function onGui()
 
 	if Gui.collapsingHeader("Overviews") then
 		Gui.indent()
+		Gui.separatorText(`{capitalize(selectedArena.type)} Overviews`)
 
-		for i, overview in overviewOffsets do
+		for i, overview in overviewOffsets[`_{selectedArena.type}`] do
 			if i ~= 1 then
 				Gui.separator()
 			end
@@ -2371,8 +2640,8 @@ function onGui()
 		end
 		if Gui.button("Set Orientation to Arena") then
 			camera.position = selectedArena.transform.position
-			rotEuler = selectedArena.transform.rotation:euler()
 			camera.rotation = selectedArena.transform.rotation
+			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
 		end
 		Gui.sameLine()
 		if Gui.button("Print Relative Orientation") then
@@ -2395,6 +2664,10 @@ function onGui()
 		Gui.sameLine()
 		if Gui.button("Print Selected Arena") then
 			print(selectedArena)
+		end
+		if Gui.treeNode("Selected Arena Dimensions") then
+			selectedArena:GUIChangeDimensions()
+			Gui.treePop()
 		end
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
@@ -3917,6 +4190,7 @@ function tick(dt)
 	if boundingBoxDebug then
 		for _, arena in arenas do
 			arena.box:render(1, 0, 1)
+			arena.centerBox:render(0, 0, 1)
 		end
 	end
 end
