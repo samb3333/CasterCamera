@@ -6,20 +6,34 @@ metadata = {
 	defaultKeybind = "",
 }
 
+--TODO:
+-- Ask Franz for permission to publicise the overlay template
+-- Add inheritance approach for arenas
+-- Add 4v4 arenas so VRML falls in love
+-- Create release message for caster update:
+-- - Include info about the update
+-- - Patch notes
+-- - Known issues
+-- Create forum and release message for overlay.
+-- Launch everything.
+
 --Notes:
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
 
 --Fix:
--- Double click right click while not moving mouse makes you unable to rotate the camera.
+-- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 
 --Add:
--- Black box behind player names to make it easier to read
+-- When exiting POV set the camera to look at the ball. Possibly make an option under controls.
+-- Black box behind player names to make it easier to read (Maybe, overlay should help with this)
 -- White circle around ball to see it behind walls
--- Support for driftblitz and 4v4
+-- Support for driftblitz
 
 -- Future ideas:
 -- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
+-- Send who last touched the ball to overlay.
+-- Make a template minimap for the overlay
 
 -- GameData
 local readLocation = 0
