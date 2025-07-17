@@ -153,16 +153,16 @@ local function initializeConfig()
 			},
 			_driftblitz = {
 				{
-					position = Vec3.new(1300, -2200, 950),
+					position = Vec3.new(795, -3565, 1140),
 					rotation = Quat.fromEuler(0, -20, 60),
 				},
 				{
-					position = Vec3.new(1000, 0, 1000),
-					rotation = Quat.fromEuler(0, -35, 0),
+					position = Vec3.new(3585, -1670, 40),
+					rotation = Quat.fromEuler(0, 0, 50),
 				},
 				{
-					position = Vec3.new(1300, 2200, 950),
-					rotation = Quat.fromEuler(0, -20, -60),
+					position = Vec3.new(4500, 3135, 620),
+					rotation = Quat.fromEuler(0, -15, -90),
 				},
 			},
 		},
