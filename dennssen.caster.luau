@@ -2173,12 +2173,6 @@ function setSelectedArena(arena: Arena)
 end
 
 function onGui()
-	local currentTime = os.clock()
-	if math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100) < 100 then
-		Gui.text(`Loading gamemodes... ({math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100)}%)`)
-		return
-	end
-
 	if followPlussCamera == nil then
 		Gui.text(
 			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
@@ -2380,16 +2374,23 @@ function onGui()
 		arenaName = ""
 	end
 	if Gui.beginCombo("Selected Arena", arenaName) then
-		for _, arena: Arena in arenas do
-			if Gui.selectable(arena.name, arena.name == selectedArena.name) then
-				setSelectedArena(arena)
+		if arenas then
+			for _, arena: Arena in arenas do
+				if Gui.selectable(arena.name, arena.name == selectedArena.name) then
+					setSelectedArena(arena)
+				end
 			end
 		end
 		Gui.endCombo()
 	end
-	Gui.newLine()
 	Gui.setItemTooltip("The currently selected arena")
 
+	local currentTime = os.clock()
+	if math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100) < 100 then
+		Gui.text(`Loading Arenas... ({math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100)}%)`)
+	end
+
+	Gui.newLine()
 	cameraFOV = Gui.sliderFloat("Field Of View", cameraFOV, 1, 179)
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
@@ -2720,13 +2721,15 @@ function onGui()
 		if Gui.button("Print Pressed Keys") then
 			print(pressedInputKeys)
 		end
-		Gui.sameLine()
-		if selectedArena and Gui.button("Print Selected Arena") then
-			print(selectedArena)
-		end
-		if Gui.treeNode("Selected Arena Dimensions") then
-			selectedArena:GUIChangeDimensions()
-			Gui.treePop()
+		if selectedArena then
+			Gui.sameLine()
+			if Gui.button("Print Selected Arena") then
+				print(selectedArena)
+			end
+			if Gui.treeNode("Selected Arena Dimensions") then
+				selectedArena:GUIChangeDimensions()
+				Gui.treePop()
+			end
 		end
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
