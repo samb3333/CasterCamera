@@ -3692,6 +3692,7 @@ function followPlayer()
 		gestureControls = false,
 		autoBall = false,
 		autoGoalCam = false,
+		showQuests = false,
 	}
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
