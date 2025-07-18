@@ -1447,7 +1447,7 @@ function getGamepadKeysDown(): { Key }
 	return pressedKeys
 end
 
-function getKeyboardKeysDown(): { Key }
+function getKeyboardKeysDown(): { Key } -- AnyKey early return?
 	local bannedInputs = {}
 	local pressedKeys: { Key } = {}
 
@@ -2129,8 +2129,8 @@ function setSelectedArena(arena: Arena)
 end
 
 function onGui()
-	if getDictSize(arenas) == 0 or selectedArena == nil then
-		local currentTime = os.clock()
+	local currentTime = os.clock()
+	if math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100) < 100 then
 		Gui.text(`Loading gamemodes... ({math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100)}%)`)
 		return
 	end
@@ -2329,7 +2329,13 @@ function onGui()
 	end
 	Gui.setItemTooltip("Gets the closest arena | For most accuracy be inside the arena when pressing")
 
-	if Gui.beginCombo("Selected Arena", selectedArena.name) then
+	local arenaName
+	if selectedArena then
+		arenaName = selectedArena.name
+	else
+		arenaName = ""
+	end
+	if Gui.beginCombo("Selected Arena", arenaName) then
 		for _, arena: Arena in arenas do
 			if Gui.selectable(arena.name, arena.name == selectedArena.name) then
 				setSelectedArena(arena)
@@ -2489,7 +2495,7 @@ function onGui()
 		Gui.newLine()
 	end
 
-	if Gui.collapsingHeader("Overviews") then
+	if selectedArena and Gui.collapsingHeader("Overviews") then
 		Gui.indent()
 		Gui.separatorText(`{capitalize(selectedArena.type)} Overviews`)
 
@@ -2647,13 +2653,13 @@ function onGui()
 				print(gamemodeId)
 			end
 		end
-		if Gui.button("Set Orientation to Arena") then
+		if selectedArena and Gui.button("Set Orientation to Arena") then
 			camera.position = selectedArena.transform.position
 			camera.rotation = selectedArena.transform.rotation
 			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
 		end
 		Gui.sameLine()
-		if Gui.button("Print Relative Orientation") then
+		if selectedArena and Gui.button("Print Relative Orientation") then
 			local RelativeLocation =
 				selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
 			local RelativeRotation = camera.rotation * selectedArena.transform.rotation:inverse()
@@ -2671,7 +2677,7 @@ function onGui()
 			print(pressedInputKeys)
 		end
 		Gui.sameLine()
-		if Gui.button("Print Selected Arena") then
+		if selectedArena and Gui.button("Print Selected Arena") then
 			print(selectedArena)
 		end
 		if Gui.treeNode("Selected Arena Dimensions") then
@@ -2684,25 +2690,27 @@ function onGui()
 		Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
 		Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
 		Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
-		Gui.text("Home Team: ")
-		Gui.indent()
-		for i, player in selectedArena.home.players do
-			Gui.text(i .. " " .. player.playerName)
-		end
-		Gui.unindent()
-		Gui.text("Away Team: ")
-		Gui.indent()
-		for i, player in selectedArena.away.players do
-			Gui.text(i .. " " .. player.playerName)
-		end
-		Gui.unindent()
+		if selectedArena then
+			Gui.text("Home Team: ")
+			Gui.indent()
+			for i, player in selectedArena.home.players do
+				Gui.text(i .. " " .. player.playerName)
+			end
+			Gui.unindent()
+			Gui.text("Away Team: ")
+			Gui.indent()
+			for i, player in selectedArena.away.players do
+				Gui.text(i .. " " .. player.playerName)
+			end
+			Gui.unindent()
 
-		Gui.text("All Players: ")
-		Gui.indent()
-		for i, player in selectedArena.players do
-			Gui.text(i .. " " .. player.playerName)
+			Gui.text("All Players: ")
+			Gui.indent()
+			for i, player in selectedArena.players do
+				Gui.text(i .. " " .. player.playerName)
+			end
+			Gui.unindent()
 		end
-		Gui.unindent()
 		Gui.treePop()
 	end
 end
@@ -3278,6 +3286,18 @@ function readOtherInputs()
 		end
 	end
 
+	if
+		(getCasterKey(inputs.keyboard.speedUp).held or getCasterKey(inputs.gamepad.speedUp).held)
+		and targetSpeedIndex >= #speedGears - 1
+		and not speedLastGearBuffer
+	then
+		targetSpeedIndex = #speedGears
+	end
+
+	if selectedArena == nil then
+		return
+	end
+
 	if getCasterKey(inputs.keyboard.getClosestArena).down or getCasterKey(inputs.gamepad.getClosestArena).down then
 		setSelectedArena(getClosestArena(camera.position))
 	end
@@ -3286,14 +3306,6 @@ function readOtherInputs()
 		sendMessage(overlayCamera, {
 			info = "clearStats",
 		})
-	end
-
-	if
-		(getCasterKey(inputs.keyboard.speedUp).held or getCasterKey(inputs.gamepad.speedUp).held)
-		and targetSpeedIndex >= #speedGears - 1
-		and not speedLastGearBuffer
-	then
-		targetSpeedIndex = #speedGears
 	end
 
 	if getCasterKey(inputs.keyboard.overview1).down or getCasterKey(inputs.gamepad.overview1).down then
@@ -4128,7 +4140,7 @@ function tick(dt)
 		return
 	end
 
-	if arenas == nil or getDictSize(arenas) == 0 then
+	if arenas == nil then
 		local currentTime = os.clock()
 		if currentTime >= arenaLoadTime + getArenaDelay then
 			arenas = getArenas()
@@ -4136,14 +4148,6 @@ function tick(dt)
 				setSelectedArena(getDictIndex(arenas, 1))
 			end
 		end
-	end
-
-	if getDictSize(arenas) == 0 or selectedArena == nil then
-		return
-	end
-
-	if Input.getKeyDown(Input.Key.N) then
-		print(selectedArena)
 	end
 
 	setNewInputTimes(getKeyboardKeysDown())
@@ -4157,6 +4161,15 @@ function tick(dt)
 	camera.fieldOfView = cameraFOV
 
 	gameData = getReplayFrameFromIndex(readLocation)
+
+	if selectedArena == nil then
+		readInput()
+
+		moveCamera()
+		rotateCamera()
+		return
+	end
+
 	ball = getClosestArenaBall(selectedArena.transform.position, gameData)
 	selectedArena:tick()
 
