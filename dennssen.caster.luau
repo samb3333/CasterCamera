@@ -3114,7 +3114,7 @@ function createParticle(
 		position = position,
 		rotation = rotation,
 		scale = scale,
-		velocity = rotation:rotateVector(velocity),
+		velocity = velocity,
 		Color = Color,
 		variant = variant,
 		lifespan = lifespan,
@@ -3252,8 +3252,7 @@ end
 -- particle end
 
 --effects start
-function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
-	local particleRotation = selectedArena.transform.rotation * Quat.fromEuler(0, 0, 90)
+function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: Color)
 	for i = 1, 300 do
 		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
 		createParticle(
@@ -3266,20 +3265,20 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 			math.random(800, 1300)
 		)
 	end
-	createParticle(goalPosition, particleRotation, 0.9, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 150)
+	createParticle(goalPosition, goalRotation, 0.9, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 150)
 
 	--rings
-	createParticle(goalPosition, particleRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 200)
-	createParticle(goalPosition, particleRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 400)
+	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 200)
+	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 400)
 
 	--goal outline
 	local goalSpeed = 20
 	for i = 1, 3 do
 		createParticle(
 			goalPosition,
-			particleRotation,
+			goalRotation,
 			1,
-			(selectedArena.transform.position - goalPosition):normalize() * goalSpeed,
+			goalRotation:getForwardVector() * goalSpeed,
 			particleColor,
 			ParticleVariant.GoalRing,
 			400
@@ -3289,8 +3288,7 @@ function GoalExplosionEffect(goalPosition: Vec3, particleColor: Color)
 end
 
 function GameStartEffect()
-	local particlePosition = selectedArena.transform.position
-		+ selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 100))
+	local particlePosition = selectedArena.centerBox.position
 
 	local colourAverage = {
 		r = (homeTeamPrimaryColor.r + awayTeamPrimaryColor.r) / 2,
@@ -3325,7 +3323,7 @@ function GameStartEffect()
 		400
 	)
 	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
-	for i = 1, math.random(50, 80) do
+	for i = 1, 300 do
 		createParticle(
 			particlePosition,
 			selectedArena.transform.rotation,
@@ -3940,7 +3938,11 @@ function goalScoreCheck()
 
 	-- the ball has newely scored
 	if selectedArena.away.scoreIncrease then
-		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
+		GoalExplosionEffect(
+			selectedArena.home.goal.position + Vec3.new(0, 0, -60),
+			selectedArena.home.goal.rotation,
+			awayTeamPrimaryColor
+		)
 
 		local shooterName = ""
 		local assistName = ""
@@ -3992,7 +3994,11 @@ function goalScoreCheck()
 	end
 
 	if selectedArena.home.scoreIncrease then
-		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
+		GoalExplosionEffect(
+			selectedArena.away.goal.position + Vec3.new(0, 0, -60),
+			selectedArena.home.goal.rotation,
+			homeTeamPrimaryColor
+		)
 
 		local shooterName = ""
 		local assistName = ""
@@ -4294,11 +4300,19 @@ function tick(dt)
 	getTeamColors()
 
 	if Input.getKeyDown(one) then
-		GoalExplosionEffect(selectedArena.home.goal.position + Vec3.new(0, 0, -60), awayTeamPrimaryColor)
+		GoalExplosionEffect(
+			selectedArena.home.goal.position + Vec3.new(0, 0, -60),
+			selectedArena.home.goal.rotation,
+			awayTeamPrimaryColor
+		)
 	end
 
 	if Input.getKeyDown(two) then
-		GoalExplosionEffect(selectedArena.away.goal.position + Vec3.new(0, 0, -60), homeTeamPrimaryColor)
+		GoalExplosionEffect(
+			selectedArena.away.goal.position + Vec3.new(0, 0, -60),
+			selectedArena.away.goal.rotation,
+			homeTeamPrimaryColor
+		)
 	end
 
 	if Input.getKeyDown(three) then
