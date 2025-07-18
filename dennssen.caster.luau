@@ -33,6 +33,9 @@ metadata = {
 -- Send who last touched the ball to overlay.
 -- Make a template minimap for the overlay
 
+-- Issues:
+-- Overtime goals are not detected
+
 -- GameData
 local readLocation = 0
 local gameData: ReplayFrame
@@ -299,12 +302,29 @@ local CAMERA_MODE_NAMES = {
 
 -- Bounding Box start
 
+type Local = {
+	position: Vec3,
+	normal: Vec3,
+	length: number,
+}
+
+local nilLocal = {
+	position = nil,
+	normal = nil,
+	lenght = nil,
+}
+
 type BoxType = {
 	__index: BoxType,
 	position: Vec3,
 	size: Vec3,
 	rotation: Quat,
 	vertexLocations: { Vec3 },
+	locals: {
+		x: Local,
+		y: Local,
+		z: Local,
+	},
 
 	__tostring: (self: BoxType) -> string,
 	new: (inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat) -> BoxType,
@@ -328,6 +348,23 @@ function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat): Box
 	self.rotation = inputRotation
 
 	self.vertexLocations = {}
+	self.locals = {
+		x = {
+			position = nil,
+			normal = nil,
+			length = nil,
+		},
+		y = {
+			position = nil,
+			normal = nil,
+			length = nil,
+		},
+		z = {
+			position = nil,
+			normal = nil,
+			length = nil,
+		},
+	}
 	self:generatePoints()
 	return self
 end
@@ -377,6 +414,15 @@ function Box:generatePoints(): ()
 	end
 
 	self.vertexLocations = newVertexLocations
+
+	self.locals.x.position = self.vertexLocations[5] - self.vertexLocations[1]
+	self.locals.y.position = self.vertexLocations[3] - self.vertexLocations[1]
+	self.locals.z.position = self.vertexLocations[2] - self.vertexLocations[1]
+
+	for _, l in self.locals do
+		l.normal = l.position:getSafeNormal()
+		l.length = l.position:length()
+	end
 end
 
 function Box:render(r: number, g: number, b: number): ()
@@ -416,16 +462,11 @@ function Box:checkPointIntersect(point: Vec3): boolean
 
 	local projectionVector: Vec3 = point - centerPoint
 
-	-- Thanks to MrStick, Brick_Rage, and RAD_David
-	local xLocal = self.vertexLocations[5] - self.vertexLocations[1]
-	local yLocal = self.vertexLocations[3] - self.vertexLocations[1]
-	local zLocal = self.vertexLocations[2] - self.vertexLocations[1]
+	local pX: number = math.abs(Vec3.dot(projectionVector, self.locals.x.normal))
+	local pY: number = math.abs(Vec3.dot(projectionVector, self.locals.y.normal))
+	local pZ: number = math.abs(Vec3.dot(projectionVector, self.locals.z.normal))
 
-	local pX: number = math.abs(Vec3.dot(projectionVector, xLocal:getSafeNormal()))
-	local pY: number = math.abs(Vec3.dot(projectionVector, yLocal:getSafeNormal()))
-	local pZ: number = math.abs(Vec3.dot(projectionVector, zLocal:getSafeNormal()))
-
-	if 2 * pX <= xLocal:length() and 2 * pY <= yLocal:length() and 2 * pZ <= zLocal:length() then
+	if 2 * pX <= self.locals.x.length and 2 * pY <= self.locals.y.length and 2 * pZ <= self.locals.z.length then
 		return true
 	else
 		return false
@@ -2893,12 +2934,11 @@ function getClosestPlayerToBall(maximumDistance: number?): ReplayPlayer?
 		local leftHandPosition = root.rotation:rotateVector(player.leftHand.position) + root.position
 		local rightHandPosition = root.rotation:rotateVector(player.rightHand.position) + root.position
 
-		local rootDistance = getDist(ball.transform.position, root.position)
 		local headDistance = getDist(ball.transform.position, headPosition)
 		local leftHandDistance = getDist(ball.transform.position, leftHandPosition)
 		local rightHandDistance = getDist(ball.transform.position, rightHandPosition)
 
-		local minimumDistance = math.min(rootDistance, headDistance, leftHandDistance, rightHandDistance)
+		local minimumDistance = math.min(headDistance, leftHandDistance, rightHandDistance)
 
 		if minimumDistance < closestPlayerDistance then
 			closestPlayerDistance = minimumDistance
@@ -2956,9 +2996,8 @@ function getPlayer()
 	local playerIndex = findPlayerInTable(selectedArena.players, tryGetPlayer)
 	if playerIndex == nil then
 		return
-	else
-		currentPlayerIndex = playerIndex
 	end
+	currentPlayerIndex = playerIndex
 	followPlayer()
 end
 
@@ -3600,22 +3639,15 @@ function followPlayer()
 end
 
 function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
-	local sameTeam = false
-	if
-		findPlayerInTable(selectedArena.home.players, player1)
-		and findPlayerInTable(selectedArena.home.players, player2)
-	then
-		sameTeam = true
+	if player1.teamIndex == TeamIndex.NoTeam or player2.teamIndex == TeamIndex.NoTeam then
+		return false
 	end
 
-	if
-		findPlayerInTable(selectedArena.away.players, player1)
-		and findPlayerInTable(selectedArena.away.players, player2)
-	then
-		sameTeam = true
+	if player1.teamIndex == player2.teamIndex then
+		return true
 	end
 
-	return sameTeam
+	return false
 end
 
 function resetPlayersWithBall()
@@ -3667,14 +3699,14 @@ function checkForGoalPotential(): boolean
 	end
 
 	if homeGoalPotentialEnter and not previousHomeGoalPotentialEnter then
-		if findPlayerInTable(selectedArena.away.players, lastPlayerWithBall) then
+		if lastPlayerWithBall.teamIndex == TeamIndex.awayTeam then
 			goalPlayer = lastPlayerWithBall
 			successfulPotential = true
 		end
 	end
 
 	if awayGoalPotentialEnter and not previousAwayGoalPotentialEnter then
-		if findPlayerInTable(selectedArena.home.players, lastPlayerWithBall) then
+		if lastPlayerWithBall.teamIndex == TeamIndex.homeTeam then
 			goalPlayer = lastPlayerWithBall
 			successfulPotential = true
 		end
@@ -3683,45 +3715,52 @@ function checkForGoalPotential(): boolean
 	return successfulPotential
 end
 
-function checkForSave(homeDist: number, awayDist: number): boolean
+function checkForSave(goal: { team: string, dist: number }): boolean
 	local goalie = getClosestPlayerToBall(60)
 
 	local successfulSave = false
-	if not homeGoalPotentialEnter and previousHomeGoalPotentialEnter then
-		if homeDist <= 600 then
-			if goalie and findPlayerInTable(selectedArena.home.players, goalie) then
-				successfulSave = true
 
-				resetPlayersWithBall()
+	if goal.team == "home" then
+		if
+			not homeGoalPotentialEnter
+			and previousHomeGoalPotentialEnter
+			and goal.dist <= 600
+			and goalie
+			and goalie.teamIndex == TeamIndex.homeTeam
+		then
+			successfulSave = true
 
-				sendSafeMessage(overlayCamera, {
-					info = "stats",
-					value = {
-						team = "home",
-						stat = "saves",
-						player = goalie.playerName,
-					},
-				})
-			end
+			resetPlayersWithBall()
+
+			sendSafeMessage(overlayCamera, {
+				info = "stats",
+				value = {
+					team = "home",
+					stat = "saves",
+					player = goalie.playerName,
+				},
+			})
 		end
-	end
+	elseif goal.team == "away" then
+		if
+			not awayGoalPotentialEnter
+			and previousAwayGoalPotentialEnter
+			and goal.dist <= 600
+			and goalie
+			and goalie.teamIndex == TeamIndex.awayTeam
+		then
+			successfulSave = true
 
-	if not awayGoalPotentialEnter and previousAwayGoalPotentialEnter then
-		if awayDist <= 600 then
-			if goalie and findPlayerInTable(selectedArena.away.players, goalie) then
-				successfulSave = true
+			resetPlayersWithBall()
 
-				resetPlayersWithBall()
-
-				sendSafeMessage(overlayCamera, {
-					info = "stats",
-					value = {
-						team = "away",
-						stat = "saves",
-						player = goalie.playerName,
-					},
-				})
-			end
+			sendSafeMessage(overlayCamera, {
+				info = "stats",
+				value = {
+					team = "away",
+					stat = "saves",
+					player = goalie.playerName,
+				},
+			})
 		end
 	end
 
@@ -3747,42 +3786,59 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 
 	local ballToHomeGoalDist = getDist(ball.transform.position, homeGoalBox.position)
 	local ballToAwayGoalDist = getDist(ball.transform.position, awayGoalBox.position)
-	local ballHomePotentialPosition = ball.transform.position + (ball.velocity:normalize() * ballToHomeGoalDist)
-	local ballAwayPotentialPosition = ball.transform.position + (ball.velocity:normalize() * ballToAwayGoalDist)
+	local closestGoal = {}
 
-	local homeHit = camera:castRay(ball.transform.position, ballHomePotentialPosition)
-	local awayHit = camera:castRay(ball.transform.position, ballAwayPotentialPosition)
-
-	if homeHit.successful then
-		local velocityDotNormal = ball.velocity:dot(homeHit.normal)
-		local reflectedVelocityNormalized = (ball.velocity - (homeHit.normal * (2 * velocityDotNormal))):normalize()
-		local distanceLeft = getDist(homeHit.position, homeGoalBox.position)
-
-		ballHomePotentialPosition = homeHit.position + (reflectedVelocityNormalized * distanceLeft)
-	end
-
-	if awayHit.successful then
-		local velocityDotNormal = ball.velocity:dot(awayHit.normal)
-		local reflectedVelocityNormalized = (ball.velocity - (awayHit.normal * (2 * velocityDotNormal))):normalize()
-		local distanceLeft = getDist(awayHit.position, awayGoalBox.position)
-
-		ballAwayPotentialPosition = awayHit.position + (reflectedVelocityNormalized * distanceLeft)
-	end
-
-	if
-		homeGoalBox:checkPointIntersect(ballHomePotentialPosition) or homeGoalBox:checkPointIntersect(homeHit.position)
-	then
-		homeGoalPotentialEnter = true
+	if ballToHomeGoalDist < ballToAwayGoalDist then
+		closestGoal.team = "home"
+		closestGoal.dist = ballToHomeGoalDist
 	else
-		homeGoalPotentialEnter = false
+		closestGoal.team = "away"
+		closestGoal.dist = ballToAwayGoalDist
 	end
 
-	if
-		awayGoalBox:checkPointIntersect(ballAwayPotentialPosition) or awayGoalBox:checkPointIntersect(awayHit.position)
-	then
-		awayGoalPotentialEnter = true
-	else
+	if closestGoal.team == "home" then
+		local ballHomePotentialPosition = ball.transform.position + (ball.velocity:normalize() * ballToHomeGoalDist)
+		local homeHit = camera:castRay(ball.transform.position, ballHomePotentialPosition)
+
+		if homeHit.successful then
+			local velocityDotNormal = ball.velocity:dot(homeHit.normal)
+			local reflectedVelocityNormalized = (ball.velocity - (homeHit.normal * (2 * velocityDotNormal))):normalize()
+			local distanceLeft = getDist(homeHit.position, homeGoalBox.position)
+
+			ballHomePotentialPosition = homeHit.position + (reflectedVelocityNormalized * distanceLeft)
+		end
+
+		if
+			homeGoalBox:checkPointIntersect(ballHomePotentialPosition)
+			or homeGoalBox:checkPointIntersect(homeHit.position)
+		then
+			homeGoalPotentialEnter = true
+		else
+			homeGoalPotentialEnter = false
+		end
 		awayGoalPotentialEnter = false
+	else
+		local ballAwayPotentialPosition = ball.transform.position + (ball.velocity:normalize() * ballToAwayGoalDist)
+
+		local awayHit = camera:castRay(ball.transform.position, ballAwayPotentialPosition)
+
+		if awayHit.successful then
+			local velocityDotNormal = ball.velocity:dot(awayHit.normal)
+			local reflectedVelocityNormalized = (ball.velocity - (awayHit.normal * (2 * velocityDotNormal))):normalize()
+			local distanceLeft = getDist(awayHit.position, awayGoalBox.position)
+
+			ballAwayPotentialPosition = awayHit.position + (reflectedVelocityNormalized * distanceLeft)
+		end
+
+		if
+			awayGoalBox:checkPointIntersect(ballAwayPotentialPosition)
+			or awayGoalBox:checkPointIntersect(awayHit.position)
+		then
+			awayGoalPotentialEnter = true
+		else
+			awayGoalPotentialEnter = false
+		end
+		homeGoalPotentialEnter = false
 	end
 
 	lastPlayerWithBall = checkForPlayerBallContact()
@@ -3794,7 +3850,7 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		return
 	end
 
-	if checkForSave(ballToHomeGoalDist, ballToAwayGoalDist) then
+	if checkForSave(closestGoal) then
 		earlyStatChangeReturn(false)
 		return
 	end
