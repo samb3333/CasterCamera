@@ -1204,6 +1204,9 @@ function getArenas(): { [any]: Arena }
 		elseif slotId:find("Soccer") then
 			local arena = Driftblitz.new(gamemode)
 			arenas[arena.name] = arena
+		elseif slotId:find("Jakeball") then
+			local arena = Arena4v4.new(gamemode)
+			arenas[arena.name] = arena
 		end
 	end
 
