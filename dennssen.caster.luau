@@ -4398,6 +4398,7 @@ function tick(dt)
 	gameData = getReplayFrameFromIndex(readLocation)
 
 	if selectedArena == nil then
+		toggleSmoothing(true, true)
 		readInput()
 
 		moveCamera()
