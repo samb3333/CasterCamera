@@ -1,3 +1,5 @@
+--!strict
+
 local version: string = "1.4.0"
 metadata = {
 	name = "Caster",
@@ -7,7 +9,8 @@ metadata = {
 }
 
 --TODO:
--- Add 4v4 arenas so VRML falls in love
+-- Test follow pluss gamemode update. (GoalCam, 3v3)
+-- Create release message for follow pluss.
 -- Create release message for caster update:
 -- - Include info about the update
 -- - Patch notes
@@ -35,6 +38,7 @@ metadata = {
 
 -- Issues:
 -- Overtime goals are not detected
+-- Game crashes when joining any server for the second time
 
 -- GameData
 local readLocation = 0
@@ -329,6 +333,8 @@ type BoxType = {
 	generatePoints: (self: BoxType) -> (),
 	render: (self: BoxType, r: number, g: number, b: number) -> (),
 	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
+
+	empty: BoxType,
 }
 
 local Box: BoxType = {} :: BoxType
@@ -344,19 +350,19 @@ function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat): Box
 	self.vertexLocations = {}
 	self.locals = {
 		x = {
-			position = nil,
-			normal = nil,
-			length = nil,
+			position = Vec3.zeroVector,
+			normal = Vec3.zeroVector,
+			length = 0,
 		},
 		y = {
-			position = nil,
-			normal = nil,
-			length = nil,
+			position = Vec3.zeroVector,
+			normal = Vec3.zeroVector,
+			length = 0,
 		},
 		z = {
-			position = nil,
-			normal = nil,
-			length = nil,
+			position = Vec3.zeroVector,
+			normal = Vec3.zeroVector,
+			length = 0,
 		},
 	}
 	self:generatePoints()
@@ -413,7 +419,7 @@ function Box:generatePoints(): ()
 	self.locals.y.position = self.vertexLocations[3] - self.vertexLocations[1]
 	self.locals.z.position = self.vertexLocations[2] - self.vertexLocations[1]
 
-	for _, l in self.locals do
+	for _, l: Local in self.locals :: { Local } do
 		l.normal = l.position:getSafeNormal()
 		l.length = l.position:length()
 	end
@@ -445,7 +451,7 @@ function Box:render(r: number, g: number, b: number): ()
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getRightVector() * 100, 0, 0, 1, 10, 0)
 end
 
-function Box:checkPointIntersect(point: Vec3): boolean
+function Box:checkPointIntersect(point: Vec3?): boolean
 	if point == nil then
 		return false
 	end
@@ -466,6 +472,8 @@ function Box:checkPointIntersect(point: Vec3): boolean
 		return false
 	end
 end
+
+Box.empty = Box.new(Vec3.zeroVector, Vec3.zeroVector, Quat.identity)
 
 -- Ball
 local ball: ReplayBall
@@ -657,9 +665,9 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		scoreIncrease = false,
 		roundsWon = 0,
 		goal = {
-			position = nil,
-			rotation = nil,
-			box = nil,
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+			box = Box.empty,
 		},
 		overview = {},
 		players = {},
@@ -671,9 +679,9 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		scoreIncrease = false,
 		roundsWon = 0,
 		goal = {
-			position = nil,
-			rotation = nil,
-			box = nil,
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+			box = Box.empty,
 		},
 		overview = {},
 		players = {},
@@ -687,11 +695,6 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 end
 
 function Arena:tick()
-	if self.gamemode == nil then
-		print("gamemode is nil")
-		return
-	end
-
 	local gameTimeComponent = self.gamemode:getGameTimeComponent()
 
 	if gameTimeComponent then
@@ -898,7 +901,7 @@ function Arena:sendInfoMessage()
 	})
 end
 
-local Arena3v3 = {} :: Arena & {
+type Arena3v3 = Arena & {
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
 	boxSize: Vec3,
@@ -907,6 +910,8 @@ local Arena3v3 = {} :: Arena & {
 	goalBoxSize: Vec3,
 	goalPositionOffset: Vec3,
 }
+
+local Arena3v3 = {} :: Arena3v3
 Arena3v3.__index = Arena3v3
 setmetatable(Arena3v3, { __index = Arena })
 
@@ -919,12 +924,12 @@ Arena3v3.goalBoxSize = Vec3.new(100, 500, 225)
 Arena3v3.goalPositionOffset = Vec3.new(3285, 0, 175)
 
 function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Arena3v3)
+	local self = setmetatable(Arena.new(gamemode), Arena3v3) :: any
 	self.type = "3v3"
 	self.name = self.slotId:gsub("TKB_", "")
 	self:setupDimensions()
 	self:setupOverviews()
-	return self
+	return self :: Arena3v3
 end
 
 function Arena3v3:isPointOnHomeSide(point: Vec3): boolean
@@ -954,7 +959,7 @@ function Arena3v3:setupDimensions()
 		position = self.transform.position
 			+ (self.transform.rotation * Arena3v3.homeRotationOffset):rotateVector(Arena3v3.goalPositionOffset),
 		rotation = self.transform.rotation * Arena3v3.homeRotationOffset:inverse(),
-		box = nil,
+		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, Arena3v3.goalBoxSize, self.home.goal.rotation)
@@ -963,7 +968,7 @@ function Arena3v3:setupDimensions()
 		position = self.transform.position
 			+ (self.transform.rotation * Arena3v3.awayRotationOffset):rotateVector(Arena3v3.goalPositionOffset),
 		rotation = self.transform.rotation * Arena3v3.awayRotationOffset:inverse(),
-		box = nil,
+		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Arena3v3.goalBoxSize, self.away.goal.rotation)
 end
@@ -1017,7 +1022,7 @@ function Arena3v3:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
-local Arena4v4 = {} :: Arena & {
+type Arena4v4 = Arena & {
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
 	boxSize: Vec3,
@@ -1026,6 +1031,8 @@ local Arena4v4 = {} :: Arena & {
 	goalBoxSize: Vec3,
 	goalPositionOffset: Vec3,
 }
+
+local Arena4v4 = {} :: Arena4v4
 Arena4v4.__index = Arena4v4
 setmetatable(Arena4v4, { __index = Arena })
 
@@ -1038,12 +1045,12 @@ Arena4v4.goalBoxSize = Vec3.new(200, 450, 225)
 Arena4v4.goalPositionOffset = Vec3.new(4075, 0, 175)
 
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Arena4v4)
+	local self = setmetatable(Arena.new(gamemode), Arena4v4) :: any
 	self.type = "4v4"
 	self.name = `Jakeball {self.slotId:sub(self.slotId:len() - 2)}`
 	self:setupDimensions()
 	self:setupOverviews()
-	return self
+	return self :: Arena4v4
 end
 
 function Arena4v4:isPointOnHomeSide(point: Vec3): boolean
@@ -1073,7 +1080,7 @@ function Arena4v4:setupDimensions()
 		position = self.transform.position
 			+ (self.transform.rotation * Arena4v4.homeRotationOffset):rotateVector(Arena4v4.goalPositionOffset),
 		rotation = self.transform.rotation * Arena4v4.homeRotationOffset:inverse(),
-		box = nil,
+		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, Arena4v4.goalBoxSize, self.home.goal.rotation)
@@ -1082,7 +1089,7 @@ function Arena4v4:setupDimensions()
 		position = self.transform.position
 			+ (self.transform.rotation * Arena4v4.awayRotationOffset):rotateVector(Arena4v4.goalPositionOffset),
 		rotation = self.transform.rotation * Arena4v4.awayRotationOffset:inverse(),
-		box = nil,
+		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Arena4v4.goalBoxSize, self.away.goal.rotation)
 end
@@ -1105,7 +1112,7 @@ function Arena4v4:setupOverviews()
 	end
 end
 
-function Arena4v4:getTeamRotation(teamIndex: number): Quat
+function Arena4v4:getTeamRotation(teamIndex: number?): Quat
 	local rotation = Quat.identity
 	if teamIndex == TeamIndex.homeTeam then
 		rotation = self.transform.rotation * Arena4v4.homeRotationOffset
@@ -1136,7 +1143,7 @@ function Arena4v4:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
-local Driftblitz = {} :: Arena & {
+type Driftblitz = Arena & {
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
 	boxSize: Vec3,
@@ -1145,6 +1152,8 @@ local Driftblitz = {} :: Arena & {
 	goalBoxSize: Vec3,
 	goalPositionOffset: Vec3,
 }
+
+local Driftblitz = {} :: Driftblitz
 Driftblitz.__index = Driftblitz
 setmetatable(Driftblitz, { __index = Arena })
 
@@ -1157,12 +1166,12 @@ Driftblitz.goalBoxSize = Vec3.new(100, 890, 300)
 Driftblitz.goalPositionOffset = Vec3.new(5295, 0, 175)
 
 function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Driftblitz)
+	local self = setmetatable(Arena.new(gamemode), Driftblitz) :: any
 	self.name = self.slotId
 	self.type = "driftblitz"
 	self:setupDimensions()
 	self:setupOverviews()
-	return self
+	return self :: Driftblitz
 end
 
 function Driftblitz:isPointOnHomeSide(point: Vec3): boolean
@@ -1192,7 +1201,7 @@ function Driftblitz:setupDimensions()
 		position = self.transform.position
 			+ (self.transform.rotation * Driftblitz.homeRotationOffset):rotateVector(Driftblitz.goalPositionOffset),
 		rotation = self.transform.rotation * Driftblitz.homeRotationOffset:inverse(),
-		box = nil,
+		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, Driftblitz.goalBoxSize, self.home.goal.rotation)
@@ -1201,7 +1210,7 @@ function Driftblitz:setupDimensions()
 		position = self.transform.position
 			+ (self.transform.rotation * Driftblitz.awayRotationOffset):rotateVector(Driftblitz.goalPositionOffset),
 		rotation = self.transform.rotation * Driftblitz.awayRotationOffset:inverse(),
-		box = nil,
+		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Driftblitz.goalBoxSize, self.away.goal.rotation)
 end
@@ -1630,7 +1639,7 @@ function createCasterInput(
 		hotkey = _hotkey,
 		modifiers = _modifires,
 		editable = _editable,
-	}
+	} :: CasterInput
 end
 
 function compareCasterInputs(a: { hotkey: Key, modifiers: { Key }? }, b: { hotkey: Key, modifiers: { Key }? }): boolean
@@ -2175,7 +2184,7 @@ function main()
 	rotEuler = defaultRotation:euler()
 	followPlussCamera = getCameraById("dennssen.followpluss")
 	overlayCamera = getCameraById("dennssen.overlayInfo")
-	if overlayCamera ~= nil then
+	if overlayCamera then
 		usingOverlay = true
 		sendMessage(overlayCamera, {
 			info = "version",
@@ -2239,7 +2248,7 @@ function setSelectedArena(arena: Arena)
 end
 
 function onGui()
-	if followPlussCamera == nil then
+	if not followPlussCamera then
 		Gui.text(
 			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
 		)
@@ -2588,7 +2597,7 @@ function onGui()
 		Gui.newLine()
 
 		if Gui.beginCombo("Third Person Mode", CAMERA_MODE_NAMES[thirdPersonMode]) then
-			for key, value in THIRD_PERSON_MODES do
+			for key, value: number in THIRD_PERSON_MODES :: { number } do
 				if Gui.selectable(CAMERA_MODE_NAMES[value], thirdPersonMode == value) then
 					thirdPersonMode = value
 				end
@@ -3048,7 +3057,7 @@ function getClosestPlayerToLineOfSight(): ReplayPlayer?
 end
 
 function getPlayer()
-	if followPlussCamera == nil then
+	if not followPlussCamera then
 		return
 	end
 
@@ -3407,7 +3416,7 @@ function readOtherInputs()
 		})
 	end
 
-	if getCasterKey(inputs.keyboard.overview1).down or getCasterKey(inputs.gamepad.overview1).down then
+	if ball and (getCasterKey(inputs.keyboard.overview1).down or getCasterKey(inputs.gamepad.overview1).down) then
 		if playerFollow then
 			stopFollow()
 		end
@@ -3420,7 +3429,7 @@ function readOtherInputs()
 			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
 		end
 	end
-	if getCasterKey(inputs.keyboard.overview2).down or getCasterKey(inputs.gamepad.overview2).down then
+	if ball and (getCasterKey(inputs.keyboard.overview2).down or getCasterKey(inputs.gamepad.overview2).down) then
 		if playerFollow then
 			stopFollow()
 		end
@@ -3433,7 +3442,7 @@ function readOtherInputs()
 			setGlobalCameraRotation(selectedArena.away.overview[2].rotation)
 		end
 	end
-	if getCasterKey(inputs.keyboard.overview3).down or getCasterKey(inputs.gamepad.overview3).down then
+	if ball and (getCasterKey(inputs.keyboard.overview3).down or getCasterKey(inputs.gamepad.overview3).down) then
 		if playerFollow then
 			stopFollow()
 		end
@@ -3667,12 +3676,16 @@ function rotateCamera()
 end
 
 -- Custom function to extract the primary color
-function extractPrimaryColor(json)
-	local r = json:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)')
-	local g = json:match('"primary"%s*:%s*{.-"g"%s*:%s*(%d+)')
-	local b = json:match('"primary"%s*:%s*{.-"b"%s*:%s*(%d+)')
+function extractPrimaryColor(json: string): Color
+	local r: number? = tonumber(json:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)'))
+	local g: number? = tonumber(json:match('"primary"%s*:%s*{.-"g"%s*:%s*(%d+)'))
+	local b: number? = tonumber(json:match('"primary"%s*:%s*{.-"b"%s*:%s*(%d+)'))
 
-	return { r = tostring(r / 255), g = tostring(g / 255), b = tostring(b / 255) }
+	if r == nil or g == nil or b == nil then
+		return { r = 0, b = 0, g = 0 }
+	end
+
+	return { r = r / 255, g = g / 255, b = b / 255 } :: Color
 end
 
 function followPlayer()
@@ -3923,13 +3936,7 @@ end
 
 function goalScoreCheck()
 	local homeGoalBox: BoxType = selectedArena.home.goal.box
-	if boundingBoxDebug then
-		homeGoalBox:render(1, 0, 0)
-	end
 	local awayGoalBox: BoxType = selectedArena.away.goal.box
-	if boundingBoxDebug then
-		awayGoalBox:render(0, 0, 1)
-	end
 
 	if not selectedArena.isGameActive or selectedArena.actionTimerSeconds > 0 then
 		return
@@ -4065,9 +4072,9 @@ function getTeamColors()
 		homeTeamPrimaryColor = extractPrimaryColor(playerJson)
 	else
 		homeTeamPrimaryColor = {
-			r = tostring(math.round(homeTeamDefaultColor.r * 100) / 100),
-			g = tostring(math.round(homeTeamDefaultColor.g * 100) / 100),
-			b = tostring(math.round(homeTeamDefaultColor.b * 100) / 100),
+			r = math.round(homeTeamDefaultColor.r * 100) / 100,
+			g = math.round(homeTeamDefaultColor.g * 100) / 100,
+			b = math.round(homeTeamDefaultColor.b * 100) / 100,
 		}
 	end
 
@@ -4077,9 +4084,9 @@ function getTeamColors()
 		awayTeamPrimaryColor = extractPrimaryColor(playerJson)
 	else
 		awayTeamPrimaryColor = {
-			r = tostring(math.round(awayTeamDefaultColor.r * 100) / 100),
-			g = tostring(math.round(awayTeamDefaultColor.g * 100) / 100),
-			b = tostring(math.round(awayTeamDefaultColor.b * 100) / 100),
+			r = math.round(awayTeamDefaultColor.r * 100) / 100,
+			g = math.round(awayTeamDefaultColor.g * 100) / 100,
+			b = math.round(awayTeamDefaultColor.b * 100) / 100,
 		}
 	end
 end
@@ -4091,7 +4098,7 @@ function setNewInputTimes(newInputs: { Key })
 
 			local conciderModifier = true
 			if table.find(modifierKeys, newInputString) ~= nil then
-				for key, pressedInput in pressedInputKeys do
+				for key: string, pressedInput in pressedInputKeys :: { [string]: any } do
 					if table.find(modifierKeys, key) == nil then
 						conciderModifier = false
 					end
@@ -4205,7 +4212,7 @@ function doRebind()
 			local primary: string
 			local biggestTime = 0
 
-			for key, pressedRebindInput in pressedRebindModifiers do
+			for key: string, pressedRebindInput in pressedRebindModifiers :: { [string]: { time: number } } do
 				if pressedRebindInput.time > biggestTime then
 					biggestTime = pressedRebindInput.time
 					primary = key
@@ -4336,7 +4343,7 @@ function tick(dt)
 
 	particleAffect()
 	ballInCenterCheck()
-	if ball ~= nil then
+	if ball then
 		goalScoreCheck()
 	end
 
@@ -4345,7 +4352,9 @@ function tick(dt)
 	if boundingBoxDebug then
 		for _, arena in arenas do
 			arena.box:render(1, 0, 1)
-			arena.centerBox:render(0, 0, 1)
+			arena.centerBox:render(0, 1, 0)
+			arena.home.goal.box:render(1, 0, 0)
+			arena.away.goal.box:render(0, 0, 1)
 		end
 	end
 end
