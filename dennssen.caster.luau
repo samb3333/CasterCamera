@@ -9,7 +9,7 @@ metadata = {
 }
 
 --TODO:
--- Test follow pluss gamemode update. (GoalCam, 3v3)
+-- Add arena loading text in follow pluss.
 -- Create release message for follow pluss.
 -- Create release message for caster update:
 -- - Include info about the update
@@ -23,20 +23,21 @@ metadata = {
 -- ballCam?
 
 --Fix:
--- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
+-- When overview has a different gravity direction the cameras rotation ends up wrong.
+-- When arenas are loading the cameras movement feels smoothed.
 
 --Add:
 -- When exiting POV set the camera to look at the ball. Possibly make an option under controls.
 -- Black box behind player names to make it easier to read (Maybe, overlay should help with this)
 -- White circle around ball to see it behind walls
--- Support for driftblitz
 
 -- Future ideas:
 -- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
 -- Send who last touched the ball to overlay.
 -- Make a template minimap for the overlay
 
--- Issues:
+-- Known Issues:
+-- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals are not detected
 -- Game crashes when joining any server for the second time
 
@@ -508,6 +509,7 @@ end
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
+local followPlussVersion: string = ""
 local playerFollow = false
 local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
@@ -521,7 +523,12 @@ local THIRD_PERSON_MODES = {
 	FaceTheBall = 4,
 }
 
+function getFollowVersion(version: string)
+	followPlussVersion = version
+end
+
 type MessageValues = {
+	versionCallback: (string) -> ()?,
 	callback: (() -> ()) -> ()?,
 	readLocation: number?,
 	showNameTags: boolean?,
@@ -2183,6 +2190,10 @@ function main()
 	camera.rotation = defaultRotation
 	rotEuler = defaultRotation:euler()
 	followPlussCamera = getCameraById("dennssen.followpluss")
+	if followPlussCamera then
+		local versionMessage: MessageValues = { versionCallback = getFollowVersion }
+		sendMessage(followPlussCamera, versionMessage)
+	end
 	overlayCamera = getCameraById("dennssen.overlayInfo")
 	if overlayCamera then
 		usingOverlay = true
@@ -2583,8 +2594,9 @@ function onGui()
 		exposureBias = Gui.sliderFloat("Exposure Bias", exposureBias, -6, 6)
 	end
 
-	if Gui.collapsingHeader("POV") then
+	if followPlussCamera and Gui.collapsingHeader("POV") then
 		Gui.indent()
+		Gui.text(`Follow Pluss version: {followPlussVersion}`)
 
 		followFOV = Gui.sliderInt("Field of View", followFOV, 1, 179)
 		Gui.setItemTooltip("Sets the FOV for when the camera is in POV mode")
