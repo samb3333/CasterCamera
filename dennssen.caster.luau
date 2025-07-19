@@ -9,7 +9,6 @@ metadata = {
 }
 
 --TODO:
--- Add arena loading text in follow pluss.
 -- Create release message for follow pluss.
 -- Create release message for caster update:
 -- - Include info about the update
@@ -21,10 +20,6 @@ metadata = {
 --Notes:
 -- clean up config with more "Categories" like post processing has
 -- ballCam?
-
---Fix:
--- When overview has a different gravity direction the cameras rotation ends up wrong.
--- When arenas are loading the cameras movement feels smoothed.
 
 --Add:
 -- When exiting POV set the camera to look at the ball. Possibly make an option under controls.
@@ -219,6 +214,86 @@ local function parseBallJSON(str)
 	result.type = tonumber(typeVal)
 
 	return result
+end
+
+function compareVersion(
+	actualRelease: number,
+	expectedRelease: number,
+	actualMajor: number,
+	expectedMajor: number,
+	actualMinor: number,
+	expectedMinor: number
+): number
+	if actualRelease ~= expectedRelease then
+		return actualRelease - expectedRelease
+	end
+	if actualMajor ~= expectedMajor then
+		return actualMajor - expectedMajor
+	end
+	return actualMinor - expectedMinor
+end
+
+function checkVersion(version: string, versionExpression: string, cameraName: string): { success: boolean, msg: string }
+	local msg: string = ""
+	local release: string? | number, major: string? | number, minor: string? | number =
+		version:match("(%d+)%.(%d+)%.(%d+)")
+	local exLogic: string?, exRelease: string? | number, exMajor: string? | number, exMinor: string? | number =
+		versionExpression:match("([=<>]+)(%d+)%.(%d+)%.(%d+)")
+
+	if not release or not major or not minor or not exRelease or not exMajor or not exMinor then
+		return { success = false, msg = "Wrong version format" }
+	end
+
+	release = tonumber(release)
+	major = tonumber(major)
+	minor = tonumber(minor)
+	exRelease = tonumber(exRelease)
+	exMajor = tonumber(exMajor)
+	exMinor = tonumber(exMinor)
+
+	local comparison = compareVersion(
+		release :: number,
+		exRelease :: number,
+		major :: number,
+		exMajor :: number,
+		minor :: number,
+		exMinor :: number
+	)
+
+	if exLogic == "=" then
+		msg = `Recommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor}`
+		if comparison ~= 0 then
+			return { success = false, msg = msg }
+		end
+	elseif exLogic == ">=" then
+		msg = `Recommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or higher`
+
+		if comparison < 0 then
+			return { success = false, msg = msg }
+		end
+	elseif exLogic == "<=" then
+		msg = `Recommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or lower`
+
+		if comparison > 0 then
+			return { success = false, msg = msg }
+		end
+	elseif exLogic == ">" then
+		msg = `Recommended version of {cameraName} is higher than {exRelease}.{exMajor}.{exMinor}`
+
+		if comparison <= 0 then
+			return { success = false, msg = msg }
+		end
+	elseif exLogic == "<" then
+		msg = `Recommended version of {cameraName} is lower than {exRelease}.{exMajor}.{exMinor}`
+
+		if comparison >= 0 then
+			return { success = false, msg = msg }
+		end
+	else
+		return { success = false, msg = "Unsupported comparison operator" }
+	end
+
+	return { success = true, msg = "" }
 end
 
 function getDictSize(dict): number
@@ -487,6 +562,8 @@ local getBallVariant = config.getBallVariant
 
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
+local requiredOverlayVersion: string = "=1.0.0"
+local overlayWarning: string = ""
 local overlayVersion: string = ""
 local usingOverlay: boolean = false
 local sendOverlayInfo: boolean = config.sendOverlayInfo
@@ -509,7 +586,9 @@ end
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
+local requiredFollowPlussVersion: string = "=1.9.0"
 local followPlussVersion: string = ""
+local followPlussWarning: string = ""
 local playerFollow = false
 local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
@@ -2193,6 +2272,13 @@ function main()
 	if followPlussCamera then
 		local versionMessage: MessageValues = { versionCallback = getFollowVersion }
 		sendMessage(followPlussCamera, versionMessage)
+		local result = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
+		if not result.success then
+			followPlussWarning = `WARNING: {result.msg}. If you are experiencing issues consider upgrading/downgrading.`
+		end
+	else
+		followPlussWarning =
+			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
 	end
 	overlayCamera = getCameraById("dennssen.overlayInfo")
 	if overlayCamera then
@@ -2201,6 +2287,10 @@ function main()
 			info = "version",
 			value = getOverlayVersion,
 		})
+		local result = checkVersion(overlayVersion, requiredOverlayVersion, "Overlay Info")
+		if not result.success then
+			overlayWarning = `WARNING: {result.msg}. If you are experiencing issues consider upgrading/downgrading.`
+		end
 	end
 end
 
@@ -2259,10 +2349,8 @@ function setSelectedArena(arena: Arena)
 end
 
 function onGui()
-	if not followPlussCamera then
-		Gui.text(
-			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
-		)
+	if followPlussWarning ~= "" then
+		Gui.text(followPlussWarning)
 	end
 
 	if Gui.button(Icon.Question) then
@@ -2660,6 +2748,9 @@ function onGui()
 		if Gui.collapsingHeader("Overlay") then
 			Gui.indent()
 			Gui.text(`Overlay version: {overlayVersion}`)
+			if overlayWarning ~= "" then
+				Gui.text(overlayWarning)
+			end
 			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
 			Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
 
@@ -3358,6 +3449,12 @@ function GameStartEffect()
 end
 --effects end
 
+function setGlobalCameraRotation(globalRotation)
+	camera.rotation = globalRotation
+	local localRotation = gravity.upRotation:inverse() * globalRotation
+	rotEuler = localRotation:euler()
+end
+
 function readInput()
 	readOtherInputs()
 	readMoveInput()
@@ -3622,12 +3719,6 @@ function moveCamera()
 	local upwardsMovement = upDirection * Up * speedMultiplier * 50 * deltaTime
 
 	camera.position += (forwardMovement + sidewaysMovement + upwardsMovement)
-end
-
-function setGlobalCameraRotation(globalRotation)
-	camera.rotation = globalRotation
-	local localRotation = gravity.upRotation:inverse() * globalRotation
-	rotEuler = localRotation:euler()
 end
 
 local rotDelta: Vec3 = Vec3.zeroVector
