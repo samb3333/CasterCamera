@@ -51,6 +51,12 @@ metadata = {
 local readLocation = 0
 local gameData: ReplayFrame
 
+function debugPrint(s: any)
+	if Input.getKeyDown(Input.Key.N) then
+		print(s)
+	end
+end
+
 local defaultKeybinds = {
 	keyboard = {
 		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
