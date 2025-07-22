@@ -3941,12 +3941,24 @@ function checkBallContact()
 	local contactTime = os.clock()
 
 	if contactPlayer.teamIndex == TeamIndex.homeTeam then
+		if
+			ballCollisionInfo.home.current
+			and contactPlayer.playerId == ballCollisionInfo.home.current.player.playerId
+		then
+			return
+		end
 		ballCollisionInfo.home.previous = ballCollisionInfo.home.current
 		ballCollisionInfo.home.current = {
 			contactTime = contactTime,
 			player = contactPlayer,
 		}
 	elseif contactPlayer.teamIndex == TeamIndex.awayTeam then
+		if
+			ballCollisionInfo.away.current
+			and contactPlayer.playerId == ballCollisionInfo.away.current.player.playerId
+		then
+			return
+		end
 		ballCollisionInfo.away.previous = ballCollisionInfo.away.current
 		ballCollisionInfo.away.current = {
 			contactTime = contactTime,
