@@ -42,7 +42,6 @@ metadata = {
 -- Fix:
 -- Add note to stats screen "Stats are estimates and can be inaccurate"
 -- Timer seems to hitch when counting upwards
--- Improve lastPlayerWithBall to include 2 players from both teams and time of last touch
 -- Overviews middle and right do not work on controller
 
 -- GameData
@@ -1764,7 +1763,7 @@ type CasterInput = {
 	name: string,
 	description: string,
 	hotkey: Key,
-	modifiers: { Key }?,
+	modifiers: { Key },
 	editable: boolean,
 }
 
@@ -1840,7 +1839,7 @@ function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boo
 
 	local currentPrimaryTime = pressedInputKeys[keyToString(primary)].time
 
-	if modifiers then
+	if getDictSize(modifiers) > 0 then
 		-- check for modifier keys not being held down
 		for _, key: Key in modifiers do
 			if not Input.getKeyDown(key) and not Input.getKey(key) then
