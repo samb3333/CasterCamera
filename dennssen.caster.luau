@@ -9,6 +9,9 @@ metadata = {
 }
 
 --TODO:
+-- Shorten goal display visability
+-- Create roundsSVG in stats showcase for BO7
+
 -- Create release message for follow pluss.
 -- Create release message for caster update:
 -- - Include info about the update
@@ -35,6 +38,14 @@ metadata = {
 -- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals are not detected
 -- Game crashes when joining any server for the second time
+
+-- Fix:
+-- Find a way to differentiate resets and actuall finishes
+-- Goal explositions are the wrong color?
+-- Add note to stats screen "Stats are estimates and can be inaccurate"
+-- Timer seems to hitch when counting upwards
+-- Improve lastPlayerWithBall to include 2 players from both teams and time of last touch
+-- Overviews middle and right do not work on controller
 
 -- GameData
 local readLocation = 0
