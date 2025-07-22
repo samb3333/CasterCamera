@@ -4139,7 +4139,7 @@ function goalScoreCheck()
 	if selectedArena.home.scoreIncrease then
 		GoalExplosionEffect(
 			selectedArena.away.goal.position + Vec3.new(0, 0, -60),
-			selectedArena.home.goal.rotation,
+			selectedArena.away.goal.rotation,
 			homeTeamPrimaryColor
 		)
 
