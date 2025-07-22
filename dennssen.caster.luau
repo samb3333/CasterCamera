@@ -40,8 +40,6 @@ metadata = {
 -- Game crashes when joining any server for the second time
 
 -- Fix:
--- Find a way to differentiate resets and actuall finishes
--- Goal explositions are the wrong color?
 -- Add note to stats screen "Stats are estimates and can be inaccurate"
 -- Timer seems to hitch when counting upwards
 -- Improve lastPlayerWithBall to include 2 players from both teams and time of last touch
@@ -1447,8 +1445,40 @@ local vignetteIntensity = config.postProcessing.vignetteIntensity
 local exposureBias = config.postProcessing.exposureBias
 
 -- Stats
-local lastPlayerWithBall: ReplayPlayer? = nil
-local previousLastPlayerWithBall: ReplayPlayer? = nil
+type BallCollision = {
+	home: {
+		current: {
+			contactTime: number,
+			player: ReplayPlayer,
+		}?,
+		previous: {
+			contactTime: number,
+			player: ReplayPlayer,
+		}?,
+	},
+	away: {
+		current: {
+			contactTime: number,
+			player: ReplayPlayer,
+		}?,
+		previous: {
+			contactTime: number,
+			player: ReplayPlayer,
+		}?,
+	},
+}
+
+local ballCollisionInfo: BallCollision = {
+	home = {
+		current = nil,
+		previous = nil,
+	},
+	away = {
+		current = nil,
+		previous = nil,
+	},
+}
+
 local homeGoalPotentialEnter: boolean = false
 local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
@@ -1456,9 +1486,7 @@ local previousAwayGoalPotentialEnter: boolean = false
 
 local lastPlayerBallContactPoint: Vec3 = Vec3.zeroVector
 local maximumTimeSincePass: number = 5
-local timeSincePass: number = 0
 
-local assistPlayer: ReplayPlayer? = nil
 local goalPlayer: ReplayPlayer? = nil
 
 -- Gravity
@@ -1682,6 +1710,7 @@ function getGamepadKeysDown(): { Key }
 			table.insert(pressedKeys, Input.Gamepad[key])
 		end
 	end
+
 	return pressedKeys
 end
 
@@ -2364,8 +2393,16 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 	return `Succesfully set Overview #{overviewKey} to Camera`
 end
 
+function resetPlayersWithBall()
+	ballCollisionInfo.home.current = nil
+	ballCollisionInfo.home.previous = nil
+	ballCollisionInfo.away.current = nil
+	ballCollisionInfo.away.previous = nil
+end
+
 function setSelectedArena(arena: Arena)
 	if selectedArena and arena.name ~= selectedArena.name then -- new arena
+		resetPlayersWithBall()
 		sendSafeMessage(overlayCamera, {
 			info = "rounds",
 			value = "clear",
@@ -2930,8 +2967,11 @@ function onGui()
 		if Gui.button("Print Pressed Keys") then
 			print(pressedInputKeys)
 		end
+		Gui.sameLine()
+		if Gui.button("Print ball collision info") then
+			print(ballCollisionInfo)
+		end
 		if selectedArena then
-			Gui.sameLine()
 			if Gui.button("Print Selected Arena") then
 				print(selectedArena)
 			end
@@ -3859,64 +3899,87 @@ function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boo
 	return false
 end
 
-function resetPlayersWithBall()
-	lastPlayerWithBall = nil
-	previousLastPlayerWithBall = nil
-end
-
-function checkForPlayerBallContact(): ReplayPlayer?
+function checkBallContact()
 	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(30)
-	if contactPlayer ~= nil then
-		lastPlayerBallContactPoint = contactPlayer.root.position
-		if lastPlayerWithBall ~= nil and contactPlayer.playerId == lastPlayerWithBall.playerId then
-			return lastPlayerWithBall
-		end
-		return contactPlayer
-	end
-	return lastPlayerWithBall
-end
-
-function getAssistPlayer()
-	if lastPlayerWithBall == nil or previousLastPlayerWithBall == nil then
+	if contactPlayer == nil then
 		return
 	end
 
-	if
-		playersAreOnSameTeam(lastPlayerWithBall, previousLastPlayerWithBall)
-		and lastPlayerWithBall.playerId ~= previousLastPlayerWithBall.playerId
-	then
-		assistPlayer = previousLastPlayerWithBall
-		timeSincePass = 0
-	elseif not playersAreOnSameTeam(lastPlayerWithBall, previousLastPlayerWithBall) then
-		assistPlayer = nil
+	local contactTime = os.clock()
+
+	if contactPlayer.teamIndex == TeamIndex.homeTeam then
+		ballCollisionInfo.home.previous = ballCollisionInfo.home.current
+		ballCollisionInfo.home.current = {
+			contactTime = contactTime,
+			player = contactPlayer,
+		}
+	elseif contactPlayer.teamIndex == TeamIndex.awayTeam then
+		ballCollisionInfo.away.previous = ballCollisionInfo.away.current
+		ballCollisionInfo.away.current = {
+			contactTime = contactTime,
+			player = contactPlayer,
+		}
+	end
+end
+
+function getPossessionTeam(): string?
+	if ballCollisionInfo.home.current == nil and ballCollisionInfo.away.current == nil then
+		return nil
 	end
 
-	if assistPlayer then
-		timeSincePass += deltaTime
-		if timeSincePass >= maximumTimeSincePass then
-			timeSincePass = 0
-			assistPlayer = nil
-		end
+	if ballCollisionInfo.home.current == nil then
+		return "away"
+	end
+
+	if ballCollisionInfo.away.current == nil then
+		return "home"
+	end
+
+	if ballCollisionInfo.home.current.contactTime > ballCollisionInfo.away.current.contactTime then
+		return "home"
+	else
+		return "away"
+	end
+end
+
+function getAssistPlayer(team: string): ReplayPlayer?
+	local possessionTeam = ballCollisionInfo[team]
+
+	if possessionTeam.current == nil or possessionTeam.previous == nil then
+		return nil
+	end
+
+	if os.clock() - possessionTeam.current.contactTime < maximumTimeSincePass then
+		return possessionTeam.previous.player
+	else
+		return nil
 	end
 end
 
 function checkForGoalPotential(): boolean
 	local successfulPotential = false
+	local possesionTeamString: string? = getPossessionTeam()
 
-	if lastPlayerWithBall == nil then
+	if not possesionTeamString then
+		return successfulPotential
+	end
+
+	local possessionTeam = ballCollisionInfo[possesionTeamString]
+
+	if possessionTeam.current == nil then
 		return successfulPotential
 	end
 
 	if homeGoalPotentialEnter and not previousHomeGoalPotentialEnter then
-		if lastPlayerWithBall.teamIndex == TeamIndex.awayTeam then
-			goalPlayer = lastPlayerWithBall
+		if possessionTeam.current.player.teamIndex == TeamIndex.awayTeam then
+			goalPlayer = possessionTeam.current.player
 			successfulPotential = true
 		end
 	end
 
 	if awayGoalPotentialEnter and not previousAwayGoalPotentialEnter then
-		if lastPlayerWithBall.teamIndex == TeamIndex.homeTeam then
-			goalPlayer = lastPlayerWithBall
+		if possessionTeam.current.player.teamIndex == TeamIndex.homeTeam then
+			goalPlayer = possessionTeam.current.player
 			successfulPotential = true
 		end
 	end
@@ -3982,7 +4045,6 @@ function earlyStatChangeReturn(ballExit: boolean)
 		awayGoalPotentialEnter = false
 	end
 
-	previousLastPlayerWithBall = lastPlayerWithBall
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
 	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
 end
@@ -4050,9 +4112,7 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		homeGoalPotentialEnter = false
 	end
 
-	lastPlayerWithBall = checkForPlayerBallContact()
-
-	getAssistPlayer()
+	checkBallContact()
 
 	if checkForGoalPotential() then
 		earlyStatChangeReturn(false)
@@ -4064,7 +4124,6 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		return
 	end
 
-	previousLastPlayerWithBall = lastPlayerWithBall
 	previousHomeGoalPotentialEnter = homeGoalPotentialEnter
 	previousAwayGoalPotentialEnter = awayGoalPotentialEnter
 end
@@ -4090,9 +4149,11 @@ function goalScoreCheck()
 		local shooterName = ""
 		local assistName = ""
 
-		if lastPlayerWithBall then
-			shooterName = lastPlayerWithBall.playerName
+		if ballCollisionInfo.away.current then
+			shooterName = ballCollisionInfo.away.current.player.playerName
 		end
+
+		local assistPlayer = getAssistPlayer("away")
 
 		if assistPlayer then
 			assistName = assistPlayer.playerName
@@ -4146,9 +4207,11 @@ function goalScoreCheck()
 		local shooterName = ""
 		local assistName = ""
 
-		if lastPlayerWithBall then
-			shooterName = lastPlayerWithBall.playerName
+		if ballCollisionInfo.home.current then
+			shooterName = ballCollisionInfo.home.current.player.playerName
 		end
+
+		local assistPlayer = getAssistPlayer("home")
 
 		if assistPlayer then
 			assistName = assistPlayer.playerName
