@@ -2967,9 +2967,42 @@ function onGui()
 		if Gui.button("Print Pressed Keys") then
 			print(pressedInputKeys)
 		end
-		Gui.sameLine()
-		if Gui.button("Print ball collision info") then
-			print(ballCollisionInfo)
+		if Gui.treeNode("Print ball collision info") then
+			if Gui.treeNode("Home") then
+				if Gui.treeNode("Current##Home") then
+					if ballCollisionInfo.home.current then
+						Gui.text(`PlayerName: {ballCollisionInfo.home.current.player.playerName}`)
+						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.current.contactTime}`)
+					end
+					Gui.treePop()
+				end
+				if Gui.treeNode("Previous##Home") then
+					if ballCollisionInfo.home.previous then
+						Gui.text(`PlayerName: {ballCollisionInfo.home.previous.player.playerName}`)
+						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.previous.contactTime}`)
+					end
+					Gui.treePop()
+				end
+				Gui.treePop()
+			end
+			if Gui.treeNode("Away") then
+				if Gui.treeNode("Current##Away") then
+					if ballCollisionInfo.away.current then
+						Gui.text(`PlayerName: {ballCollisionInfo.away.current.player.playerName}`)
+						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.current.contactTime}`)
+					end
+					Gui.treePop()
+				end
+				if Gui.treeNode("Previous##Away") then
+					if ballCollisionInfo.away.previous then
+						Gui.text(`PlayerName: {ballCollisionInfo.away.previous.player.playerName}`)
+						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.previous.contactTime}`)
+					end
+					Gui.treePop()
+				end
+				Gui.treePop()
+			end
+			Gui.treePop()
 		end
 		if selectedArena then
 			if Gui.button("Print Selected Arena") then
