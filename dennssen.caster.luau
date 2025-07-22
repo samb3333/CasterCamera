@@ -4201,28 +4201,22 @@ function ballInCenterCheck()
 end
 
 function getTeamColors()
-	if #gameData.players > 0 and #selectedArena.home.players > 0 then
+	if #selectedArena.home.players > 0 then
 		local firstPlayer = selectedArena.home.players[1]
 		local playerJson = firstPlayer:toJson()
 		homeTeamPrimaryColor = extractPrimaryColor(playerJson)
+		debugPrint(homeTeamPrimaryColor)
 	else
-		homeTeamPrimaryColor = {
-			r = math.round(homeTeamDefaultColor.r * 100) / 100,
-			g = math.round(homeTeamDefaultColor.g * 100) / 100,
-			b = math.round(homeTeamDefaultColor.b * 100) / 100,
-		}
+		homeTeamPrimaryColor = homeTeamDefaultColor
 	end
 
-	if #gameData.players > 0 and #selectedArena.away.players > 0 then
+	if #selectedArena.away.players > 0 then
 		local firstPlayer = selectedArena.away.players[1]
 		local playerJson = firstPlayer:toJson()
 		awayTeamPrimaryColor = extractPrimaryColor(playerJson)
+		debugPrint(awayTeamPrimaryColor)
 	else
-		awayTeamPrimaryColor = {
-			r = math.round(awayTeamDefaultColor.r * 100) / 100,
-			g = math.round(awayTeamDefaultColor.g * 100) / 100,
-			b = math.round(awayTeamDefaultColor.b * 100) / 100,
-		}
+		awayTeamPrimaryColor = awayTeamDefaultColor
 	end
 end
 
