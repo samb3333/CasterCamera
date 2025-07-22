@@ -3467,11 +3467,12 @@ function GameStartEffect()
 	)
 	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
 	for i = 1, 300 do
+		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
 		createParticle(
 			particlePosition,
 			selectedArena.transform.rotation,
 			0.5,
-			Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80)),
+			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
 			colourPallette[math.random(1, 2)],
 			ParticleVariant.Embers,
 			math.random(800, 1300)
