@@ -721,8 +721,10 @@ type Arena = {
 	lastIsGameActive: boolean,
 	isGameActive: boolean,
 	isKickoff: boolean,
+	isOvertime: boolean,
 
 	gameTimeSeconds: number,
+	lastGameTimeSeconds: number,
 	actionTimerSeconds: number,
 	isGracePeriod: boolean,
 	bestOfAmount: number,
@@ -803,11 +805,16 @@ function Arena:tick()
 	if gameTimeComponent then
 		local gameTimeSeconds = gameTimeComponent:getTimeSeconds()
 		local actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
+		self.lastGameTimeSeconds = self.gameTimeSeconds or 0
 		self.gameTimeSeconds = gameTimeSeconds
 		self.actionTimerSeconds = actionTimerSeconds
 	else
 		self.gameTimeSeconds = 0
 		self.actionTimerSeconds = 0
+	end
+
+	if self.gameTimeSeconds > self.lastGameTimeSeconds and not self.isOvertime then
+		self.isOvertime = true
 	end
 
 	self.lastIsGameActive = self.isGameActive
@@ -882,24 +889,29 @@ function Arena:tick()
 end
 
 function Arena:onRoundEnd()
-	if self.home.score == self.away.score then -- find who scored in overtime
-		local homeDirection = getForward(self.transform.position, self.home.goal.position)
-		local ballDirection = getForward(self.transform.position, ball.transform.position)
-		local isHomePoint = homeDirection:dot(ballDirection) > 0
+	local cachedHomeScore = self.home.score
+	local cachedAwayScore = self.away.score
 
-		if isHomePoint then
-			self.home.score += 1
+	if not self.isOvertime and self.lastGameTimeSeconds > 0 then -- is restart
+		return
+	end
+
+	if self.isOvertime then -- find who scored in overtime
+		if self.home.goal.box:checkPointIntersect(ball.transform.position) then
+			cachedHomeScore += 1
+		elseif self.away.goal.box:checkPointIntersect(ball.transform.position) then
+			cachedAwayScore += 1
 		else
-			self.away.score += 1
+			return -- is restart during overtime
 		end
 	end
 
 	local round: Round = {
 		home = {
-			score = self.home.score,
+			score = cachedHomeScore,
 		},
 		away = {
-			score = self.away.score,
+			score = cachedAwayScore,
 		},
 	}
 
@@ -910,6 +922,8 @@ function Arena:onRoundEnd()
 end
 
 function Arena:onGameStart()
+	self.isOvertime = false
+
 	sendSafeMessage(overlayCamera, {
 		info = "clearStats",
 		value = "",
