@@ -998,6 +998,10 @@ function Arena:sendInfoMessage()
 	})
 
 	sendSafeMessage(overlayCamera, {
+		info = "overtime",
+		value = self.isOvertime,
+	})
+	sendSafeMessage(overlayCamera, {
 		info = "grace",
 		value = self.isGracePeriod,
 	})
