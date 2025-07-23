@@ -9,7 +9,9 @@ metadata = {
 }
 
 --TODO:
--- Shorten goal display visability
+-- Add images that show off each overlay to the fullest
+-- Seperate help page into dev help and setup help
+-- Shorten goal display visability -- needs testing
 -- Create roundsSVG in stats showcase for BO7
 
 -- Create release message for follow pluss.
@@ -38,11 +40,6 @@ metadata = {
 -- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals are not detected
 -- Game crashes when joining any server for the second time
-
--- Fix:
--- Add note to stats screen "Stats are estimates and can be inaccurate"
--- Timer seems to hitch when counting upwards
--- Overviews middle and right do not work on controller
 
 -- GameData
 local readLocation = 0
@@ -4312,7 +4309,6 @@ function getTeamColors()
 		local firstPlayer = selectedArena.home.players[1]
 		local playerJson = firstPlayer:toJson()
 		homeTeamPrimaryColor = extractPrimaryColor(playerJson)
-		debugPrint(homeTeamPrimaryColor)
 	else
 		homeTeamPrimaryColor = homeTeamDefaultColor
 	end
@@ -4321,7 +4317,6 @@ function getTeamColors()
 		local firstPlayer = selectedArena.away.players[1]
 		local playerJson = firstPlayer:toJson()
 		awayTeamPrimaryColor = extractPrimaryColor(playerJson)
-		debugPrint(awayTeamPrimaryColor)
 	else
 		awayTeamPrimaryColor = awayTeamDefaultColor
 	end
