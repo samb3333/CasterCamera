@@ -9,8 +9,9 @@ metadata = {
 }
 
 --TODO:
--- Do more installation testing
--- Shorten goal display visability -- needs testing
+-- Combine Smoothing and Sensitivity & Deadzone into 1 category
+-- Add Accessibility category
+-- Add Ball outline option in accessibilty category
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
@@ -27,7 +28,6 @@ metadata = {
 --Add:
 -- When exiting POV set the camera to look at the ball. Possibly make an option under controls.
 -- Black box behind player names to make it easier to read (Maybe, overlay should help with this)
--- White circle around ball to see it behind walls
 
 -- Future ideas:
 -- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
@@ -116,7 +116,7 @@ local function initializeConfig()
 		invertControllerLookVertical = false,
 		controllerSensitivity = 0.5,
 		positionSmoothing = 0.02,
-		lookSmoothness = 0,
+		lookSmoothness = 0.25,
 		particleSimSpeed = 1,
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
@@ -357,6 +357,14 @@ function lerp(a: number, b: number, t: number): number
 	return a * (1.0 - t) + b * t
 end
 
+function getApparentRaidus(radius: number, distance: number, HUDDepth: number): number
+	return HUDDepth * (radius / distance)
+end
+
+function convertToHUD(vec: Vec2): Vec3
+	return camera.rotation:getRightVector() * vec.x + camera.rotation:getUpVector() * vec.y
+end
+
 function keyToString(key: Key): string
 	return string.gsub(tostring(key), "Gamepad_", "")
 end
@@ -370,6 +378,9 @@ local transitionTime: number
 local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
 local defaultRotation = Quat.fromEuler(0, 0, 90)
+
+local cameraPosition: Vec3 = defaultPosition
+local cameraVelocity: Vec3 = Vec3.zeroVector
 
 local TeamIndex = {
 	NoTeam = -1,
@@ -388,6 +399,106 @@ local CAMERA_MODE_NAMES = {
 	[3] = "Velocity Rotation",
 	[4] = "Face The Ball",
 }
+
+type HUD = {
+	__index: HUD,
+	width: number,
+	height: number,
+	depth: number,
+	transform: {
+		origin: Vec3,
+		top: Vec3,
+		left: Vec3,
+		bottom: Vec3,
+		right: Vec3,
+	},
+
+	new: (width: number, height: number, depth: number) -> HUD,
+	generateTransform: (self: HUD) -> (),
+
+	tick: (self: HUD) -> (),
+	drawPoint: (anchor: Vec3, color: Vec3, pointSize: number, lifetime: number) -> (),
+	drawLine: (startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number) -> (),
+	worldToHUD: (self: HUD, worldPosition: Vec3) -> Vec3,
+}
+
+local HUD: HUD = {} :: HUD
+HUD.__index = HUD
+
+function HUD.new(width: number, height: number, depth: number): HUD
+	local self: HUD = setmetatable({}, HUD) :: any
+	self.width = width
+	self.height = height
+	self.depth = depth
+
+	self:generateTransform()
+
+	return self :: HUD
+end
+
+function HUD:generateTransform()
+	self.transform = {} :: any
+
+	local cameraPosition: Vec3
+	local cameraRotation: Quat
+
+	if camera.positionSmoothing > 0 then
+		cameraPosition = camera:getSmoothedPosition() + cameraVelocity
+	else
+		cameraPosition = camera.position
+	end
+
+	if camera.rotationSmoothing > 0 then
+		cameraRotation = camera:getSmoothedRotation()
+	else
+		cameraRotation = camera.rotation
+	end
+
+	self.transform.origin = cameraPosition + (cameraRotation:getForwardVector() * self.depth)
+
+	local fovRad = math.rad(camera.fieldOfView)
+	local aspectRatio = self.width / self.height
+	local halfWidth = math.tan(fovRad / 2) * self.depth
+	local halfHeight = halfWidth / aspectRatio
+
+	self.transform.top = self.transform.origin + (cameraRotation:getUpVector() * halfHeight)
+	self.transform.left = self.transform.origin + (cameraRotation:getRightVector() * -halfWidth)
+	self.transform.bottom = self.transform.origin + (cameraRotation:getUpVector() * -halfHeight)
+	self.transform.right = self.transform.origin + (cameraRotation:getRightVector() * halfWidth)
+end
+
+function HUD:tick()
+	self:generateTransform()
+end
+
+function HUD.drawPoint(anchor: Vec3, color: Vec3, pointSize: number, lifetime: number)
+	WorldDraw.drawPoint(anchor, color.x, color.y, color.z, pointSize, lifetime)
+end
+
+function HUD.drawLine(startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number)
+	WorldDraw.drawLine(startAnchor, endAnchor, color.x, color.y, color.z, thickness, lifetime)
+end
+
+function HUD:worldToHUD(worldPosition: Vec3): Vec3
+	local camPos = camera.position
+	local camForward = camera.rotation:getForwardVector()
+	local hudOrigin = self.transform.origin
+
+	local rayDir = (worldPosition - camPos):getSafeNormal()
+	local denom = camForward:dot(rayDir)
+
+	if denom <= 0 then
+		return Vec3.zeroVector
+	end
+
+	-- Ray-plane intersection:
+	local t = (hudOrigin - camPos):dot(camForward) / denom
+	local projected = camPos + rayDir * t
+
+	return projected
+end
+
+local ui = HUD.new(1920, 1080, 100)
 
 -- Bounding Box start
 
@@ -1493,7 +1604,9 @@ local gravityChaser: Quat = gravity.upRotation
 -- Caster Camera
 local cameraFOV = config.cameraFOV
 local cameraMode = nil
+-- amount of seconds it takes for the camera to reach it's target
 local positionSmoothing = config.positionSmoothing
+local cameraPositionSmoothing: number = positionSmoothing
 local lookSmoothness = config.lookSmoothness
 local dynamicLookSmoothness = lookSmoothness
 local targetSpeedIndex: number = 1
@@ -2325,6 +2438,8 @@ function main()
 	arenaLoadTime = os.clock()
 	camera.position = defaultPosition
 	camera.rotation = defaultRotation
+	camera.rotationSmoothing = 0
+	camera.positionSmoothing = 0
 	rotEuler = defaultRotation:euler()
 	followPlussCamera = getCameraById("dennssen.followpluss")
 	if followPlussCamera then
@@ -2634,7 +2749,7 @@ function onGui()
 	cameraFOV = Gui.sliderFloat("Field Of View", cameraFOV, 1, 179)
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
-	camera.position = Gui.dragFloat3("Camera Position", camera.position, 1, -math.huge, math.huge)
+	cameraPosition = Gui.dragFloat3("Camera Position", cameraPosition, 1, -math.huge, math.huge)
 	local newRot = Gui.dragFloat3("Camera Rotation", rotEuler, 1, -180, 180)
 	if Gui.isItemActive() then
 		gravityChaser = gravity.upRotation
@@ -2930,6 +3045,10 @@ function onGui()
 
 	if Gui.treeNode("Debug") then
 		Gui.text(`Version: {version}`)
+		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
+		Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
+
+		speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
 		if Gui.button("Print Arenas") then
 			for _, arena in arenas do
@@ -3044,15 +3163,13 @@ end
 
 function toggleSmoothing(position: boolean, rotation: boolean)
 	if position then
-		camera.positionSmoothing = positionSmoothing
+		cameraPositionSmoothing = positionSmoothing
 	else
-		camera.positionSmoothing = 0
+		cameraPositionSmoothing = 0
 	end
 	if rotation then
-		camera.rotationSmoothing = 0.02
 		dynamicLookSmoothness = lookSmoothness
 	else
-		camera.rotationSmoothing = 0
 		dynamicLookSmoothness = 0
 	end
 end
@@ -3074,7 +3191,7 @@ function onTransitionBegin(transitionInfo: Transition)
 	end
 
 	alwaysTick = true
-	camera.rotationSmoothing = 0.02
+	camera.rotationSmoothing = 0
 	camera.hideNearestHead = false
 	camera.showNameTags = true
 end
@@ -3338,7 +3455,6 @@ function createParticle(
 end
 
 function particleAffect()
-	WorldDraw.clear()
 	if #particlesTable < 1 then
 		return
 	end
@@ -3821,7 +3937,11 @@ function moveCamera()
 	local sidewaysMovement = rightDirection * Horizontal * speedMultiplier * 100 * deltaTime
 	local upwardsMovement = upDirection * Up * speedMultiplier * 50 * deltaTime
 
-	camera.position += (forwardMovement + sidewaysMovement + upwardsMovement)
+	cameraVelocity = (forwardMovement + sidewaysMovement + upwardsMovement)
+
+	cameraPosition += cameraVelocity
+
+	camera.position = Vec3.lerp(camera.position, cameraPosition, deltaTime / (cameraPositionSmoothing + deltaTime))
 end
 
 local rotDelta: Vec3 = Vec3.zeroVector
@@ -3865,14 +3985,8 @@ function rotateCamera()
 
 	local nextLookDiff = rotDelta * math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1)
 
-	if gravityChaser ~= gravity.upRotation then
-		local nextGravityChaser = gravity.upRotation
-
-		local nextRotation = nextGravityChaser:inverse()
-			* Quat.fromXZ(camera.rotation:getForwardVector(), nextGravityChaser:rotateVector(Vec3.new(0, 0, 1)))
-		rotEuler = nextRotation:euler() + Vec3.new(rotEuler.x, 0, 0) -- preserve existing roll
-		gravityChaser = nextGravityChaser
-	end
+	gravityChaser =
+		Quat.slerp(gravityChaser, gravity.upRotation, math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1))
 
 	rotEuler += nextLookDiff
 	rotDelta -= nextLookDiff
@@ -4498,12 +4612,44 @@ function doRebind()
 	end
 end
 
+function ballOutline()
+	ui:tick()
+
+	local ballUIPosition = ui:worldToHUD(ball.transform.position)
+
+	local ballRadius = 17.5
+	local ballDistance = getDist(camera.position, ball.transform.position)
+	local segments = 20
+	local radius = getApparentRaidus(ballRadius, ballDistance, ui.depth)
+	local thickness = radius / 4
+
+	local angleStep = (2 * math.pi) / segments
+	local prevPoint = nil
+
+	for i = 0, segments do
+		local angle = i * angleStep
+
+		local x = radius * math.cos(angle)
+		local y = radius * math.sin(angle)
+
+		local point = ballUIPosition + (camera.rotation:getRightVector() * x) + (camera.rotation:getUpVector() * y)
+
+		if prevPoint then
+			ui.drawLine(prevPoint, point, Vec3.new(1, 1, 1), thickness, 0)
+		end
+
+		prevPoint = point
+	end
+end
+
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = false
 		onExit()
 		return
 	end
+
+	WorldDraw.clear()
 
 	if arenas == nil then
 		local currentTime = os.clock()
@@ -4582,6 +4728,8 @@ function tick(dt)
 	end
 
 	removeOldInputTimes()
+
+	ballOutline()
 
 	if boundingBoxDebug then
 		for _, arena in arenas do
