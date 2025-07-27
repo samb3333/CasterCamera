@@ -9,10 +9,8 @@ metadata = {
 }
 
 --TODO:
--- Add images that show off each overlay to the fullest
--- Seperate help page into dev help and setup help
+-- Do more installation testing
 -- Shorten goal display visability -- needs testing
--- Create roundsSVG in stats showcase for BO7
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
