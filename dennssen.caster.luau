@@ -156,6 +156,7 @@ local function initializeConfig()
 		controllerSensitivity = 0.5,
 		positionSmoothing = 0.02,
 		lookSmoothness = 0.25,
+		ballOutline = true,
 		particleSimSpeed = 1,
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
@@ -705,6 +706,7 @@ Box.empty = Box.new(Vec3.zeroVector, Vec3.zeroVector, Quat.identity)
 -- Ball
 local ball: ReplayBall
 local ballRotation: Quat = Quat.identity
+local ballOutline: boolean = config.ballOutline
 local GetBallVariant = {
 	PlayerBallDistance = "PlayerBallDistance",
 	LineOfSight = "LineOfSight",
@@ -2792,18 +2794,14 @@ function onGui()
 	Gui.newLine()
 
 	Gui.text("Settings")
-	if Gui.collapsingHeader("Smoothing") then
+
+	if Gui.collapsingHeader("Controls") then
 		Gui.indent()
 		positionSmoothing = Gui.sliderFloat("Position Smoothing", positionSmoothing, 0, 1)
 		positionSmoothing = math.clamp(positionSmoothing, 0, 1)
 		lookSmoothness = Gui.sliderFloat("Rotation Smoothing", lookSmoothness, 0, 1)
 		lookSmoothness = math.clamp(lookSmoothness, 0, 1)
-		Gui.unindent()
 		Gui.newLine()
-	end
-
-	if Gui.collapsingHeader("Sensitivity & Deadzone") then
-		Gui.indent()
 		invertControllerLookHorizontal = Gui.checkbox("Invert Controller Horizontal", invertControllerLookHorizontal)
 		invertControllerLookVertical = Gui.checkbox("Invert Controller Vertical", invertControllerLookVertical)
 		controllerSensitivity = Gui.sliderFloat("Controller Sensitivity", controllerSensitivity, 0.001, 2)
@@ -2815,6 +2813,14 @@ function onGui()
 		invertMouseLookVertical = Gui.checkbox("Invert Mouse Vertical", invertMouseLookVertical)
 		mouseSensitivity = Gui.sliderFloat("Mouse Sensitivity", mouseSensitivity, 0.001, 2)
 		mouseSensitivity = math.clamp(mouseSensitivity, 0.001, 2)
+		Gui.unindent()
+		Gui.newLine()
+	end
+
+	if Gui.collapsingHeader("Accessibility") then
+		Gui.indent()
+		ballOutline = Gui.checkbox("Ball Outline", ballOutline)
+		Gui.setItemTooltip("Toggles an outline around the arena ball that shows it's position through walls.")
 		Gui.unindent()
 		Gui.newLine()
 	end
@@ -3043,6 +3049,7 @@ function onGui()
 		config.positionSmoothing = positionSmoothing
 		config.lookSmoothness = lookSmoothness
 		config.particleSimSpeed = particleSimSpeed
+		config.ballOutline = ballOutline
 		config.vibrance = vibrance
 		config.getBallVariant = getBallVariant
 		config.sendOverlayInfo = sendOverlayInfo
