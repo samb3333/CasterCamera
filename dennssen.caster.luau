@@ -11,7 +11,6 @@ metadata = {
 --TODO:
 -- Fix rounds in 3v3 not working.
 -- Possibly have to increase the size of the goal boxes in 3v3
--- Move version number to the top of the GUI
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
@@ -944,6 +943,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		players = {},
 	}
 
+	self.isOvertime = false
 	self.isKickoff = false
 
 	print(`made arena {self.slotId}`)
@@ -954,10 +954,11 @@ end
 function Arena:tick()
 	local gameTimeComponent = self.gamemode:getGameTimeComponent()
 
+	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
 	if gameTimeComponent then
+		self.lastGameTimeSeconds = self.gameTimeSeconds or self.matchLengthSeconds
 		local gameTimeSeconds = gameTimeComponent:getTimeSeconds()
 		local actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
-		self.lastGameTimeSeconds = self.gameTimeSeconds or 0
 		self.gameTimeSeconds = gameTimeSeconds
 		self.actionTimerSeconds = actionTimerSeconds
 	else
@@ -988,6 +989,7 @@ function Arena:tick()
 		self.home.previousScore = self.home.score
 		self.away.previousScore = self.away.score
 
+		self.lastGameTimeSeconds = self.gameTimeSeconds
 		self.lastIsGameActive = self.isGameActive
 
 		arenaSwitch = false
@@ -998,8 +1000,6 @@ function Arena:tick()
 	else
 		self.bestOfAmount = 1
 	end
-
-	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
 
 	self.home.scoreIncrease = self.home.previousScore < self.home.score
 	self.away.scoreIncrease = self.away.previousScore < self.away.score
