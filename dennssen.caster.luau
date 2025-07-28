@@ -9,8 +9,7 @@ metadata = {
 }
 
 --TODO:
--- Fix rounds in 3v3 not working.
--- Possibly have to increase the size of the goal boxes in 3v3
+-- Fix rounds in 3v3 not working. (Only overtime needs testing)
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
@@ -1193,8 +1192,8 @@ Arena3v3.awayRotationOffset = Quat.fromEuler(0, 0, -90)
 Arena3v3.boxSize = Vec3.new(5100, 6750, 1440)
 Arena3v3.boxOffset = Vec3.new(0, 0, 650)
 Arena3v3.centerBoxOffset = Vec3.new(0, 0, 300)
-Arena3v3.goalBoxSize = Vec3.new(100, 500, 225)
-Arena3v3.goalPositionOffset = Vec3.new(3285, 0, 175)
+Arena3v3.goalBoxSize = Vec3.new(150, 500, 225)
+Arena3v3.goalPositionOffset = Vec3.new(3250, 0, 175)
 
 function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	local self = setmetatable(Arena.new(gamemode), Arena3v3) :: any
