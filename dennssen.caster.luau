@@ -3284,21 +3284,6 @@ function findPlayerInTable(table: { ReplayPlayer }, player: ReplayPlayer): numbe
 	return index
 end
 
-function velocityPivotPosition(position: Vec3, velocity: Vec3, radius: number, ball: boolean): Vec3
-	local velocityPivot = Vec3.zeroVector
-
-	local cameraDirection = velocity:getSafeNormal() + ballRotation:euler():normalize() * 20
-	if not ball then
-		cameraDirection = -cameraDirection
-	end
-
-	velocityPivot = Vec3.lerp(camera.position, position + cameraDirection * radius, 10)
-
-	velocityPivot = position + cameraDirection * radius
-
-	return velocityPivot
-end
-
 function getClosestArena(targetPosition: Vec3): Arena -- Remove this function when/if we get the arena from the player
 	local closestArenaDistance = math.huge
 	local closestArena = nil
