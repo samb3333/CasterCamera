@@ -101,6 +101,45 @@ local defaultKeybinds = {
 	},
 }
 
+function DeepStructureCopy(structureTable, normalTable): boolean
+	local adjusted = false
+	if typeof(structureTable) == "table" then
+		for structureKey, structureValue in structureTable do
+			if normalTable[structureKey] == nil then
+				adjusted = true
+				normalTable[structureKey] = structureValue
+			elseif typeof(normalTable[structureKey]) ~= typeof(structureValue) then
+				adjusted = true
+				normalTable[structureKey] = structureValue
+			elseif typeof(structureValue) == "table" then
+				if DeepStructureCopy(structureValue, normalTable[structureKey]) then
+					adjusted = true
+				end
+			end
+		end
+	end
+
+	return adjusted
+end
+
+function DeepStructureClean(structureTable, normalTable): boolean
+	local adjusted = false
+	if typeof(normalTable) == "table" then
+		for normalKey, normalValue in normalTable do
+			if structureTable[normalKey] == nil then
+				adjusted = true
+				normalTable[normalKey] = nil
+			elseif typeof(normalValue) == "table" then
+				if DeepStructureClean(structureTable[normalKey], normalValue) then
+					adjusted = true
+				end
+			end
+		end
+	end
+
+	return adjusted
+end
+
 local function initializeConfig()
 	local saveToConfig = false
 	local neededValues = {
@@ -191,20 +230,12 @@ local function initializeConfig()
 		},
 	}
 
-	-- saves new values that are not there from before to all profiles
-	for neededKey, neededValue in pairs(neededValues) do
-		if config[neededKey] == nil then
-			saveToConfig = true
-			config[neededKey] = neededValue
-		end
+	if DeepStructureCopy(neededValues, config) then
+		saveToConfig = true
 	end
 
-	-- removes saved but no longer used values in all profiles
-	for configKey, configValue in pairs(config) do
-		if neededValues[configKey] == nil then
-			saveToConfig = true
-			config[configKey] = nil
-		end
+	if DeepStructureClean(neededValues, config) then
+		saveToConfig = true
 	end
 
 	if saveToConfig then
