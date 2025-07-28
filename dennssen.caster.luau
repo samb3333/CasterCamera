@@ -4638,7 +4638,11 @@ function doRebind()
 	end
 end
 
-function ballOutline()
+function drawBallOutline()
+	if not ballOutline then
+		return
+	end
+
 	ui:tick()
 
 	local ballUIPosition = ui:worldToHUD(ball.transform.position)
@@ -4745,6 +4749,7 @@ function tick(dt)
 
 		moveCamera()
 		rotateCamera()
+		drawBallOutline()
 	end
 
 	particleAffect()
@@ -4754,8 +4759,6 @@ function tick(dt)
 	end
 
 	removeOldInputTimes()
-
-	ballOutline()
 
 	if boundingBoxDebug then
 		for _, arena in arenas do
