@@ -9,9 +9,9 @@ metadata = {
 }
 
 --TODO:
--- Combine Smoothing and Sensitivity & Deadzone into 1 category
--- Add Accessibility category
--- Add Ball outline option in accessibilty category
+-- Fix rounds in 3v3 not working.
+-- Possibly have to increase the size of the goal boxes in 3v3
+-- Move version number to the top of the GUI
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
@@ -434,6 +434,7 @@ local CAMERA_MODE_NAMES = {
 
 type HUD = {
 	__index: HUD,
+	cameraId: string,
 	width: number,
 	height: number,
 	depth: number,
@@ -445,7 +446,8 @@ type HUD = {
 		right: Vec3,
 	},
 
-	new: (width: number, height: number, depth: number) -> HUD,
+	new: (cameraId: string, width: number, height: number, depth: number) -> HUD,
+	setCamera: (self: HUD, cameraId: string) -> (),
 	generateTransform: (self: HUD) -> (),
 
 	tick: (self: HUD) -> (),
@@ -457,8 +459,9 @@ type HUD = {
 local HUD: HUD = {} :: HUD
 HUD.__index = HUD
 
-function HUD.new(width: number, height: number, depth: number): HUD
+function HUD.new(cameraId: string, width: number, height: number, depth: number): HUD
 	local self: HUD = setmetatable({}, HUD) :: any
+	self.cameraId = cameraId
 	self.width = width
 	self.height = height
 	self.depth = depth
@@ -468,35 +471,37 @@ function HUD.new(width: number, height: number, depth: number): HUD
 	return self :: HUD
 end
 
+function HUD:setCamera(cameraId: string)
+	self.cameraId = cameraId
+end
+
 function HUD:generateTransform()
 	self.transform = {} :: any
 
-	local cameraPosition: Vec3
-	local cameraRotation: Quat
+	local _camera
 
-	if camera.positionSmoothing > 0 then
-		cameraPosition = camera:getSmoothedPosition() + cameraVelocity
+	if self.cameraId ~= "" then
+		_camera = getCameraById(self.cameraId)
 	else
-		cameraPosition = camera.position
+		_camera = camera
 	end
 
-	if camera.rotationSmoothing > 0 then
-		cameraRotation = camera:getSmoothedRotation()
-	else
-		cameraRotation = camera.rotation
-	end
+	local _cameraPosition: Vec3
+	local _cameraRotation: Quat
+	_cameraPosition = _camera.position
+	_cameraRotation = _camera.rotation
 
-	self.transform.origin = cameraPosition + (cameraRotation:getForwardVector() * self.depth)
+	self.transform.origin = _cameraPosition + (_cameraRotation:getForwardVector() * self.depth)
 
-	local fovRad = math.rad(camera.fieldOfView)
+	local fovRad = math.rad(_camera.fieldOfView)
 	local aspectRatio = self.width / self.height
 	local halfWidth = math.tan(fovRad / 2) * self.depth
 	local halfHeight = halfWidth / aspectRatio
 
-	self.transform.top = self.transform.origin + (cameraRotation:getUpVector() * halfHeight)
-	self.transform.left = self.transform.origin + (cameraRotation:getRightVector() * -halfWidth)
-	self.transform.bottom = self.transform.origin + (cameraRotation:getUpVector() * -halfHeight)
-	self.transform.right = self.transform.origin + (cameraRotation:getRightVector() * halfWidth)
+	self.transform.top = self.transform.origin + (_cameraRotation:getUpVector() * halfHeight)
+	self.transform.left = self.transform.origin + (_cameraRotation:getRightVector() * -halfWidth)
+	self.transform.bottom = self.transform.origin + (_cameraRotation:getUpVector() * -halfHeight)
+	self.transform.right = self.transform.origin + (_cameraRotation:getRightVector() * halfWidth)
 end
 
 function HUD:tick()
@@ -512,8 +517,16 @@ function HUD.drawLine(startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness
 end
 
 function HUD:worldToHUD(worldPosition: Vec3): Vec3
-	local camPos = camera.position
-	local camForward = camera.rotation:getForwardVector()
+	local _camera
+
+	if self.cameraId ~= "" then
+		_camera = getCameraById(self.cameraId)
+	else
+		_camera = camera
+	end
+
+	local camPos = _camera.position
+	local camForward = _camera.rotation:getForwardVector()
 	local hudOrigin = self.transform.origin
 
 	local rayDir = (worldPosition - camPos):getSafeNormal()
@@ -530,7 +543,7 @@ function HUD:worldToHUD(worldPosition: Vec3): Vec3
 	return projected
 end
 
-local ui = HUD.new(1920, 1080, 100)
+local ui = HUD.new("", 1920, 1080, 100)
 
 -- Bounding Box start
 
@@ -715,6 +728,7 @@ local getBallVariant = config.getBallVariant
 
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
+local overlayId: string = "dennssen.overlayInfo"
 local requiredOverlayVersion: string = "=1.0.0"
 local overlayWarning: string = ""
 local overlayVersion: string = ""
@@ -739,6 +753,7 @@ end
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
+local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = "=1.9.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
@@ -2475,7 +2490,7 @@ function main()
 	camera.rotationSmoothing = 0
 	camera.positionSmoothing = 0
 	rotEuler = defaultRotation:euler()
-	followPlussCamera = getCameraById("dennssen.followpluss")
+	followPlussCamera = getCameraById(followPlussId)
 	if followPlussCamera then
 		local versionMessage: MessageValues = { versionCallback = getFollowVersion }
 		sendMessage(followPlussCamera, versionMessage)
@@ -2487,7 +2502,7 @@ function main()
 		followPlussWarning =
 			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
 	end
-	overlayCamera = getCameraById("dennssen.overlayInfo")
+	overlayCamera = getCameraById(overlayId)
 	if overlayCamera then
 		usingOverlay = true
 		sendMessage(overlayCamera, {
@@ -3085,9 +3100,6 @@ function onGui()
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
-		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
-		Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
-
 		speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
 		if Gui.button("Print Arenas") then
@@ -3431,6 +3443,7 @@ end
 
 function stopFollow()
 	toggleSmoothing(true, true)
+	ui:setCamera("")
 	playerFollow = false
 	camera:followCamera(nil)
 	cameraPosition = followPlussCamera:getSmoothedPosition()
@@ -4055,6 +4068,7 @@ function followPlayer()
 	}
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
+	ui:setCamera(followPlussId)
 	camera:followCamera(followPlussCamera)
 end
 
@@ -4672,6 +4686,8 @@ function drawBallOutline()
 	end
 end
 
+local debugFreecam: boolean = false
+
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = false
@@ -4741,6 +4757,11 @@ function tick(dt)
 		stopFollow()
 	end
 
+	if debugFreecam then
+		drawBallOutline()
+		return
+	end
+
 	if playerFollow then
 		readOtherInputs()
 	else
@@ -4749,8 +4770,8 @@ function tick(dt)
 
 		moveCamera()
 		rotateCamera()
-		drawBallOutline()
 	end
+	drawBallOutline()
 
 	particleAffect()
 	ballInCenterCheck()
