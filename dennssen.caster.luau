@@ -1049,9 +1049,17 @@ function Arena:onRoundEnd()
 
 	if self.isOvertime then -- find who scored in overtime
 		if self.home.goal.box:checkPointIntersect(ball.transform.position) then
-			cachedHomeScore += 1
+			if self.type == "4v4" then
+				cachedHomeScore += 1
+			else
+				cachedAwayScore += 1
+			end
 		elseif self.away.goal.box:checkPointIntersect(ball.transform.position) then
-			cachedAwayScore += 1
+			if self.type == "4v4" then
+				cachedAwayScore += 1
+			else
+				cachedHomeScore += 1
+			end
 		else
 			return -- is restart during overtime
 		end
