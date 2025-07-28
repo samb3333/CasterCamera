@@ -3100,7 +3100,7 @@ function onGui()
 			end
 		end
 		if selectedArena and Gui.button("Set Orientation to Arena") then
-			camera.position = selectedArena.transform.position
+			cameraPosition = selectedArena.transform.position
 			camera.rotation = selectedArena.transform.rotation
 			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
 		end
@@ -3217,12 +3217,12 @@ function onTransitionBegin(transitionInfo: Transition)
 	firstTransition = transitionTime <= loadTime + 1 -- Margin of 1 second
 
 	if firstTransition then
-		camera.position = defaultPosition
+		cameraPosition = defaultPosition
 		camera.rotation = defaultRotation
 		rotEuler = defaultRotation:euler()
 		rotEuler.x = 0
 	else
-		camera.position = transitionInfo.startPosition
+		cameraPosition = transitionInfo.startPosition
 		camera.rotation = transitionInfo.startRotation
 		rotEuler = transitionInfo.startRotation:euler()
 		rotEuler.x = 0
@@ -3431,7 +3431,7 @@ function stopFollow()
 	toggleSmoothing(true, true)
 	playerFollow = false
 	camera:followCamera(nil)
-	camera.position = followPlussCamera:getSmoothedPosition()
+	cameraPosition = followPlussCamera:getSmoothedPosition()
 	rotEuler = followPlussCamera:getSmoothedRotation():euler()
 	rotEuler.x = 0
 	currentPlayer = nil
@@ -3773,10 +3773,10 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			camera.position = selectedArena.home.overview[1].position
+			cameraPosition = selectedArena.home.overview[1].position
 			setGlobalCameraRotation(selectedArena.home.overview[1].rotation)
 		else
-			camera.position = selectedArena.away.overview[1].position
+			cameraPosition = selectedArena.away.overview[1].position
 			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
 		end
 	end
@@ -3786,10 +3786,10 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			camera.position = selectedArena.home.overview[2].position
+			cameraPosition = selectedArena.home.overview[2].position
 			setGlobalCameraRotation(selectedArena.home.overview[2].rotation)
 		else
-			camera.position = selectedArena.away.overview[2].position
+			cameraPosition = selectedArena.away.overview[2].position
 			setGlobalCameraRotation(selectedArena.away.overview[2].rotation)
 		end
 	end
@@ -3799,10 +3799,10 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			camera.position = selectedArena.home.overview[3].position
+			cameraPosition = selectedArena.home.overview[3].position
 			setGlobalCameraRotation(selectedArena.home.overview[3].rotation)
 		else
-			camera.position = selectedArena.away.overview[3].position
+			cameraPosition = selectedArena.away.overview[3].position
 			setGlobalCameraRotation(selectedArena.away.overview[3].rotation)
 		end
 	end
