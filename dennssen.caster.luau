@@ -2565,13 +2565,14 @@ end
 function onGui()
 	if followPlussWarning ~= "" then
 		Gui.text(followPlussWarning)
+		Gui.newLine()
 	end
 
 	Gui.text(`Version: {version}`)
 	if Gui.button(Icon.Question) then
 		controlsScreen = not controlsScreen
 	end
-	Gui.setItemTooltip("Controls for the camera")
+	Gui.setItemTooltip("Keybinds for the camera")
 
 	if controlsScreen then
 		if keyboardControls then
