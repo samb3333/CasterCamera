@@ -3152,6 +3152,7 @@ function onGui()
 					if ballCollisionInfo.home.current then
 						Gui.text(`PlayerName: {ballCollisionInfo.home.current.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.current.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.home.current.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -3159,6 +3160,7 @@ function onGui()
 					if ballCollisionInfo.home.previous then
 						Gui.text(`PlayerName: {ballCollisionInfo.home.previous.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.previous.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.home.previous.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -3169,6 +3171,7 @@ function onGui()
 					if ballCollisionInfo.away.current then
 						Gui.text(`PlayerName: {ballCollisionInfo.away.current.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.current.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.away.current.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -3176,6 +3179,7 @@ function onGui()
 					if ballCollisionInfo.away.previous then
 						Gui.text(`PlayerName: {ballCollisionInfo.away.previous.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.previous.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.away.previous.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
