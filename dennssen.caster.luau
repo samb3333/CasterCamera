@@ -2567,6 +2567,7 @@ function onGui()
 		Gui.text(followPlussWarning)
 	end
 
+	Gui.text(`Version: {version}`)
 	if Gui.button(Icon.Question) then
 		controlsScreen = not controlsScreen
 	end
@@ -3082,7 +3083,6 @@ function onGui()
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
-		Gui.text(`Version: {version}`)
 		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
 		Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
 
