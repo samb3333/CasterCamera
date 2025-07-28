@@ -1606,20 +1606,24 @@ local exposureBias = config.postProcessing.exposureBias
 type BallCollision = {
 	home: {
 		current: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
 		previous: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
 	},
 	away: {
 		current: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
 		previous: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
@@ -1642,7 +1646,6 @@ local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
 local previousAwayGoalPotentialEnter: boolean = false
 
-local lastPlayerBallContactPoint: Vec3 = Vec3.zeroVector
 local maximumTimeSincePass: number = 5
 
 local goalPlayer: ReplayPlayer? = nil
@@ -4100,10 +4103,12 @@ function checkBallContact()
 			ballCollisionInfo.home.current
 			and contactPlayer.playerId == ballCollisionInfo.home.current.player.playerId
 		then
+			ballCollisionInfo.home.current.lastContactPlace = ball.transform.position
 			return
 		end
 		ballCollisionInfo.home.previous = ballCollisionInfo.home.current
 		ballCollisionInfo.home.current = {
+			lastContactPlace = ball.transform.position,
 			contactTime = contactTime,
 			player = contactPlayer,
 		}
@@ -4112,10 +4117,12 @@ function checkBallContact()
 			ballCollisionInfo.away.current
 			and contactPlayer.playerId == ballCollisionInfo.away.current.player.playerId
 		then
+			ballCollisionInfo.away.current.lastContactPlace = ball.transform.position
 			return
 		end
 		ballCollisionInfo.away.previous = ballCollisionInfo.away.current
 		ballCollisionInfo.away.current = {
+			lastContactPlace = ball.transform.position,
 			contactTime = contactTime,
 			player = contactPlayer,
 		}
@@ -4348,9 +4355,16 @@ function goalScoreCheck()
 
 		local shooterName = ""
 		local assistName = ""
+		local shotFrom: Vec3
 
 		if ballCollisionInfo.away.current then
 			shooterName = ballCollisionInfo.away.current.player.playerName
+			shotFrom = ballCollisionInfo.away.current.lastContactPlace
+		end
+
+		local shotDistance: number = 0
+		if shotFrom then
+			shotDistance = getDist(shotFrom, ball.transform.position) / 100
 		end
 
 		local assistPlayer = getAssistPlayer("away")
@@ -4366,7 +4380,7 @@ function goalScoreCheck()
 				assister = assistName,
 				team = "away",
 				shotSpeed = ball.velocity:length() / 100,
-				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
+				shotDistanceMeters = shotDistance,
 			},
 		})
 
@@ -4406,9 +4420,16 @@ function goalScoreCheck()
 
 		local shooterName = ""
 		local assistName = ""
+		local shotFrom: Vec3
 
 		if ballCollisionInfo.home.current then
 			shooterName = ballCollisionInfo.home.current.player.playerName
+			shotFrom = ballCollisionInfo.home.current.lastContactPlace
+		end
+
+		local shotDistance: number = 0
+		if shotFrom then
+			shotDistance = getDist(shotFrom, ball.transform.position) / 100
 		end
 
 		local assistPlayer = getAssistPlayer("home")
@@ -4424,7 +4445,7 @@ function goalScoreCheck()
 				assister = assistName,
 				team = "home",
 				shotSpeed = ball.velocity:length() / 100,
-				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
+				shotDistanceMeters = shotDistance,
 			},
 		})
 
