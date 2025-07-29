@@ -954,7 +954,11 @@ function Arena:tick()
 
 	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
 	if gameTimeComponent then
-		self.lastGameTimeSeconds = self.gameTimeSeconds or self.matchLengthSeconds
+		if self.gameTimeSeconds and self.isGameActive then
+			self.lastGameTimeSeconds = self.gameTimeSeconds
+		else
+			self.lastGameTimeSeconds = self.matchLengthSeconds
+		end
 		local gameTimeSeconds = gameTimeComponent:getTimeSeconds()
 		local actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
 		self.gameTimeSeconds = gameTimeSeconds
@@ -1047,6 +1051,7 @@ function Arena:onRoundEnd()
 	end
 
 	if self.isOvertime then -- find who scored in overtime
+		self.isOvertime = false
 		if self.home.goal.box:checkPointIntersect(ball.transform.position) then
 			if self.type == "4v4" then
 				cachedHomeScore += 1
