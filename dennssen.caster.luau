@@ -20,12 +20,12 @@ metadata = {
 -- Launch everything.
 
 --Notes:
--- clean up config with more "Categories" like post processing has
+-- clean up config with more "Categories" like post processing has (Now possible with new config initialization)
 -- ballCam?
 
 --Add:
--- When exiting POV set the camera to look at the ball. Possibly make an option under controls.
--- Black box behind player names to make it easier to read (Maybe, overlay should help with this)
+-- When exiting POV set the camera to look at the ball. make an option under accessibility.
+-- Black box behind player names to make it easier to read
 
 -- Future ideas:
 -- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
@@ -716,7 +716,6 @@ Box.empty = Box.new(Vec3.zeroVector, Vec3.zeroVector, Quat.identity)
 
 -- Ball
 local ball: ReplayBall
-local ballRotation: Quat = Quat.identity
 local ballOutline: boolean = config.ballOutline
 local GetBallVariant = {
 	PlayerBallDistance = "PlayerBallDistance",
@@ -1084,8 +1083,8 @@ function Arena:onGameStart()
 	self.isOvertime = false
 
 	sendSafeMessage(overlayCamera, {
-		info = "clearStats",
-		value = "",
+		info = "stats",
+		value = "clear",
 	})
 
 	sendSafeMessage(overlayCamera, {
@@ -3140,7 +3139,8 @@ function onGui()
 		end
 		if Gui.button("Reset All Stats") then
 			sendMessage(overlayCamera, {
-				info = "clearStats",
+				info = "stats",
+				value = "clear",
 			})
 		end
 		if Gui.button("Print Pressed Keys") then
@@ -3795,7 +3795,8 @@ function readOtherInputs()
 
 	if getCasterKey(inputs.keyboard.clearOverlayInfo).down or getCasterKey(inputs.gamepad.clearOverlayInfo).down then
 		sendMessage(overlayCamera, {
-			info = "clearStats",
+			info = "stats",
+			value = "clear",
 		})
 	end
 
