@@ -2486,6 +2486,7 @@ local invertControllerLookVertical: boolean = config.invertControllerLookVertica
 local controllerSensitivity: number = config.controllerSensitivity
 
 -- Gui
+local debugFreecam: boolean = false
 local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
@@ -3116,6 +3117,11 @@ function onGui()
 	if Gui.treeNode("Debug") then
 		speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
+		if Gui.button("Follow Freecam") then
+			debugFreecam = true
+			ui:setCamera("anotheraxiom.freecam")
+			camera:followCamera(getCameraById("anotheraxiom.freecam"))
+		end
 		if Gui.button("Print Arenas") then
 			for _, arena in arenas do
 				print(arena.slotId)
