@@ -1325,8 +1325,8 @@ Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, 90)
 Arena4v4.boxSize = Vec3.new(6110, 8400, 1490)
 Arena4v4.boxOffset = Vec3.new(0, 0, 600)
 Arena4v4.centerBoxOffset = Vec3.new(0, 0, 250)
-Arena4v4.goalBoxSize = Vec3.new(200, 450, 225)
-Arena4v4.goalPositionOffset = Vec3.new(4075, 0, 175)
+Arena4v4.goalBoxSize = Vec3.new(220, 450, 225)
+Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
 
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	local self = setmetatable(Arena.new(gamemode), Arena4v4) :: any
