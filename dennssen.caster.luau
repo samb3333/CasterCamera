@@ -33,9 +33,10 @@ metadata = {
 -- Make a template minimap for the overlay
 
 -- Known Issues:
--- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
+-- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals are not detected
 -- Game crashes when joining any server for the second time
+-- Goal explosion in Driftblitz does not match the goal size and shape
 
 -- GameData
 local readLocation = 0
