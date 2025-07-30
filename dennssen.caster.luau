@@ -4144,6 +4144,30 @@ function checkBallContact()
 	end
 end
 
+function getLastPlayerWithBall(): ReplayPlayer?
+	local homeTouchTime: number = 0
+	local homePlayer: ReplayPlayer
+	local awayTouchTime: number = 0
+	local awayPlayer: ReplayPlayer
+	if ballCollisionInfo.home.current then
+		homeTouchTime = ballCollisionInfo.home.current.contactTime
+		homePlayer = ballCollisionInfo.home.current.player
+	end
+
+	if ballCollisionInfo.away.current then
+		awayTouchTime = ballCollisionInfo.away.current.contactTime
+		awayPlayer = ballCollisionInfo.away.current.player
+	end
+
+	if homeTouchTime > awayTouchTime then
+		return homePlayer
+	elseif awayTouchTime > homeTouchTime then
+		return awayPlayer
+	else
+		return nil
+	end
+end
+
 function getPossessionTeam(): string?
 	if ballCollisionInfo.home.current == nil and ballCollisionInfo.away.current == nil then
 		return nil
@@ -4211,10 +4235,11 @@ end
 
 function checkForSave(goal: { team: string, dist: number }): boolean
 	local goalie = getClosestPlayerToBall(60)
+	local lastPlayerWithBall = getLastPlayerWithBall()
 
 	local successfulSave = false
 
-	if goal.team == "home" then
+	if goal.team == "home" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == TeamIndex.awayTeam then
 		if
 			not homeGoalPotentialEnter
 			and previousHomeGoalPotentialEnter
@@ -4235,7 +4260,7 @@ function checkForSave(goal: { team: string, dist: number }): boolean
 				},
 			})
 		end
-	elseif goal.team == "away" then
+	elseif goal.team == "away" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == TeamIndex.homeTeam then
 		if
 			not awayGoalPotentialEnter
 			and previousAwayGoalPotentialEnter
@@ -4724,8 +4749,6 @@ function drawBallOutline()
 		prevPoint = point
 	end
 end
-
-local debugFreecam: boolean = false
 
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
