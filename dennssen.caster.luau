@@ -1,6 +1,6 @@
 --!strict
 
-local version: string = "1.4.0"
+local version: string = "2.0.0"
 metadata = {
 	name = "Caster",
 	description = "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
