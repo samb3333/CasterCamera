@@ -879,6 +879,7 @@ type Arena = {
 	isGracePeriod: boolean,
 	bestOfAmount: number,
 	matchLengthSeconds: number,
+	mercyScoreDifference: number,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
@@ -954,6 +955,7 @@ function Arena:tick()
 	local gameTimeComponent = self.gamemode:getGameTimeComponent()
 
 	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
+	self.mercyScoreDifference = self.gamemode:getNumberConfigVariable("mercyscoredifference")
 	if gameTimeComponent then
 		if self.gameTimeSeconds and self.isGameActive then
 			self.lastGameTimeSeconds = self.gameTimeSeconds
@@ -1046,8 +1048,9 @@ end
 function Arena:onRoundEnd()
 	local cachedHomeScore = self.home.score
 	local cachedAwayScore = self.away.score
+	local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
 
-	if not self.isOvertime and self.lastGameTimeSeconds > 0 then -- is restart
+	if not self.isOvertime and self.lastGameTimeSeconds > 0 and scoreDifference < self.mercyScoreDifference then -- is restart
 		return
 	end
 
