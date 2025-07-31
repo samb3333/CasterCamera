@@ -2485,6 +2485,7 @@ local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
 local addRound: boolean = false
+local overlayResponse: string = ""
 local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
@@ -2995,6 +2996,9 @@ function onGui()
 			if overlayWarning ~= "" then
 				Gui.text(overlayWarning)
 			end
+			if overlayResponse ~= "" then
+				Gui.text(overlayResponse)
+			end
 			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
 			Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
 
@@ -3008,6 +3012,19 @@ function onGui()
 			Gui.setItemTooltip(
 				"The team name for the away side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
 			)
+			if Gui.button(`{Icon.Retweet} Swap team names`) then
+				local temp = homeTeam
+				homeTeam = awayTeam
+				awayTeam = temp
+				sendMessage(overlayCamera, {
+					info = "teamNames",
+					value = {
+						home = homeTeam,
+						away = awayTeam,
+					},
+				})
+				overlayResponse = "Team names are swapped"
+			end
 
 			if Gui.button(Icon.Upload .. " Send Teams to Overlay") then
 				sendMessage(overlayCamera, {
@@ -3017,8 +3034,7 @@ function onGui()
 						away = awayTeam,
 					},
 				})
-				homeTeam = ""
-				awayTeam = ""
+				overlayResponse = "Team names are sendt"
 			end
 
 			Gui.newLine()
