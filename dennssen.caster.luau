@@ -841,6 +841,7 @@ type Round = {
 }
 
 type ArenaTeam = {
+	previousActualScore: number,
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
@@ -883,8 +884,9 @@ type Arena = {
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
-	onRoundEnd: (self: Arena) -> (),
 	onGameStart: (self: Arena) -> (),
+	onRoundStart: (self: Arena) -> (),
+	onRoundEnd: (self: Arena) -> (),
 	setTeams: (self: Arena) -> (),
 	sendInfoMessage: (self: Arena) -> (),
 
@@ -916,6 +918,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	self.players = {}
 
 	self.home = {
+		previousActualScore = 0,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -930,6 +933,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	}
 
 	self.away = {
+		previousActualScore = 0,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -978,17 +982,21 @@ function Arena:tick()
 	self.lastIsGameActive = self.isGameActive
 	self.isGameActive = self.gamemode:getIsGameRunning()
 
-	if not self.isGameActive and self.lastIsGameActive then
-		self:onRoundEnd()
+	local homeActualScore = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	if homeActualScore ~= self.home.previousActualScore then
+		self.home.previousScore = self.home.score
+		self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
 	end
+	self.home.scoreIncrease = self.home.previousActualScore ~= homeActualScore
+	self.home.previousActualScore = homeActualScore
 
-	self.home.previousScore = self.home.score
-	self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
-	self.away.previousScore = self.away.score
-	self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
-
-	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
-	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
+	local awayActualScore = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+	if awayActualScore ~= self.away.previousActualScore then
+		self.away.previousScore = self.away.score
+		self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+	end
+	self.away.scoreIncrease = self.away.previousActualScore ~= awayActualScore
+	self.away.previousActualScore = awayActualScore
 
 	if arenaSwitch then
 		self.home.previousScore = self.home.score
@@ -1000,14 +1008,18 @@ function Arena:tick()
 		arenaSwitch = false
 	end
 
+	if not self.isGameActive and self.lastIsGameActive then
+		self:onRoundEnd()
+	end
+
+	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
+	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
+
 	if self.gamemode:getBoolConfigVariable("busebestof") then
 		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
 	else
 		self.bestOfAmount = 1
 	end
-
-	self.home.scoreIncrease = self.home.previousScore < self.home.score
-	self.away.scoreIncrease = self.away.previousScore < self.away.score
 
 	if self.home.scoreIncrease or self.away.scoreIncrease then
 		timeSinceLastGracePeriod = 0
@@ -1039,31 +1051,84 @@ function Arena:tick()
 
 	if started and self.home.roundsWon == 0 and self.away.roundsWon == 0 then
 		self:onGameStart()
+	elseif started then
+		self:onRoundStart()
 	end
 
 	self:setTeams()
 	self:sendInfoMessage()
 end
 
-function Arena:onRoundEnd()
-	local cachedHomeScore = self.home.score
-	local cachedAwayScore = self.away.score
-	local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
+function Arena:onGameStart()
+	print("game start")
 
-	if not self.isOvertime and self.lastGameTimeSeconds > 0 and scoreDifference < self.mercyScoreDifference then -- is restart
+	sendSafeMessage(overlayCamera, {
+		info = "stats",
+		value = "clear",
+	})
+
+	sendSafeMessage(overlayCamera, {
+		info = "rounds",
+		value = "clear",
+	})
+
+	self:onRoundStart()
+end
+
+function Arena:onRoundStart()
+	self.isOvertime = false
+	self.home.score = 0
+	self.home.previousScore = 0
+	self.away.score = 0
+	self.away.previousScore = 0
+	print("round start")
+end
+
+function Arena:onRoundEnd()
+	print("round end")
+	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
+	local cachedHomeScore
+	local cachedAwayScore
+
+	if endsWithAGoal then
+		cachedHomeScore = self.home.previousScore
+		cachedAwayScore = self.away.previousScore
+	else
+		cachedHomeScore = self.home.score
+		cachedAwayScore = self.away.score
+	end
+
+	local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
+	local isMercy = scoreDifference >= (self.mercyScoreDifference - 1) and endsWithAGoal
+
+	print(`Home pre-score: {self.home.previousScore}`)
+	print(`Away pre-score: {self.away.previousScore}`)
+	print(`Game time: {self.gameTimeSeconds}`)
+	print(`Action time: {self.actionTimerSeconds}`)
+	print(`Ends with goal: {endsWithAGoal}`)
+	print(`Is overtime: {self.isOvertime}`)
+	print(`Is mercy: {isMercy}`)
+
+	if self.isOvertime and not endsWithAGoal then -- is restart
+		print("overtime restart")
 		return
 	end
 
-	if self.isOvertime then -- find who scored in overtime
-		self.isOvertime = false
-		if self.home.goal.box:checkPointIntersect(ball.transform.position) then
-			cachedAwayScore += 1
-		elseif self.away.goal.box:checkPointIntersect(ball.transform.position) then
-			cachedHomeScore += 1
-		else
-			return -- is restart during overtime
-		end
+	if not self.isOvertime and self.gameTimeSeconds > 0 and not isMercy then -- is restart
+		print("restart" .. " " .. scoreDifference)
+		return
 	end
+
+	if endsWithAGoal and self.home.goal.box:checkPointIntersect(ball.transform.position) then -- spec bugging again
+		print("Increased away score")
+		cachedAwayScore += 1
+	elseif endsWithAGoal and self.away.goal.box:checkPointIntersect(ball.transform.position) then -- spec bugging again
+		print("Increased home score")
+		cachedHomeScore += 1
+	end
+
+	print(`Home score: {cachedHomeScore}`)
+	print(`Away score: {cachedAwayScore}`)
 
 	local round: Round = {
 		home = {
@@ -1077,20 +1142,6 @@ function Arena:onRoundEnd()
 	sendSafeMessage(overlayCamera, {
 		info = "rounds",
 		value = round,
-	})
-end
-
-function Arena:onGameStart()
-	self.isOvertime = false
-
-	sendSafeMessage(overlayCamera, {
-		info = "stats",
-		value = "clear",
-	})
-
-	sendSafeMessage(overlayCamera, {
-		info = "rounds",
-		value = "clear",
 	})
 end
 
