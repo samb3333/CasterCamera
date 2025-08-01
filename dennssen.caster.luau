@@ -33,10 +33,13 @@ metadata = {
 -- Make a template minimap for the overlay
 
 -- Known Issues:
+-- No replay compatibility
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
--- Overtime goals are not detected
--- Game crashes when joining any server for the second time
+-- Overtime goals don't have particle affects
+-- Game crashes when joining a second server in the same session (join server -> Quit to menu -> join server -> crash)
 -- Goal explosion in Driftblitz does not match the goal size and shape
+-- Scores can be inaccurate when selecting an arena if the arenas previous round was in overtime or was a mercy win
+-- Back to back overtime (0-0) it will not count the second round if the same team wins twice.
 
 -- GameData
 local readLocation = 0
