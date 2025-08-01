@@ -4487,7 +4487,7 @@ function goalScoreCheck()
 		sendSafeMessage(overlayCamera, {
 			info = "shot",
 			value = {
-				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
+				shooter = shooterName,
 				assister = assistName,
 				team = "away",
 				shotSpeed = ball.velocity:length() / 100,
