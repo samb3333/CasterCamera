@@ -3262,6 +3262,12 @@ function onGui()
 			Gui.treePop()
 		end
 		if selectedArena then
+			Gui.text(
+				`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(ball.transform.position)}`
+			)
+			Gui.text(
+				`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(ball.transform.position)}`
+			)
 			if Gui.button("Print Selected Arena") then
 				print(selectedArena)
 			end
