@@ -1,6 +1,6 @@
 --!strict
 
-local version: string = "1.4.0"
+local version: string = "2.0.0"
 metadata = {
 	name = "Caster",
 	description = "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
@@ -9,8 +9,15 @@ metadata = {
 }
 
 --TODO:
--- Do more installation testing
--- Shorten goal display visability -- needs testing
+-- Normal Win (h ~= a)
+-- Mercy Win (h - a >= 6)
+-- Overtime Win (h == a)
+-- Normal Reset ()
+
+-- Do a full scale test of 3v3
+-- Do a full scale test of 4v4
+
+-- Spell check overlay
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
@@ -21,13 +28,12 @@ metadata = {
 -- Launch everything.
 
 --Notes:
--- clean up config with more "Categories" like post processing has
+-- clean up config with more "Categories" like post processing has (Now possible with new config initialization)
 -- ballCam?
 
 --Add:
--- When exiting POV set the camera to look at the ball. Possibly make an option under controls.
--- Black box behind player names to make it easier to read (Maybe, overlay should help with this)
--- White circle around ball to see it behind walls
+-- When exiting POV set the camera to look at the ball. make an option under accessibility.
+-- Black box behind player names to make it easier to read
 
 -- Future ideas:
 -- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
@@ -35,9 +41,13 @@ metadata = {
 -- Make a template minimap for the overlay
 
 -- Known Issues:
--- Double click right click while not moving mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
--- Overtime goals are not detected
--- Game crashes when joining any server for the second time
+-- No replay compatibility
+-- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
+-- Overtime goals don't have particle affects
+-- Game crashes when joining a second server in the same session (join server -> Quit to menu -> join server -> crash)
+-- Goal explosion in Driftblitz does not match the goal size and shape
+-- Scores can be inaccurate when selecting an arena if the arenas previous round was in overtime or was a mercy win
+-- Back to back overtime (0-0) it will not count the second round if the same team wins twice.
 
 -- GameData
 local readLocation = 0
@@ -101,6 +111,45 @@ local defaultKeybinds = {
 	},
 }
 
+function DeepStructureCopy(structureTable, normalTable): boolean
+	local adjusted = false
+	if typeof(structureTable) == "table" then
+		for structureKey, structureValue in structureTable do
+			if normalTable[structureKey] == nil then
+				adjusted = true
+				normalTable[structureKey] = structureValue
+			elseif typeof(normalTable[structureKey]) ~= typeof(structureValue) then
+				adjusted = true
+				normalTable[structureKey] = structureValue
+			elseif typeof(structureValue) == "table" then
+				if DeepStructureCopy(structureValue, normalTable[structureKey]) then
+					adjusted = true
+				end
+			end
+		end
+	end
+
+	return adjusted
+end
+
+function DeepStructureClean(structureTable, normalTable): boolean
+	local adjusted = false
+	if typeof(normalTable) == "table" then
+		for normalKey, normalValue in normalTable do
+			if structureTable[normalKey] == nil then
+				adjusted = true
+				normalTable[normalKey] = nil
+			elseif typeof(normalValue) == "table" then
+				if DeepStructureClean(structureTable[normalKey], normalValue) then
+					adjusted = true
+				end
+			end
+		end
+	end
+
+	return adjusted
+end
+
 local function initializeConfig()
 	local saveToConfig = false
 	local neededValues = {
@@ -116,7 +165,8 @@ local function initializeConfig()
 		invertControllerLookVertical = false,
 		controllerSensitivity = 0.5,
 		positionSmoothing = 0.02,
-		lookSmoothness = 0,
+		lookSmoothness = 0.25,
+		ballOutline = true,
 		particleSimSpeed = 1,
 		vibrance = 1,
 		getBallVariant = "PlayerBallDistance",
@@ -191,20 +241,12 @@ local function initializeConfig()
 		},
 	}
 
-	-- saves new values that are not there from before to all profiles
-	for neededKey, neededValue in pairs(neededValues) do
-		if config[neededKey] == nil then
-			saveToConfig = true
-			config[neededKey] = neededValue
-		end
+	if DeepStructureCopy(neededValues, config) then
+		saveToConfig = true
 	end
 
-	-- removes saved but no longer used values in all profiles
-	for configKey, configValue in pairs(config) do
-		if neededValues[configKey] == nil then
-			saveToConfig = true
-			config[configKey] = nil
-		end
+	if DeepStructureClean(neededValues, config) then
+		saveToConfig = true
 	end
 
 	if saveToConfig then
@@ -357,6 +399,14 @@ function lerp(a: number, b: number, t: number): number
 	return a * (1.0 - t) + b * t
 end
 
+function getApparentRaidus(radius: number, distance: number, HUDDepth: number): number
+	return HUDDepth * (radius / distance)
+end
+
+function convertToHUD(vec: Vec2): Vec3
+	return camera.rotation:getRightVector() * vec.x + camera.rotation:getUpVector() * vec.y
+end
+
 function keyToString(key: Key): string
 	return string.gsub(tostring(key), "Gamepad_", "")
 end
@@ -370,6 +420,9 @@ local transitionTime: number
 local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
 local defaultRotation = Quat.fromEuler(0, 0, 90)
+
+local cameraPosition: Vec3 = defaultPosition
+local cameraVelocity: Vec3 = Vec3.zeroVector
 
 local TeamIndex = {
 	NoTeam = -1,
@@ -388,6 +441,119 @@ local CAMERA_MODE_NAMES = {
 	[3] = "Velocity Rotation",
 	[4] = "Face The Ball",
 }
+
+type HUD = {
+	__index: HUD,
+	cameraId: string,
+	width: number,
+	height: number,
+	depth: number,
+	transform: {
+		origin: Vec3,
+		top: Vec3,
+		left: Vec3,
+		bottom: Vec3,
+		right: Vec3,
+	},
+
+	new: (cameraId: string, width: number, height: number, depth: number) -> HUD,
+	setCamera: (self: HUD, cameraId: string) -> (),
+	generateTransform: (self: HUD) -> (),
+
+	tick: (self: HUD) -> (),
+	drawPoint: (anchor: Vec3, color: Vec3, pointSize: number, lifetime: number) -> (),
+	drawLine: (startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number) -> (),
+	worldToHUD: (self: HUD, worldPosition: Vec3) -> Vec3,
+}
+
+local HUD: HUD = {} :: HUD
+HUD.__index = HUD
+
+function HUD.new(cameraId: string, width: number, height: number, depth: number): HUD
+	local self: HUD = setmetatable({}, HUD) :: any
+	self.cameraId = cameraId
+	self.width = width
+	self.height = height
+	self.depth = depth
+
+	self:generateTransform()
+
+	return self :: HUD
+end
+
+function HUD:setCamera(cameraId: string)
+	self.cameraId = cameraId
+end
+
+function HUD:generateTransform()
+	self.transform = {} :: any
+
+	local _camera
+
+	if self.cameraId ~= "" then
+		_camera = getCameraById(self.cameraId)
+	else
+		_camera = camera
+	end
+
+	local _cameraPosition: Vec3
+	local _cameraRotation: Quat
+	_cameraPosition = _camera.position
+	_cameraRotation = _camera.rotation
+
+	self.transform.origin = _cameraPosition + (_cameraRotation:getForwardVector() * self.depth)
+
+	local fovRad = math.rad(_camera.fieldOfView)
+	local aspectRatio = self.width / self.height
+	local halfWidth = math.tan(fovRad / 2) * self.depth
+	local halfHeight = halfWidth / aspectRatio
+
+	self.transform.top = self.transform.origin + (_cameraRotation:getUpVector() * halfHeight)
+	self.transform.left = self.transform.origin + (_cameraRotation:getRightVector() * -halfWidth)
+	self.transform.bottom = self.transform.origin + (_cameraRotation:getUpVector() * -halfHeight)
+	self.transform.right = self.transform.origin + (_cameraRotation:getRightVector() * halfWidth)
+end
+
+function HUD:tick()
+	self:generateTransform()
+end
+
+function HUD.drawPoint(anchor: Vec3, color: Vec3, pointSize: number, lifetime: number)
+	WorldDraw.drawPoint(anchor, color.x, color.y, color.z, pointSize, lifetime)
+end
+
+function HUD.drawLine(startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number)
+	WorldDraw.drawLine(startAnchor, endAnchor, color.x, color.y, color.z, thickness, lifetime)
+end
+
+function HUD:worldToHUD(worldPosition: Vec3): Vec3
+	local _camera
+
+	if self.cameraId ~= "" then
+		_camera = getCameraById(self.cameraId)
+	else
+		_camera = camera
+	end
+
+	local camPos = _camera.position
+	local camForward = _camera.rotation:getForwardVector()
+	local hudOrigin = self.transform.origin
+
+	local rayDir = (worldPosition - camPos):getSafeNormal()
+	local denom = camForward:dot(rayDir)
+
+	if denom <= 0 then
+		return Vec3.zeroVector
+	end
+
+	-- Ray-plane intersection:
+	local t = (hudOrigin - camPos):dot(camForward) / denom
+	local projected = camPos + rayDir * t
+
+	return projected
+end
+
+local ui = HUD.new("", 1920, 1080, 100)
 
 -- Bounding Box start
 
@@ -562,7 +728,7 @@ Box.empty = Box.new(Vec3.zeroVector, Vec3.zeroVector, Quat.identity)
 
 -- Ball
 local ball: ReplayBall
-local ballRotation: Quat = Quat.identity
+local ballOutline: boolean = config.ballOutline
 local GetBallVariant = {
 	PlayerBallDistance = "PlayerBallDistance",
 	LineOfSight = "LineOfSight",
@@ -571,6 +737,7 @@ local getBallVariant = config.getBallVariant
 
 -- Overlay Camera
 local overlayCamera: SpectatorCamera = nil
+local overlayId: string = "dennssen.overlayInfo"
 local requiredOverlayVersion: string = "=1.0.0"
 local overlayWarning: string = ""
 local overlayVersion: string = ""
@@ -595,6 +762,7 @@ end
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
+local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = "=1.9.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
@@ -625,6 +793,7 @@ type MessageValues = {
 	targetPlayer: ReplayPlayer?,
 	targetPlayerName: string?,
 	positionSmoothing: number?,
+	rotationSmoothing: number?,
 	cameraFOV: number?,
 	cameraMode: number?,
 	radius: number?,
@@ -683,10 +852,13 @@ type Round = {
 }
 
 type ArenaTeam = {
+	previousActualScore: number,
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
+	previousRoundsWon: number,
 	roundsWon: number,
+	roundsWonIncrease: boolean,
 	goal: {
 		position: Vec3,
 		rotation: Quat,
@@ -714,18 +886,22 @@ type Arena = {
 	isGameActive: boolean,
 	isKickoff: boolean,
 	isOvertime: boolean,
+	isGracePeriod: boolean,
 
 	gameTimeSeconds: number,
 	lastGameTimeSeconds: number,
 	actionTimerSeconds: number,
-	isGracePeriod: boolean,
 	bestOfAmount: number,
 	matchLengthSeconds: number,
+	mercyScoreDifference: number,
+
+	gracePeriodStartTime: number,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
-	onRoundEnd: (self: Arena) -> (),
 	onGameStart: (self: Arena) -> (),
+	onRoundStart: (self: Arena) -> (),
+	onRoundEnd: (self: Arena) -> (),
 	setTeams: (self: Arena) -> (),
 	sendInfoMessage: (self: Arena) -> (),
 
@@ -741,10 +917,9 @@ type Arena = {
 local Arena: Arena = {} :: Arena
 Arena.__index = Arena
 
-local arenaSwitch: boolean = false
+local arenaInstantUpdate: boolean = false
 
 local centerBoxSize = Vec3.new(50, 50, 125)
-local timeSinceLastGracePeriod: number = 0
 
 local overviewOffsets = config.overviewOffsets
 
@@ -757,10 +932,13 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	self.players = {}
 
 	self.home = {
+		previousActualScore = 0,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
+		previousRoundsWon = 0,
 		roundsWon = 0,
+		roundsWonIncrease = false,
 		goal = {
 			position = Vec3.zeroVector,
 			rotation = Quat.identity,
@@ -771,10 +949,13 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 	}
 
 	self.away = {
+		previousActualScore = 0,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
+		previousRoundsWon = 0,
 		roundsWon = 0,
+		roundsWonIncrease = false,
 		goal = {
 			position = Vec3.zeroVector,
 			rotation = Quat.identity,
@@ -784,7 +965,10 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		players = {},
 	}
 
+	self.gracePeriodStartTime = 0
+	self.isOvertime = false
 	self.isKickoff = false
+	self.isGracePeriod = false
 
 	print(`made arena {self.slotId}`)
 
@@ -792,79 +976,13 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 end
 
 function Arena:tick()
-	local gameTimeComponent = self.gamemode:getGameTimeComponent()
-
-	if gameTimeComponent then
-		local gameTimeSeconds = gameTimeComponent:getTimeSeconds()
-		local actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
-		self.lastGameTimeSeconds = self.gameTimeSeconds or 0
-		self.gameTimeSeconds = gameTimeSeconds
-		self.actionTimerSeconds = actionTimerSeconds
-	else
-		self.gameTimeSeconds = 0
-		self.actionTimerSeconds = 0
-	end
-
-	if self.gameTimeSeconds > self.lastGameTimeSeconds and not self.isOvertime then
-		self.isOvertime = true
-	end
-
+	local currentTime = os.clock()
 	self.lastIsGameActive = self.isGameActive
 	self.isGameActive = self.gamemode:getIsGameRunning()
 
-	if not self.isGameActive and self.lastIsGameActive then
-		self:onRoundEnd()
-	end
-
-	self.home.previousScore = self.home.score
-	self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
-	self.away.previousScore = self.away.score
-	self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
-
-	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
-	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
-
-	if arenaSwitch then
-		self.home.previousScore = self.home.score
-		self.away.previousScore = self.away.score
-
+	if arenaInstantUpdate then
 		self.lastIsGameActive = self.isGameActive
-
-		arenaSwitch = false
 	end
-
-	if self.gamemode:getBoolConfigVariable("busebestof") then
-		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
-	else
-		self.bestOfAmount = 1
-	end
-
-	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
-
-	self.home.scoreIncrease = self.home.previousScore < self.home.score
-	self.away.scoreIncrease = self.away.previousScore < self.away.score
-
-	if self.home.scoreIncrease or self.away.scoreIncrease then
-		timeSinceLastGracePeriod = 0
-		self.isGracePeriod = true
-	end
-
-	if not self.isGracePeriod and self.actionTimerSeconds > 0 and self.gameTimeSeconds < self.matchLengthSeconds then
-		timeSinceLastGracePeriod = 0
-		self.isGracePeriod = true
-	end
-
-	if
-		self.isGracePeriod
-		and (
-			(timeSinceLastGracePeriod > 6 and self.actionTimerSeconds == 0)
-			or self.gameTimeSeconds == self.matchLengthSeconds
-		)
-	then
-		self.isGracePeriod = false
-	end
-
-	timeSinceLastGracePeriod += deltaTime
 
 	if not self.isKickoff and not self.lastIsGameActive and self.isGameActive then
 		self.isKickoff = true
@@ -874,29 +992,180 @@ function Arena:tick()
 
 	if started and self.home.roundsWon == 0 and self.away.roundsWon == 0 then
 		self:onGameStart()
+	elseif started then
+		self:onRoundStart()
+	end
+
+	local gameTimeComponent = self.gamemode:getGameTimeComponent()
+
+	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
+	self.mercyScoreDifference = self.gamemode:getNumberConfigVariable("mercyscoredifference")
+	if gameTimeComponent then
+		if self.gameTimeSeconds and self.isGameActive then
+			self.lastGameTimeSeconds = self.gameTimeSeconds
+		elseif self.matchLengthSeconds then
+			self.lastGameTimeSeconds = self.matchLengthSeconds
+		else
+			self.lastGameTimeSeconds = 0
+		end
+		self.gameTimeSeconds = gameTimeComponent:getTimeSeconds()
+		self.actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
+	else
+		self.gameTimeSeconds = 0
+		self.lastGameTimeSeconds = 0
+		self.actionTimerSeconds = 0
+	end
+
+	local homeActualScore = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	local awayActualScore = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+
+	if homeActualScore ~= self.home.previousActualScore then
+		self.home.previousScore = self.home.score
+		self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	end
+
+	if awayActualScore ~= self.away.previousActualScore then
+		self.away.previousScore = self.away.score
+		self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+	end
+
+	if arenaInstantUpdate then
+		self.home.previousActualScore = homeActualScore
+		self.away.previousActualScore = awayActualScore
+		self.lastGameTimeSeconds = self.gameTimeSeconds
+	end
+
+	self.home.scoreIncrease = self.home.previousActualScore ~= homeActualScore and homeActualScore ~= 0
+	self.away.scoreIncrease = self.away.previousActualScore ~= awayActualScore and awayActualScore ~= 0
+
+	self.home.previousActualScore = homeActualScore
+	self.away.previousActualScore = awayActualScore
+
+	if self.home.scoreIncrease or self.away.scoreIncrease then
+		print("goal")
+		self.gracePeriodStartTime = currentTime
+		self.isGracePeriod = true
+	elseif not self.isGracePeriod and self.actionTimerSeconds > 0 and self.isGameActive then
+		self.gracePeriodStartTime = currentTime
+		self.isGracePeriod = true
+	end
+
+	if
+		self.isGracePeriod
+		and ((currentTime - self.gracePeriodStartTime > 6 and self.actionTimerSeconds == 0) or not self.isGameActive)
+	then
+		self.isGracePeriod = false
+	end
+
+	if self.gameTimeSeconds > self.lastGameTimeSeconds and not self.isOvertime then
+		self.isOvertime = true
+	end
+
+	self.home.previousRoundsWon = self.home.roundsWon
+	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
+	self.away.previousRoundsWon = self.away.roundsWon
+	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
+
+	if arenaInstantUpdate then
+		self.home.previousRoundsWon = self.home.roundsWon
+		self.away.previousRoundsWon = self.away.roundsWon
+	end
+
+	self.home.roundsWonIncrease = self.home.roundsWon > self.home.previousRoundsWon
+	self.away.roundsWonIncrease = self.away.roundsWon > self.away.previousRoundsWon
+
+	if self.gamemode:getBoolConfigVariable("busebestof") then
+		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
+	else
+		self.bestOfAmount = 1
+	end
+
+	if not self.isGameActive and self.lastIsGameActive then
+		self:onRoundEnd()
 	end
 
 	self:setTeams()
 	self:sendInfoMessage()
+
+	if arenaInstantUpdate then
+		arenaInstantUpdate = false
+	end
+end
+
+function Arena:onGameStart()
+	print("game start")
+
+	sendSafeMessage(overlayCamera, {
+		info = "stats",
+		value = "clear",
+	})
+
+	sendSafeMessage(overlayCamera, {
+		info = "rounds",
+		value = "clear",
+	})
+
+	self:onRoundStart()
+end
+
+function Arena:onRoundStart()
+	self.isOvertime = false
+	self.home.score = 0
+	self.home.previousScore = 0
+	self.away.score = 0
+	self.away.previousScore = 0
+	print("round start")
 end
 
 function Arena:onRoundEnd()
-	local cachedHomeScore = self.home.score
-	local cachedAwayScore = self.away.score
-
-	if not self.isOvertime and self.lastGameTimeSeconds > 0 then -- is restart
+	print("round end")
+	local isRestart = not self.home.roundsWonIncrease and not self.away.roundsWonIncrease
+	if isRestart then
+		print("restart")
 		return
 	end
 
-	if self.isOvertime then -- find who scored in overtime
-		if self.home.goal.box:checkPointIntersect(ball.transform.position) then
-			cachedHomeScore += 1
-		elseif self.away.goal.box:checkPointIntersect(ball.transform.position) then
-			cachedAwayScore += 1
-		else
-			return -- is restart during overtime
-		end
+	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
+	local cachedHomeScore
+	local cachedAwayScore
+
+	if endsWithAGoal then
+		cachedHomeScore = self.home.previousScore
+		cachedAwayScore = self.away.previousScore
+	else
+		cachedHomeScore = self.home.score
+		cachedAwayScore = self.away.score
 	end
+
+	local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
+	local isMercy = scoreDifference >= (self.mercyScoreDifference - 1) and endsWithAGoal
+
+	print(`Home pre-score: {self.home.previousScore}`)
+	print(`Away pre-score: {self.away.previousScore}`)
+	print(`Game time: {self.gameTimeSeconds}`)
+	print(`Action time: {self.actionTimerSeconds}`)
+	print(`Ends with goal: {endsWithAGoal}`)
+	print(`Is overtime: {self.isOvertime}`)
+	print(`Is mercy: {isMercy}`)
+
+	if
+		endsWithAGoal
+		and (self.isOvertime or isMercy)
+		and self.home.goal.box:checkPointIntersect(ball.transform.position)
+	then
+		print("Increased away score")
+		cachedAwayScore += 1
+	elseif
+		endsWithAGoal
+		and (self.isOvertime or isMercy)
+		and self.away.goal.box:checkPointIntersect(ball.transform.position)
+	then
+		print("Increased home score")
+		cachedHomeScore += 1
+	end
+
+	print(`Home score: {cachedHomeScore}`)
+	print(`Away score: {cachedAwayScore}`)
 
 	local round: Round = {
 		home = {
@@ -910,20 +1179,6 @@ function Arena:onRoundEnd()
 	sendSafeMessage(overlayCamera, {
 		info = "rounds",
 		value = round,
-	})
-end
-
-function Arena:onGameStart()
-	self.isOvertime = false
-
-	sendSafeMessage(overlayCamera, {
-		info = "clearStats",
-		value = "",
-	})
-
-	sendSafeMessage(overlayCamera, {
-		info = "rounds",
-		value = "clear",
 	})
 end
 
@@ -1033,11 +1288,11 @@ Arena3v3.awayRotationOffset = Quat.fromEuler(0, 0, -90)
 Arena3v3.boxSize = Vec3.new(5100, 6750, 1440)
 Arena3v3.boxOffset = Vec3.new(0, 0, 650)
 Arena3v3.centerBoxOffset = Vec3.new(0, 0, 300)
-Arena3v3.goalBoxSize = Vec3.new(100, 500, 225)
-Arena3v3.goalPositionOffset = Vec3.new(3285, 0, 175)
+Arena3v3.goalBoxSize = Vec3.new(150, 500, 225)
+Arena3v3.goalPositionOffset = Vec3.new(3250, 0, 175)
 
 function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Arena3v3) :: any
+	local self: Arena3v3 = setmetatable(Arena.new(gamemode), Arena3v3) :: any
 	self.type = "3v3"
 	self.name = self.slotId:gsub("TKB_", "")
 	self:setupDimensions()
@@ -1154,13 +1409,15 @@ Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, 90)
 Arena4v4.boxSize = Vec3.new(6110, 8400, 1490)
 Arena4v4.boxOffset = Vec3.new(0, 0, 600)
 Arena4v4.centerBoxOffset = Vec3.new(0, 0, 250)
-Arena4v4.goalBoxSize = Vec3.new(200, 450, 225)
-Arena4v4.goalPositionOffset = Vec3.new(4075, 0, 175)
+Arena4v4.goalBoxSize = Vec3.new(220, 450, 225)
+Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
 
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Arena4v4) :: any
+	local self: Arena4v4 = setmetatable(Arena.new(gamemode), Arena4v4) :: any
 	self.type = "4v4"
-	self.name = `Jakeball {self.slotId:sub(self.slotId:len() - 2)}`
+	local nameEnd = self.slotId:find("_") :: number
+
+	self.name = `{self.slotId:sub(1, nameEnd - 1)} {self.slotId:sub(self.slotId:len() - 2)}`
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Arena4v4
@@ -1279,7 +1536,7 @@ Driftblitz.goalBoxSize = Vec3.new(100, 890, 300)
 Driftblitz.goalPositionOffset = Vec3.new(5295, 0, 175)
 
 function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Driftblitz) :: any
+	local self: Driftblitz = setmetatable(Arena.new(gamemode), Driftblitz) :: any
 	self.name = self.slotId
 	self.type = "driftblitz"
 	self:setupDimensions()
@@ -1394,7 +1651,7 @@ function getArenas(): { [any]: Arena }
 		elseif slotId:find("Soccer") then
 			local arena = Driftblitz.new(gamemode)
 			arenas[arena.name] = arena
-		elseif slotId:find("Jakeball") then
+		elseif slotId:find("Jakeball") or slotId:find("Driftball") then
 			local arena = Arena4v4.new(gamemode)
 			arenas[arena.name] = arena
 		end
@@ -1406,10 +1663,14 @@ function getArenas(): { [any]: Arena }
 end
 
 -- arena
-local arenas: { [any]: Arena }
+local arenas: { [any]: Arena }?
 
 function updateArenaOverviews()
 	overviewOffsets = config.overviewOffsets
+
+	if not arenas then
+		return
+	end
 
 	for _, arena in arenas do
 		arena.home.overview = {}
@@ -1446,20 +1707,24 @@ local exposureBias = config.postProcessing.exposureBias
 type BallCollision = {
 	home: {
 		current: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
 		previous: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
 	},
 	away: {
 		current: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
 		previous: {
+			lastContactPlace: Vec3,
 			contactTime: number,
 			player: ReplayPlayer,
 		}?,
@@ -1482,7 +1747,6 @@ local previousHomeGoalPotentialEnter: boolean = false
 local awayGoalPotentialEnter: boolean = false
 local previousAwayGoalPotentialEnter: boolean = false
 
-local lastPlayerBallContactPoint: Vec3 = Vec3.zeroVector
 local maximumTimeSincePass: number = 5
 
 local goalPlayer: ReplayPlayer? = nil
@@ -1493,7 +1757,9 @@ local gravityChaser: Quat = gravity.upRotation
 -- Caster Camera
 local cameraFOV = config.cameraFOV
 local cameraMode = nil
+-- amount of seconds it takes for the camera to reach it's target
 local positionSmoothing = config.positionSmoothing
+local cameraPositionSmoothing: number = positionSmoothing
 local lookSmoothness = config.lookSmoothness
 local dynamicLookSmoothness = lookSmoothness
 local targetSpeedIndex: number = 1
@@ -2310,11 +2576,13 @@ local invertControllerLookVertical: boolean = config.invertControllerLookVertica
 local controllerSensitivity: number = config.controllerSensitivity
 
 -- Gui
+local debugFreecam: boolean = false
 local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
 local addRound: boolean = false
+local overlayResponse: string = ""
 local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
@@ -2325,20 +2593,23 @@ function main()
 	arenaLoadTime = os.clock()
 	camera.position = defaultPosition
 	camera.rotation = defaultRotation
+	camera.rotationSmoothing = 0
+	camera.positionSmoothing = 0
 	rotEuler = defaultRotation:euler()
-	followPlussCamera = getCameraById("dennssen.followpluss")
+	followPlussCamera = getCameraById(followPlussId)
 	if followPlussCamera then
 		local versionMessage: MessageValues = { versionCallback = getFollowVersion }
 		sendMessage(followPlussCamera, versionMessage)
 		local result = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
 		if not result.success then
-			followPlussWarning = `WARNING: {result.msg}. If you are experiencing issues consider upgrading/downgrading.`
+			followPlussWarning =
+				`WARNING: {result.msg}. If you are experiencing issues please install the recommended version.`
 		end
 	else
 		followPlussWarning =
 			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
 	end
-	overlayCamera = getCameraById("dennssen.overlayInfo")
+	overlayCamera = getCameraById(overlayId)
 	if overlayCamera then
 		usingOverlay = true
 		sendMessage(overlayCamera, {
@@ -2347,7 +2618,8 @@ function main()
 		})
 		local result = checkVersion(overlayVersion, requiredOverlayVersion, "Overlay Info")
 		if not result.success then
-			overlayWarning = `WARNING: {result.msg}. If you are experiencing issues consider upgrading/downgrading.`
+			overlayWarning =
+				`WARNING: {result.msg}. If you are experiencing issues please install the recommended version.`
 		end
 	end
 end
@@ -2399,7 +2671,7 @@ function resetPlayersWithBall()
 end
 
 function setSelectedArena(arena: Arena)
-	if selectedArena and arena.name ~= selectedArena.name then -- new arena
+	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
 		sendSafeMessage(overlayCamera, {
 			info = "rounds",
@@ -2409,7 +2681,7 @@ function setSelectedArena(arena: Arena)
 			info = "slotId",
 			value = arena.slotId,
 		})
-		arenaSwitch = true
+		arenaInstantUpdate = true
 	end
 	selectedArena = arena
 end
@@ -2417,12 +2689,14 @@ end
 function onGui()
 	if followPlussWarning ~= "" then
 		Gui.text(followPlussWarning)
+		Gui.newLine()
 	end
 
+	Gui.text(`Version: {version}`)
 	if Gui.button(Icon.Question) then
 		controlsScreen = not controlsScreen
 	end
-	Gui.setItemTooltip("Controls for the camera")
+	Gui.setItemTooltip("Keybinds for the camera")
 
 	if controlsScreen then
 		if keyboardControls then
@@ -2588,8 +2862,9 @@ function onGui()
 		for i = 1, #Replay.listLoaded() do
 			if Gui.selectable("Replay " .. i, i == readLocation) then
 				if i ~= readLocation then
-					arenas = {}
+					arenas = nil
 					arenaLoadTime = os.clock()
+					arenaInstantUpdate = true
 				end
 				readLocation = i
 			end
@@ -2634,7 +2909,7 @@ function onGui()
 	cameraFOV = Gui.sliderFloat("Field Of View", cameraFOV, 1, 179)
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
-	camera.position = Gui.dragFloat3("Camera Position", camera.position, 1, -math.huge, math.huge)
+	cameraPosition = Gui.dragFloat3("Camera Position", cameraPosition, 1, -math.huge, math.huge)
 	local newRot = Gui.dragFloat3("Camera Rotation", rotEuler, 1, -180, 180)
 	if Gui.isItemActive() then
 		gravityChaser = gravity.upRotation
@@ -2646,18 +2921,14 @@ function onGui()
 	Gui.newLine()
 
 	Gui.text("Settings")
-	if Gui.collapsingHeader("Smoothing") then
+
+	if Gui.collapsingHeader("Controls") then
 		Gui.indent()
 		positionSmoothing = Gui.sliderFloat("Position Smoothing", positionSmoothing, 0, 1)
 		positionSmoothing = math.clamp(positionSmoothing, 0, 1)
 		lookSmoothness = Gui.sliderFloat("Rotation Smoothing", lookSmoothness, 0, 1)
 		lookSmoothness = math.clamp(lookSmoothness, 0, 1)
-		Gui.unindent()
 		Gui.newLine()
-	end
-
-	if Gui.collapsingHeader("Sensitivity & Deadzone") then
-		Gui.indent()
 		invertControllerLookHorizontal = Gui.checkbox("Invert Controller Horizontal", invertControllerLookHorizontal)
 		invertControllerLookVertical = Gui.checkbox("Invert Controller Vertical", invertControllerLookVertical)
 		controllerSensitivity = Gui.sliderFloat("Controller Sensitivity", controllerSensitivity, 0.001, 2)
@@ -2669,6 +2940,14 @@ function onGui()
 		invertMouseLookVertical = Gui.checkbox("Invert Mouse Vertical", invertMouseLookVertical)
 		mouseSensitivity = Gui.sliderFloat("Mouse Sensitivity", mouseSensitivity, 0.001, 2)
 		mouseSensitivity = math.clamp(mouseSensitivity, 0.001, 2)
+		Gui.unindent()
+		Gui.newLine()
+	end
+
+	if Gui.collapsingHeader("Accessibility") then
+		Gui.indent()
+		ballOutline = Gui.checkbox("Ball Outline", ballOutline)
+		Gui.setItemTooltip("Toggles an outline around the arena ball that shows it's position through walls.")
 		Gui.unindent()
 		Gui.newLine()
 	end
@@ -2817,6 +3096,9 @@ function onGui()
 			if overlayWarning ~= "" then
 				Gui.text(overlayWarning)
 			end
+			if overlayResponse ~= "" then
+				Gui.text(overlayResponse)
+			end
 			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
 			Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
 
@@ -2830,6 +3112,19 @@ function onGui()
 			Gui.setItemTooltip(
 				"The team name for the away side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
 			)
+			if Gui.button(`{Icon.Retweet} Swap team names`) then
+				local temp = homeTeam
+				homeTeam = awayTeam
+				awayTeam = temp
+				sendMessage(overlayCamera, {
+					info = "teamNames",
+					value = {
+						home = homeTeam,
+						away = awayTeam,
+					},
+				})
+				overlayResponse = "Team names are swapped"
+			end
 
 			if Gui.button(Icon.Upload .. " Send Teams to Overlay") then
 				sendMessage(overlayCamera, {
@@ -2839,8 +3134,7 @@ function onGui()
 						away = awayTeam,
 					},
 				})
-				homeTeam = ""
-				awayTeam = ""
+				overlayResponse = "Team names are sendt"
 			end
 
 			Gui.newLine()
@@ -2897,6 +3191,7 @@ function onGui()
 		config.positionSmoothing = positionSmoothing
 		config.lookSmoothness = lookSmoothness
 		config.particleSimSpeed = particleSimSpeed
+		config.ballOutline = ballOutline
 		config.vibrance = vibrance
 		config.getBallVariant = getBallVariant
 		config.sendOverlayInfo = sendOverlayInfo
@@ -2929,25 +3224,31 @@ function onGui()
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
-		Gui.text(`Version: {version}`)
+		speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
-		if Gui.button("Print Arenas") then
+		if Gui.button("Follow Freecam") then
+			debugFreecam = true
+			ui:setCamera("anotheraxiom.freecam")
+			camera:followCamera(getCameraById("anotheraxiom.freecam"))
+		end
+		if arenas and Gui.button("Print Arenas") then
 			for _, arena in arenas do
 				print(arena.slotId)
 			end
 		end
 		Gui.sameLine()
 		if Gui.button("Print Gamemode Ids") then
-			for _, gamemodeId in SpectatorGamemodes.listGamemodeIds() do
-				print(gamemodeId)
+			for _, gamemode in SpectatorGamemodes.listGamemodes() do
+				print(gamemode:getSlotId())
 			end
 		end
+
 		if selectedArena and Gui.button("Set Orientation to Arena") then
-			camera.position = selectedArena.transform.position
+			cameraPosition = selectedArena.transform.position
 			camera.rotation = selectedArena.transform.rotation
 			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
 		end
-		Gui.sameLine()
+
 		if selectedArena and Gui.button("Print Relative Orientation") then
 			local RelativeLocation =
 				selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
@@ -2956,10 +3257,12 @@ function onGui()
 			print(RelativeLocation)
 			print(`Relative Rotation ({selectedArena.name}):`)
 			print(RelativeRotation:euler())
+			Gui.sameLine()
 		end
 		if Gui.button("Reset All Stats") then
 			sendMessage(overlayCamera, {
-				info = "clearStats",
+				info = "stats",
+				value = "clear",
 			})
 		end
 		if Gui.button("Print Pressed Keys") then
@@ -2971,6 +3274,7 @@ function onGui()
 					if ballCollisionInfo.home.current then
 						Gui.text(`PlayerName: {ballCollisionInfo.home.current.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.current.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.home.current.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -2978,6 +3282,7 @@ function onGui()
 					if ballCollisionInfo.home.previous then
 						Gui.text(`PlayerName: {ballCollisionInfo.home.previous.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.previous.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.home.previous.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -2988,6 +3293,7 @@ function onGui()
 					if ballCollisionInfo.away.current then
 						Gui.text(`PlayerName: {ballCollisionInfo.away.current.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.current.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.away.current.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -2995,6 +3301,7 @@ function onGui()
 					if ballCollisionInfo.away.previous then
 						Gui.text(`PlayerName: {ballCollisionInfo.away.previous.player.playerName}`)
 						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.previous.contactTime}`)
+						Gui.text(`Last Held Position: {ballCollisionInfo.away.previous.lastContactPlace}`)
 					end
 					Gui.treePop()
 				end
@@ -3003,6 +3310,12 @@ function onGui()
 			Gui.treePop()
 		end
 		if selectedArena then
+			Gui.text(
+				`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(ball.transform.position)}`
+			)
+			Gui.text(
+				`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(ball.transform.position)}`
+			)
 			if Gui.button("Print Selected Arena") then
 				print(selectedArena)
 			end
@@ -3013,7 +3326,10 @@ function onGui()
 		end
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
-		Gui.text("Camera Rotation: " .. tostring(camera.rotation:euler()))
+		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
+		Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
+		Gui.text("Camera Rotation: " .. tostring(camera:getSmoothedRotation():euler()))
+		Gui.text(`Camera Position: {tostring(camera.position)}`)
 		Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
 		Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
 		Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
@@ -3044,15 +3360,13 @@ end
 
 function toggleSmoothing(position: boolean, rotation: boolean)
 	if position then
-		camera.positionSmoothing = positionSmoothing
+		cameraPositionSmoothing = positionSmoothing
 	else
-		camera.positionSmoothing = 0
+		cameraPositionSmoothing = 0
 	end
 	if rotation then
-		camera.rotationSmoothing = 0.02
 		dynamicLookSmoothness = lookSmoothness
 	else
-		camera.rotationSmoothing = 0
 		dynamicLookSmoothness = 0
 	end
 end
@@ -3062,19 +3376,19 @@ function onTransitionBegin(transitionInfo: Transition)
 	firstTransition = transitionTime <= loadTime + 1 -- Margin of 1 second
 
 	if firstTransition then
-		camera.position = defaultPosition
+		cameraPosition = defaultPosition
 		camera.rotation = defaultRotation
 		rotEuler = defaultRotation:euler()
 		rotEuler.x = 0
 	else
-		camera.position = transitionInfo.startPosition
+		cameraPosition = transitionInfo.startPosition
 		camera.rotation = transitionInfo.startRotation
 		rotEuler = transitionInfo.startRotation:euler()
 		rotEuler.x = 0
 	end
 
 	alwaysTick = true
-	camera.rotationSmoothing = 0.02
+	camera.rotationSmoothing = 0
 	camera.hideNearestHead = false
 	camera.showNameTags = true
 end
@@ -3129,24 +3443,14 @@ function findPlayerInTable(table: { ReplayPlayer }, player: ReplayPlayer): numbe
 	return index
 end
 
-function velocityPivotPosition(position: Vec3, velocity: Vec3, radius: number, ball: boolean): Vec3
-	local velocityPivot = Vec3.zeroVector
-
-	local cameraDirection = velocity:getSafeNormal() + ballRotation:euler():normalize() * 20
-	if not ball then
-		cameraDirection = -cameraDirection
-	end
-
-	velocityPivot = Vec3.lerp(camera.position, position + cameraDirection * radius, 10)
-
-	velocityPivot = position + cameraDirection * radius
-
-	return velocityPivot
-end
-
 function getClosestArena(targetPosition: Vec3): Arena -- Remove this function when/if we get the arena from the player
 	local closestArenaDistance = math.huge
 	local closestArena = nil
+
+	if not arenas then
+		return closestArena
+	end
+
 	for _, arena: Arena in pairs(arenas) do
 		local distance = getDist(targetPosition, arena.transform.position)
 		-- because some arenas are directly above others
@@ -3289,9 +3593,10 @@ end
 
 function stopFollow()
 	toggleSmoothing(true, true)
+	ui:setCamera("")
 	playerFollow = false
 	camera:followCamera(nil)
-	camera.position = followPlussCamera:getSmoothedPosition()
+	cameraPosition = followPlussCamera:getSmoothedPosition()
 	rotEuler = followPlussCamera:getSmoothedRotation():euler()
 	rotEuler.x = 0
 	currentPlayer = nil
@@ -3338,7 +3643,6 @@ function createParticle(
 end
 
 function particleAffect()
-	WorldDraw.clear()
 	if #particlesTable < 1 then
 		return
 	end
@@ -3624,7 +3928,8 @@ function readOtherInputs()
 
 	if getCasterKey(inputs.keyboard.clearOverlayInfo).down or getCasterKey(inputs.gamepad.clearOverlayInfo).down then
 		sendMessage(overlayCamera, {
-			info = "clearStats",
+			info = "stats",
+			value = "clear",
 		})
 	end
 
@@ -3634,10 +3939,10 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			camera.position = selectedArena.home.overview[1].position
+			cameraPosition = selectedArena.home.overview[1].position
 			setGlobalCameraRotation(selectedArena.home.overview[1].rotation)
 		else
-			camera.position = selectedArena.away.overview[1].position
+			cameraPosition = selectedArena.away.overview[1].position
 			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
 		end
 	end
@@ -3647,10 +3952,10 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			camera.position = selectedArena.home.overview[2].position
+			cameraPosition = selectedArena.home.overview[2].position
 			setGlobalCameraRotation(selectedArena.home.overview[2].rotation)
 		else
-			camera.position = selectedArena.away.overview[2].position
+			cameraPosition = selectedArena.away.overview[2].position
 			setGlobalCameraRotation(selectedArena.away.overview[2].rotation)
 		end
 	end
@@ -3660,10 +3965,10 @@ function readOtherInputs()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			camera.position = selectedArena.home.overview[3].position
+			cameraPosition = selectedArena.home.overview[3].position
 			setGlobalCameraRotation(selectedArena.home.overview[3].rotation)
 		else
-			camera.position = selectedArena.away.overview[3].position
+			cameraPosition = selectedArena.away.overview[3].position
 			setGlobalCameraRotation(selectedArena.away.overview[3].rotation)
 		end
 	end
@@ -3821,7 +4126,11 @@ function moveCamera()
 	local sidewaysMovement = rightDirection * Horizontal * speedMultiplier * 100 * deltaTime
 	local upwardsMovement = upDirection * Up * speedMultiplier * 50 * deltaTime
 
-	camera.position += (forwardMovement + sidewaysMovement + upwardsMovement)
+	cameraVelocity = (forwardMovement + sidewaysMovement + upwardsMovement)
+
+	cameraPosition += cameraVelocity
+
+	camera.position = Vec3.lerp(camera.position, cameraPosition, deltaTime / (cameraPositionSmoothing + deltaTime))
 end
 
 local rotDelta: Vec3 = Vec3.zeroVector
@@ -3865,14 +4174,8 @@ function rotateCamera()
 
 	local nextLookDiff = rotDelta * math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1)
 
-	if gravityChaser ~= gravity.upRotation then
-		local nextGravityChaser = gravity.upRotation
-
-		local nextRotation = nextGravityChaser:inverse()
-			* Quat.fromXZ(camera.rotation:getForwardVector(), nextGravityChaser:rotateVector(Vec3.new(0, 0, 1)))
-		rotEuler = nextRotation:euler() + Vec3.new(rotEuler.x, 0, 0) -- preserve existing roll
-		gravityChaser = nextGravityChaser
-	end
+	gravityChaser =
+		Quat.slerp(gravityChaser, gravity.upRotation, math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1))
 
 	rotEuler += nextLookDiff
 	rotDelta -= nextLookDiff
@@ -3901,7 +4204,8 @@ function followPlayer()
 		showNameTags = true,
 		muteSelf = false,
 		targetPlayer = currentPlayer,
-		positionSmoothing = followPosititonSmoothing,
+		positionSmoothing = 0,
+		rotationSmoothing = 0,
 		cameraFOV = followFOV,
 		cameraMode = cameraMode,
 		radius = followRadius,
@@ -3915,6 +4219,7 @@ function followPlayer()
 	}
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
+	ui:setCamera(followPlussId)
 	camera:followCamera(followPlussCamera)
 end
 
@@ -3943,10 +4248,12 @@ function checkBallContact()
 			ballCollisionInfo.home.current
 			and contactPlayer.playerId == ballCollisionInfo.home.current.player.playerId
 		then
+			ballCollisionInfo.home.current.lastContactPlace = ball.transform.position
 			return
 		end
 		ballCollisionInfo.home.previous = ballCollisionInfo.home.current
 		ballCollisionInfo.home.current = {
+			lastContactPlace = ball.transform.position,
 			contactTime = contactTime,
 			player = contactPlayer,
 		}
@@ -3955,13 +4262,39 @@ function checkBallContact()
 			ballCollisionInfo.away.current
 			and contactPlayer.playerId == ballCollisionInfo.away.current.player.playerId
 		then
+			ballCollisionInfo.away.current.lastContactPlace = ball.transform.position
 			return
 		end
 		ballCollisionInfo.away.previous = ballCollisionInfo.away.current
 		ballCollisionInfo.away.current = {
+			lastContactPlace = ball.transform.position,
 			contactTime = contactTime,
 			player = contactPlayer,
 		}
+	end
+end
+
+function getLastPlayerWithBall(): ReplayPlayer?
+	local homeTouchTime: number = 0
+	local homePlayer: ReplayPlayer
+	local awayTouchTime: number = 0
+	local awayPlayer: ReplayPlayer
+	if ballCollisionInfo.home.current then
+		homeTouchTime = ballCollisionInfo.home.current.contactTime
+		homePlayer = ballCollisionInfo.home.current.player
+	end
+
+	if ballCollisionInfo.away.current then
+		awayTouchTime = ballCollisionInfo.away.current.contactTime
+		awayPlayer = ballCollisionInfo.away.current.player
+	end
+
+	if homeTouchTime > awayTouchTime then
+		return homePlayer
+	elseif awayTouchTime > homeTouchTime then
+		return awayPlayer
+	else
+		return nil
 	end
 end
 
@@ -4032,10 +4365,11 @@ end
 
 function checkForSave(goal: { team: string, dist: number }): boolean
 	local goalie = getClosestPlayerToBall(60)
+	local lastPlayerWithBall = getLastPlayerWithBall()
 
 	local successfulSave = false
 
-	if goal.team == "home" then
+	if goal.team == "home" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == TeamIndex.awayTeam then
 		if
 			not homeGoalPotentialEnter
 			and previousHomeGoalPotentialEnter
@@ -4056,7 +4390,7 @@ function checkForSave(goal: { team: string, dist: number }): boolean
 				},
 			})
 		end
-	elseif goal.team == "away" then
+	elseif goal.team == "away" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == TeamIndex.homeTeam then
 		if
 			not awayGoalPotentialEnter
 			and previousAwayGoalPotentialEnter
@@ -4191,9 +4525,16 @@ function goalScoreCheck()
 
 		local shooterName = ""
 		local assistName = ""
+		local shotFrom: Vec3
 
 		if ballCollisionInfo.away.current then
 			shooterName = ballCollisionInfo.away.current.player.playerName
+			shotFrom = ballCollisionInfo.away.current.lastContactPlace
+		end
+
+		local shotDistance: number = 0
+		if shotFrom then
+			shotDistance = getDist(shotFrom, ball.transform.position) / 100
 		end
 
 		local assistPlayer = getAssistPlayer("away")
@@ -4205,11 +4546,11 @@ function goalScoreCheck()
 		sendSafeMessage(overlayCamera, {
 			info = "shot",
 			value = {
-				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
+				shooter = shooterName,
 				assister = assistName,
 				team = "away",
 				shotSpeed = ball.velocity:length() / 100,
-				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
+				shotDistanceMeters = shotDistance,
 			},
 		})
 
@@ -4249,9 +4590,16 @@ function goalScoreCheck()
 
 		local shooterName = ""
 		local assistName = ""
+		local shotFrom: Vec3
 
 		if ballCollisionInfo.home.current then
 			shooterName = ballCollisionInfo.home.current.player.playerName
+			shotFrom = ballCollisionInfo.home.current.lastContactPlace
+		end
+
+		local shotDistance: number = 0
+		if shotFrom then
+			shotDistance = getDist(shotFrom, ball.transform.position) / 100
 		end
 
 		local assistPlayer = getAssistPlayer("home")
@@ -4267,7 +4615,7 @@ function goalScoreCheck()
 				assister = assistName,
 				team = "home",
 				shotSpeed = ball.velocity:length() / 100,
-				shotDistanceMeters = getDist(lastPlayerBallContactPoint, ball.transform.position) / 100,
+				shotDistanceMeters = shotDistance,
 			},
 		})
 
@@ -4498,12 +4846,48 @@ function doRebind()
 	end
 end
 
+function drawBallOutline()
+	if not ballOutline then
+		return
+	end
+
+	ui:tick()
+
+	local ballUIPosition = ui:worldToHUD(ball.transform.position)
+
+	local ballRadius = 17.5
+	local ballDistance = getDist(camera.position, ball.transform.position)
+	local segments = 20
+	local radius = getApparentRaidus(ballRadius, ballDistance, ui.depth)
+	local thickness = radius / 4
+
+	local angleStep = (2 * math.pi) / segments
+	local prevPoint = nil
+
+	for i = 0, segments do
+		local angle = i * angleStep
+
+		local x = radius * math.cos(angle)
+		local y = radius * math.sin(angle)
+
+		local point = ballUIPosition + (camera.rotation:getRightVector() * x) + (camera.rotation:getUpVector() * y)
+
+		if prevPoint then
+			ui.drawLine(prevPoint, point, Vec3.new(1, 1, 1), thickness, 0)
+		end
+
+		prevPoint = point
+	end
+end
+
 function tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = false
 		onExit()
 		return
 	end
+
+	WorldDraw.clear()
 
 	if arenas == nil then
 		local currentTime = os.clock()
@@ -4565,6 +4949,11 @@ function tick(dt)
 		stopFollow()
 	end
 
+	if debugFreecam then
+		drawBallOutline()
+		return
+	end
+
 	if playerFollow then
 		readOtherInputs()
 	else
@@ -4574,6 +4963,7 @@ function tick(dt)
 		moveCamera()
 		rotateCamera()
 	end
+	drawBallOutline()
 
 	particleAffect()
 	ballInCenterCheck()
@@ -4583,7 +4973,7 @@ function tick(dt)
 
 	removeOldInputTimes()
 
-	if boundingBoxDebug then
+	if arenas and boundingBoxDebug then
 		for _, arena in arenas do
 			arena.box:render(1, 0, 1)
 			arena.centerBox:render(0, 1, 0)

@@ -145,18 +145,20 @@ function onMessageReceived(messageTable: { info: string, value: any })
 	elseif info == "matchLength" then
 		currentConfig.extraArenaInfo.matchLengthSeconds = value
 	elseif info == "stats" then
-		local statsPlayer = currentConfig.statsInfo[value.team][value.player]
-		if statsPlayer == nil then
-			currentConfig.statsInfo[value.team][value.player] = {
-				goals = 0,
-				saves = 0,
-				assists = 0,
-			}
+		if value == "clear" then
+			currentConfig.statsInfo.home = {}
+			currentConfig.statsInfo.away = {}
+		else
+			local statsPlayer = currentConfig.statsInfo[value.team][value.player]
+			if statsPlayer == nil then
+				currentConfig.statsInfo[value.team][value.player] = {
+					goals = 0,
+					saves = 0,
+					assists = 0,
+				}
+			end
+			currentConfig.statsInfo[value.team][value.player][value.stat] += 1
 		end
-		currentConfig.statsInfo[value.team][value.player][value.stat] += 1
-	elseif info == "clearStats" then
-		currentConfig.statsInfo.home = {}
-		currentConfig.statsInfo.away = {}
 	elseif info == "teamNames" then
 		currentConfig.extraArenaInfo.home.name = value.home
 		currentConfig.extraArenaInfo.away.name = value.away
