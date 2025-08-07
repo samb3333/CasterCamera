@@ -9,7 +9,15 @@ metadata = {
 }
 
 --TODO:
--- Fix rounds in 3v3 not working. (Only overtime needs testing)
+-- Normal Win (h ~= a)
+-- Mercy Win (h - a >= 6)
+-- Overtime Win (h == a)
+-- Normal Reset ()
+
+-- Do a full scale test of 3v3
+-- Do a full scale test of 4v4
+
+-- Spell check overlay
 
 -- Create release message for follow pluss.
 -- Create release message for caster update:
@@ -848,7 +856,9 @@ type ArenaTeam = {
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
+	previousRoundsWon: number,
 	roundsWon: number,
+	roundsWonIncrease: boolean,
 	goal: {
 		position: Vec3,
 		rotation: Quat,
@@ -876,14 +886,16 @@ type Arena = {
 	isGameActive: boolean,
 	isKickoff: boolean,
 	isOvertime: boolean,
+	isGracePeriod: boolean,
 
 	gameTimeSeconds: number,
 	lastGameTimeSeconds: number,
 	actionTimerSeconds: number,
-	isGracePeriod: boolean,
 	bestOfAmount: number,
 	matchLengthSeconds: number,
 	mercyScoreDifference: number,
+
+	gracePeriodStartTime: number,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
 	tick: (self: Arena) -> (),
@@ -905,10 +917,9 @@ type Arena = {
 local Arena: Arena = {} :: Arena
 Arena.__index = Arena
 
-local arenaSwitch: boolean = false
+local arenaInstantUpdate: boolean = false
 
 local centerBoxSize = Vec3.new(50, 50, 125)
-local timeSinceLastGracePeriod: number = 0
 
 local overviewOffsets = config.overviewOffsets
 
@@ -925,7 +936,9 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
+		previousRoundsWon = 0,
 		roundsWon = 0,
+		roundsWonIncrease = false,
 		goal = {
 			position = Vec3.zeroVector,
 			rotation = Quat.identity,
@@ -940,7 +953,9 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
+		previousRoundsWon = 0,
 		roundsWon = 0,
+		roundsWonIncrease = false,
 		goal = {
 			position = Vec3.zeroVector,
 			rotation = Quat.identity,
@@ -950,8 +965,10 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 		players = {},
 	}
 
+	self.gracePeriodStartTime = 0
 	self.isOvertime = false
 	self.isKickoff = false
+	self.isGracePeriod = false
 
 	print(`made arena {self.slotId}`)
 
@@ -959,92 +976,13 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
 end
 
 function Arena:tick()
-	local gameTimeComponent = self.gamemode:getGameTimeComponent()
-
-	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
-	self.mercyScoreDifference = self.gamemode:getNumberConfigVariable("mercyscoredifference")
-	if gameTimeComponent then
-		if self.gameTimeSeconds and self.isGameActive then
-			self.lastGameTimeSeconds = self.gameTimeSeconds
-		else
-			self.lastGameTimeSeconds = self.matchLengthSeconds
-		end
-		local gameTimeSeconds = gameTimeComponent:getTimeSeconds()
-		local actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
-		self.gameTimeSeconds = gameTimeSeconds
-		self.actionTimerSeconds = actionTimerSeconds
-	else
-		self.gameTimeSeconds = 0
-		self.actionTimerSeconds = 0
-	end
-
-	if self.gameTimeSeconds > self.lastGameTimeSeconds and not self.isOvertime then
-		self.isOvertime = true
-	end
-
+	local currentTime = os.clock()
 	self.lastIsGameActive = self.isGameActive
 	self.isGameActive = self.gamemode:getIsGameRunning()
 
-	local homeActualScore = self.gamemode:getTeamScore(TeamIndex.homeTeam)
-	if homeActualScore ~= self.home.previousActualScore then
-		self.home.previousScore = self.home.score
-		self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
-	end
-	self.home.scoreIncrease = self.home.previousActualScore ~= homeActualScore
-	self.home.previousActualScore = homeActualScore
-
-	local awayActualScore = self.gamemode:getTeamScore(TeamIndex.awayTeam)
-	if awayActualScore ~= self.away.previousActualScore then
-		self.away.previousScore = self.away.score
-		self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
-	end
-	self.away.scoreIncrease = self.away.previousActualScore ~= awayActualScore
-	self.away.previousActualScore = awayActualScore
-
-	if arenaSwitch then
-		self.home.previousScore = self.home.score
-		self.away.previousScore = self.away.score
-
-		self.lastGameTimeSeconds = self.gameTimeSeconds
+	if arenaInstantUpdate then
 		self.lastIsGameActive = self.isGameActive
-
-		arenaSwitch = false
 	end
-
-	if not self.isGameActive and self.lastIsGameActive then
-		self:onRoundEnd()
-	end
-
-	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
-	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
-
-	if self.gamemode:getBoolConfigVariable("busebestof") then
-		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
-	else
-		self.bestOfAmount = 1
-	end
-
-	if self.home.scoreIncrease or self.away.scoreIncrease then
-		timeSinceLastGracePeriod = 0
-		self.isGracePeriod = true
-	end
-
-	if not self.isGracePeriod and self.actionTimerSeconds > 0 and self.gameTimeSeconds < self.matchLengthSeconds then
-		timeSinceLastGracePeriod = 0
-		self.isGracePeriod = true
-	end
-
-	if
-		self.isGracePeriod
-		and (
-			(timeSinceLastGracePeriod > 6 and self.actionTimerSeconds == 0)
-			or self.gameTimeSeconds == self.matchLengthSeconds
-		)
-	then
-		self.isGracePeriod = false
-	end
-
-	timeSinceLastGracePeriod += deltaTime
 
 	if not self.isKickoff and not self.lastIsGameActive and self.isGameActive then
 		self.isKickoff = true
@@ -1058,8 +996,100 @@ function Arena:tick()
 		self:onRoundStart()
 	end
 
+	local gameTimeComponent = self.gamemode:getGameTimeComponent()
+
+	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
+	self.mercyScoreDifference = self.gamemode:getNumberConfigVariable("mercyscoredifference")
+	if gameTimeComponent then
+		if self.gameTimeSeconds and self.isGameActive then
+			self.lastGameTimeSeconds = self.gameTimeSeconds
+		elseif self.matchLengthSeconds then
+			self.lastGameTimeSeconds = self.matchLengthSeconds
+		else
+			self.lastGameTimeSeconds = 0
+		end
+		self.gameTimeSeconds = gameTimeComponent:getTimeSeconds()
+		self.actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
+	else
+		self.gameTimeSeconds = 0
+		self.lastGameTimeSeconds = 0
+		self.actionTimerSeconds = 0
+	end
+
+	local homeActualScore = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	local awayActualScore = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+
+	if homeActualScore ~= self.home.previousActualScore then
+		self.home.previousScore = self.home.score
+		self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
+	end
+
+	if awayActualScore ~= self.away.previousActualScore then
+		self.away.previousScore = self.away.score
+		self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
+	end
+
+	if arenaInstantUpdate then
+		self.home.previousActualScore = homeActualScore
+		self.away.previousActualScore = awayActualScore
+		self.lastGameTimeSeconds = self.gameTimeSeconds
+	end
+
+	self.home.scoreIncrease = self.home.previousActualScore ~= homeActualScore and homeActualScore ~= 0
+	self.away.scoreIncrease = self.away.previousActualScore ~= awayActualScore and awayActualScore ~= 0
+
+	self.home.previousActualScore = homeActualScore
+	self.away.previousActualScore = awayActualScore
+
+	if self.home.scoreIncrease or self.away.scoreIncrease then
+		print("goal")
+		self.gracePeriodStartTime = currentTime
+		self.isGracePeriod = true
+	elseif not self.isGracePeriod and self.actionTimerSeconds > 0 and self.isGameActive then
+		self.gracePeriodStartTime = currentTime
+		self.isGracePeriod = true
+	end
+
+	if
+		self.isGracePeriod
+		and ((currentTime - self.gracePeriodStartTime > 6 and self.actionTimerSeconds == 0) or not self.isGameActive)
+	then
+		self.isGracePeriod = false
+	end
+
+	if self.gameTimeSeconds > self.lastGameTimeSeconds and not self.isOvertime then
+		self.isOvertime = true
+	end
+
+	self.home.previousRoundsWon = self.home.roundsWon
+	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
+	self.away.previousRoundsWon = self.away.roundsWon
+	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
+
+	if arenaInstantUpdate then
+		self.home.previousRoundsWon = self.home.roundsWon
+		self.away.previousRoundsWon = self.away.roundsWon
+	end
+
+	self.home.roundsWonIncrease = self.home.roundsWon > self.home.previousRoundsWon
+	self.away.roundsWonIncrease = self.away.roundsWon > self.away.previousRoundsWon
+
+	if self.gamemode:getBoolConfigVariable("busebestof") then
+		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
+	else
+		self.bestOfAmount = 1
+	end
+
+	if not self.isGameActive and self.lastIsGameActive then
+		self:onRoundEnd()
+	end
+
 	self:setTeams()
 	self:sendInfoMessage()
+
+	if arenaInstantUpdate then
+		arenaInstantUpdate = false
+	end
 end
 
 function Arena:onGameStart()
@@ -1089,6 +1119,12 @@ end
 
 function Arena:onRoundEnd()
 	print("round end")
+	local isRestart = not self.home.roundsWonIncrease and not self.away.roundsWonIncrease
+	if isRestart then
+		print("restart")
+		return
+	end
+
 	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
 	local cachedHomeScore
 	local cachedAwayScore
@@ -1112,20 +1148,18 @@ function Arena:onRoundEnd()
 	print(`Is overtime: {self.isOvertime}`)
 	print(`Is mercy: {isMercy}`)
 
-	if self.isOvertime and not endsWithAGoal then -- is restart
-		print("overtime restart")
-		return
-	end
-
-	if not self.isOvertime and self.gameTimeSeconds > 0 and not isMercy then -- is restart
-		print("restart" .. " " .. scoreDifference)
-		return
-	end
-
-	if endsWithAGoal and self.home.goal.box:checkPointIntersect(ball.transform.position) then -- spec bugging again
+	if
+		endsWithAGoal
+		and (self.isOvertime or isMercy)
+		and self.home.goal.box:checkPointIntersect(ball.transform.position)
+	then
 		print("Increased away score")
 		cachedAwayScore += 1
-	elseif endsWithAGoal and self.away.goal.box:checkPointIntersect(ball.transform.position) then -- spec bugging again
+	elseif
+		endsWithAGoal
+		and (self.isOvertime or isMercy)
+		and self.away.goal.box:checkPointIntersect(ball.transform.position)
+	then
 		print("Increased home score")
 		cachedHomeScore += 1
 	end
@@ -1258,7 +1292,7 @@ Arena3v3.goalBoxSize = Vec3.new(150, 500, 225)
 Arena3v3.goalPositionOffset = Vec3.new(3250, 0, 175)
 
 function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Arena3v3) :: any
+	local self: Arena3v3 = setmetatable(Arena.new(gamemode), Arena3v3) :: any
 	self.type = "3v3"
 	self.name = self.slotId:gsub("TKB_", "")
 	self:setupDimensions()
@@ -1379,9 +1413,11 @@ Arena4v4.goalBoxSize = Vec3.new(220, 450, 225)
 Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
 
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Arena4v4) :: any
+	local self: Arena4v4 = setmetatable(Arena.new(gamemode), Arena4v4) :: any
 	self.type = "4v4"
-	self.name = `Jakeball {self.slotId:sub(self.slotId:len() - 2)}`
+	local nameEnd = self.slotId:find("_") :: number
+
+	self.name = `{self.slotId:sub(1, nameEnd - 1)} {self.slotId:sub(self.slotId:len() - 2)}`
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Arena4v4
@@ -1500,7 +1536,7 @@ Driftblitz.goalBoxSize = Vec3.new(100, 890, 300)
 Driftblitz.goalPositionOffset = Vec3.new(5295, 0, 175)
 
 function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self = setmetatable(Arena.new(gamemode), Driftblitz) :: any
+	local self: Driftblitz = setmetatable(Arena.new(gamemode), Driftblitz) :: any
 	self.name = self.slotId
 	self.type = "driftblitz"
 	self:setupDimensions()
@@ -1615,7 +1651,7 @@ function getArenas(): { [any]: Arena }
 		elseif slotId:find("Soccer") then
 			local arena = Driftblitz.new(gamemode)
 			arenas[arena.name] = arena
-		elseif slotId:find("Jakeball") then
+		elseif slotId:find("Jakeball") or slotId:find("Driftball") then
 			local arena = Arena4v4.new(gamemode)
 			arenas[arena.name] = arena
 		end
@@ -1627,10 +1663,14 @@ function getArenas(): { [any]: Arena }
 end
 
 -- arena
-local arenas: { [any]: Arena }
+local arenas: { [any]: Arena }?
 
 function updateArenaOverviews()
 	overviewOffsets = config.overviewOffsets
+
+	if not arenas then
+		return
+	end
 
 	for _, arena in arenas do
 		arena.home.overview = {}
@@ -2631,7 +2671,7 @@ function resetPlayersWithBall()
 end
 
 function setSelectedArena(arena: Arena)
-	if selectedArena and arena.name ~= selectedArena.name then -- new arena
+	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
 		sendSafeMessage(overlayCamera, {
 			info = "rounds",
@@ -2641,7 +2681,7 @@ function setSelectedArena(arena: Arena)
 			info = "slotId",
 			value = arena.slotId,
 		})
-		arenaSwitch = true
+		arenaInstantUpdate = true
 	end
 	selectedArena = arena
 end
@@ -2822,8 +2862,9 @@ function onGui()
 		for i = 1, #Replay.listLoaded() do
 			if Gui.selectable("Replay " .. i, i == readLocation) then
 				if i ~= readLocation then
-					arenas = {}
+					arenas = nil
 					arenaLoadTime = os.clock()
+					arenaInstantUpdate = true
 				end
 				readLocation = i
 			end
@@ -3190,23 +3231,24 @@ function onGui()
 			ui:setCamera("anotheraxiom.freecam")
 			camera:followCamera(getCameraById("anotheraxiom.freecam"))
 		end
-		if Gui.button("Print Arenas") then
+		if arenas and Gui.button("Print Arenas") then
 			for _, arena in arenas do
 				print(arena.slotId)
 			end
 		end
 		Gui.sameLine()
 		if Gui.button("Print Gamemode Ids") then
-			for _, gamemodeId in SpectatorGamemodes.listGamemodeIds() do
-				print(gamemodeId)
+			for _, gamemode in SpectatorGamemodes.listGamemodes() do
+				print(gamemode:getSlotId())
 			end
 		end
+
 		if selectedArena and Gui.button("Set Orientation to Arena") then
 			cameraPosition = selectedArena.transform.position
 			camera.rotation = selectedArena.transform.rotation
 			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
 		end
-		Gui.sameLine()
+
 		if selectedArena and Gui.button("Print Relative Orientation") then
 			local RelativeLocation =
 				selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
@@ -3215,6 +3257,7 @@ function onGui()
 			print(RelativeLocation)
 			print(`Relative Rotation ({selectedArena.name}):`)
 			print(RelativeRotation:euler())
+			Gui.sameLine()
 		end
 		if Gui.button("Reset All Stats") then
 			sendMessage(overlayCamera, {
@@ -3403,6 +3446,11 @@ end
 function getClosestArena(targetPosition: Vec3): Arena -- Remove this function when/if we get the arena from the player
 	local closestArenaDistance = math.huge
 	local closestArena = nil
+
+	if not arenas then
+		return closestArena
+	end
+
 	for _, arena: Arena in pairs(arenas) do
 		local distance = getDist(targetPosition, arena.transform.position)
 		-- because some arenas are directly above others
@@ -4925,7 +4973,7 @@ function tick(dt)
 
 	removeOldInputTimes()
 
-	if boundingBoxDebug then
+	if arenas and boundingBoxDebug then
 		for _, arena in arenas do
 			arena.box:render(1, 0, 1)
 			arena.centerBox:render(0, 1, 0)
