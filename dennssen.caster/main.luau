@@ -1,12 +1,6 @@
 --!strict
 
 local version: string = "2.0.0"
-metadata = {
-	name = "Caster",
-	description = "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
-	author = "Dennssen",
-	defaultKeybind = "",
-}
 
 --TODO:
 -- Normal Win (h ~= a)
@@ -48,6 +42,29 @@ metadata = {
 -- Goal explosion in Driftblitz does not match the goal size and shape
 -- Scores can be inaccurate when selecting an arena if the arenas previous round was in overtime or was a mercy win
 -- Back to back overtime (0-0) it will not count the second round if the same team wins twice.
+
+-- Dependencies
+local Util = require("util")
+
+local InputSystem = require("inputsystem")
+type Keybind = InputSystem.Keybind
+type CustomInput = InputSystem.CustomInput
+type InputSystem = InputSystem.InputSystem
+
+local Box = require("box")
+type BoxType = typeof(Box)
+
+type OverviewData = {
+	overview: { { position: Vec3, rotation: Quat } },
+}
+local Arena = require("arena")
+type CasterArena = Arena.Arena<{}, OverviewData, OverviewData> & {
+	sendInfoMessage: (self: CasterArena) -> (),
+	setupOverviews: (self: CasterArena) -> (),
+}
+
+local HUD = require("hud")
+type HUD = HUD.HUD
 
 -- GameData
 local readLocation = 0
@@ -111,161 +128,96 @@ local defaultKeybinds = {
 	},
 }
 
-function DeepStructureCopy(structureTable, normalTable): boolean
-	local adjusted = false
-	if typeof(structureTable) == "table" then
-		for structureKey, structureValue in structureTable do
-			if normalTable[structureKey] == nil then
-				adjusted = true
-				normalTable[structureKey] = structureValue
-			elseif typeof(normalTable[structureKey]) ~= typeof(structureValue) then
-				adjusted = true
-				normalTable[structureKey] = structureValue
-			elseif typeof(structureValue) == "table" then
-				if DeepStructureCopy(structureValue, normalTable[structureKey]) then
-					adjusted = true
-				end
-			end
-		end
-	end
+InputSystem.setDefaultKeybinds(defaultKeybinds.keyboard, defaultKeybinds.gamepad)
 
-	return adjusted
-end
-
-function DeepStructureClean(structureTable, normalTable): boolean
-	local adjusted = false
-	if typeof(normalTable) == "table" then
-		for normalKey, normalValue in normalTable do
-			if structureTable[normalKey] == nil then
-				adjusted = true
-				normalTable[normalKey] = nil
-			elseif typeof(normalValue) == "table" then
-				if DeepStructureClean(structureTable[normalKey], normalValue) then
-					adjusted = true
-				end
-			end
-		end
-	end
-
-	return adjusted
-end
-
-local function initializeConfig()
-	local saveToConfig = false
-	local neededValues = {
-		cameraFOV = 90,
-		deadzone = 0,
-		followFOV = 100,
-		followPosititonSmoothing = 0.01,
-		followRadius = 20,
-		mouseSensitivity = 1,
-		invertMouseLookHorizontal = false,
-		invertMouseLookVertical = false,
-		invertControllerLookHorizontal = false,
-		invertControllerLookVertical = false,
-		controllerSensitivity = 0.5,
-		positionSmoothing = 0.02,
-		lookSmoothness = 0.25,
-		ballOutline = true,
-		particleSimSpeed = 1,
-		vibrance = 1,
-		getBallVariant = "PlayerBallDistance",
-		sendOverlayInfo = true,
-		thirdPersonMode = 2,
-		homeTeamDefaultColor = {
-			r = 0,
-			g = 0.5,
-			b = 0.5,
-		},
-		awayTeamDefaultColor = {
-			r = 1,
-			g = 0.1,
-			b = 0.1,
-		},
-		overviewOffsets = {
-			_3v3 = {
-				{
-					position = Vec3.new(1300, -2200, 950),
-					rotation = Quat.fromEuler(0, -20, 60),
-				},
-				{
-					position = Vec3.new(1000, 0, 1000),
-					rotation = Quat.fromEuler(0, -35, 0),
-				},
-				{
-					position = Vec3.new(1300, 2200, 950),
-					rotation = Quat.fromEuler(0, -20, -60),
-				},
+Util.initializeConfig({
+	cameraFOV = 90,
+	deadzone = 0,
+	followFOV = 100,
+	followPosititonSmoothing = 0.01,
+	followRadius = 20,
+	mouseSensitivity = 1,
+	invertMouseLookHorizontal = false,
+	invertMouseLookVertical = false,
+	invertControllerLookHorizontal = false,
+	invertControllerLookVertical = false,
+	controllerSensitivity = 0.5,
+	positionSmoothing = 0.02,
+	lookSmoothness = 0.25,
+	ballOutline = true,
+	particleSimSpeed = 1,
+	vibrance = 1,
+	getBallVariant = "PlayerBallDistance",
+	sendOverlayInfo = true,
+	thirdPersonMode = 2,
+	homeTeamDefaultColor = {
+		r = 0,
+		g = 0.5,
+		b = 0.5,
+	},
+	awayTeamDefaultColor = {
+		r = 1,
+		g = 0.1,
+		b = 0.1,
+	},
+	overviewOffsets = {
+		_3v3 = {
+			{
+				position = Vec3.new(1300, -2200, 950),
+				rotation = Quat.fromEuler(0, -20, 60),
 			},
-			_4v4 = {
-				{
-					position = Vec3.new(1055, -2600, 540),
-					rotation = Quat.fromEuler(0, -7.5, 30),
-				},
-				{
-					position = Vec3.new(2935, 0, 65),
-					rotation = Quat.fromEuler(0, 5, 0),
-				},
-				{
-					position = Vec3.new(3390, 2595, 215),
-					rotation = Quat.fromEuler(0, -7.5, -105),
-				},
+			{
+				position = Vec3.new(1000, 0, 1000),
+				rotation = Quat.fromEuler(0, -35, 0),
 			},
-			_driftblitz = {
-				{
-					position = Vec3.new(795, -3565, 1140),
-					rotation = Quat.fromEuler(0, -20, 60),
-				},
-				{
-					position = Vec3.new(3585, -1670, 40),
-					rotation = Quat.fromEuler(0, 0, 50),
-				},
-				{
-					position = Vec3.new(4500, 3135, 620),
-					rotation = Quat.fromEuler(0, -15, -90),
-				},
+			{
+				position = Vec3.new(1300, 2200, 950),
+				rotation = Quat.fromEuler(0, -20, -60),
 			},
 		},
-		keyboardKeybinds = "",
-		gamepadKeybinds = "",
-		postProcessing = {
-			bloomIntensity = 0.675,
-			bloomThreshold = -1,
-			depthOfFieldFstop = 4,
-			depthOfFieldFocalDistance = 0,
-			depthOfFieldSensorWidth = 24.576,
-			chromaticAberrationIntensity = 0,
-			motionBlurAmount = 0,
-			vignetteIntensity = 0.4,
-			exposureBias = 1,
+		_4v4 = {
+			{
+				position = Vec3.new(1055, -2600, 540),
+				rotation = Quat.fromEuler(0, -7.5, 30),
+			},
+			{
+				position = Vec3.new(2935, 0, 65),
+				rotation = Quat.fromEuler(0, 5, 0),
+			},
+			{
+				position = Vec3.new(3390, 2595, 215),
+				rotation = Quat.fromEuler(0, -7.5, -105),
+			},
 		},
-	}
-
-	if DeepStructureCopy(neededValues, config) then
-		saveToConfig = true
-	end
-
-	if DeepStructureClean(neededValues, config) then
-		saveToConfig = true
-	end
-
-	if saveToConfig then
-		saveConfig()
-	end
-end
-
-initializeConfig()
-
-local function parseBallJSON(str)
-	-- Table to store the parsed data
-	local result = {}
-
-	-- Parse type
-	local typeVal = string.match(str, '"type"%s*:%s*([%d]+)')
-	result.type = tonumber(typeVal)
-
-	return result
-end
+		_driftblitz = {
+			{
+				position = Vec3.new(795, -3565, 1140),
+				rotation = Quat.fromEuler(0, -20, 60),
+			},
+			{
+				position = Vec3.new(3585, -1670, 40),
+				rotation = Quat.fromEuler(0, 0, 50),
+			},
+			{
+				position = Vec3.new(4500, 3135, 620),
+				rotation = Quat.fromEuler(0, -15, -90),
+			},
+		},
+	},
+	keyboardKeybinds = "",
+	gamepadKeybinds = "",
+	postProcessing = {
+		bloomIntensity = 0.675,
+		bloomThreshold = -1,
+		depthOfFieldFstop = 4,
+		depthOfFieldFocalDistance = 0,
+		depthOfFieldSensorWidth = 24.576,
+		chromaticAberrationIntensity = 0,
+		motionBlurAmount = 0,
+		vignetteIntensity = 0.4,
+		exposureBias = 1,
+	},
+})
 
 function compareVersion(
 	actualRelease: number,
@@ -407,10 +359,6 @@ function convertToHUD(vec: Vec2): Vec3
 	return camera.rotation:getRightVector() * vec.x + camera.rotation:getUpVector() * vec.y
 end
 
-function keyToString(key: Key): string
-	return string.gsub(tostring(key), "Gamepad_", "")
-end
-
 local deltaTime: number = 0
 
 local loadTime: number = 0
@@ -424,11 +372,6 @@ local defaultRotation = Quat.fromEuler(0, 0, 90)
 local cameraPosition: Vec3 = defaultPosition
 local cameraVelocity: Vec3 = Vec3.zeroVector
 
-local TeamIndex = {
-	NoTeam = -1,
-	homeTeam = 0,
-	awayTeam = 1,
-}
 local CameraMode = {
 	FirstPerson = 1,
 	HeadRotation = 2,
@@ -442,289 +385,7 @@ local CAMERA_MODE_NAMES = {
 	[4] = "Face The Ball",
 }
 
-type HUD = {
-	__index: HUD,
-	cameraId: string,
-	width: number,
-	height: number,
-	depth: number,
-	transform: {
-		origin: Vec3,
-		top: Vec3,
-		left: Vec3,
-		bottom: Vec3,
-		right: Vec3,
-	},
-
-	new: (cameraId: string, width: number, height: number, depth: number) -> HUD,
-	setCamera: (self: HUD, cameraId: string) -> (),
-	generateTransform: (self: HUD) -> (),
-
-	tick: (self: HUD) -> (),
-	drawPoint: (anchor: Vec3, color: Vec3, pointSize: number, lifetime: number) -> (),
-	drawLine: (startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number) -> (),
-	worldToHUD: (self: HUD, worldPosition: Vec3) -> Vec3,
-}
-
-local HUD: HUD = {} :: HUD
-HUD.__index = HUD
-
-function HUD.new(cameraId: string, width: number, height: number, depth: number): HUD
-	local self: HUD = setmetatable({}, HUD) :: any
-	self.cameraId = cameraId
-	self.width = width
-	self.height = height
-	self.depth = depth
-
-	self:generateTransform()
-
-	return self :: HUD
-end
-
-function HUD:setCamera(cameraId: string)
-	self.cameraId = cameraId
-end
-
-function HUD:generateTransform()
-	self.transform = {} :: any
-
-	local _camera
-
-	if self.cameraId ~= "" then
-		_camera = getCameraById(self.cameraId)
-	else
-		_camera = camera
-	end
-
-	local _cameraPosition: Vec3
-	local _cameraRotation: Quat
-	_cameraPosition = _camera.position
-	_cameraRotation = _camera.rotation
-
-	self.transform.origin = _cameraPosition + (_cameraRotation:getForwardVector() * self.depth)
-
-	local fovRad = math.rad(_camera.fieldOfView)
-	local aspectRatio = self.width / self.height
-	local halfWidth = math.tan(fovRad / 2) * self.depth
-	local halfHeight = halfWidth / aspectRatio
-
-	self.transform.top = self.transform.origin + (_cameraRotation:getUpVector() * halfHeight)
-	self.transform.left = self.transform.origin + (_cameraRotation:getRightVector() * -halfWidth)
-	self.transform.bottom = self.transform.origin + (_cameraRotation:getUpVector() * -halfHeight)
-	self.transform.right = self.transform.origin + (_cameraRotation:getRightVector() * halfWidth)
-end
-
-function HUD:tick()
-	self:generateTransform()
-end
-
-function HUD.drawPoint(anchor: Vec3, color: Vec3, pointSize: number, lifetime: number)
-	WorldDraw.drawPoint(anchor, color.x, color.y, color.z, pointSize, lifetime)
-end
-
-function HUD.drawLine(startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number)
-	WorldDraw.drawLine(startAnchor, endAnchor, color.x, color.y, color.z, thickness, lifetime)
-end
-
-function HUD:worldToHUD(worldPosition: Vec3): Vec3
-	local _camera
-
-	if self.cameraId ~= "" then
-		_camera = getCameraById(self.cameraId)
-	else
-		_camera = camera
-	end
-
-	local camPos = _camera.position
-	local camForward = _camera.rotation:getForwardVector()
-	local hudOrigin = self.transform.origin
-
-	local rayDir = (worldPosition - camPos):getSafeNormal()
-	local denom = camForward:dot(rayDir)
-
-	if denom <= 0 then
-		return Vec3.zeroVector
-	end
-
-	-- Ray-plane intersection:
-	local t = (hudOrigin - camPos):dot(camForward) / denom
-	local projected = camPos + rayDir * t
-
-	return projected
-end
-
 local ui = HUD.new("", 1920, 1080, 100)
-
--- Bounding Box start
-
-type Local = {
-	position: Vec3,
-	normal: Vec3,
-	length: number,
-}
-
-type BoxType = {
-	__index: BoxType,
-	position: Vec3,
-	size: Vec3,
-	rotation: Quat,
-	vertexLocations: { Vec3 },
-	locals: {
-		x: Local,
-		y: Local,
-		z: Local,
-	},
-
-	__tostring: (self: BoxType) -> string,
-	new: (inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat) -> BoxType,
-	setPosition: (self: BoxType, inputPosition: Vec3) -> (),
-	setSize: (self: BoxType, inputPosition: Vec3) -> (),
-	setRotation: (self: BoxType, inputPosition: Quat) -> (),
-	setRotationDeg: (self: BoxType, inputRotation: Vec3) -> (),
-	generatePoints: (self: BoxType) -> (),
-	render: (self: BoxType, r: number, g: number, b: number) -> (),
-	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
-
-	empty: BoxType,
-}
-
-local Box: BoxType = {} :: BoxType
-Box.__index = Box
-
-function Box.new(inputPosition: Vec3, inputSize: Vec3, inputRotation: Quat): BoxType
-	local self: BoxType = setmetatable({}, Box) :: any
-
-	self.position = inputPosition
-	self.size = inputSize
-	self.rotation = inputRotation
-
-	self.vertexLocations = {}
-	self.locals = {
-		x = {
-			position = Vec3.zeroVector,
-			normal = Vec3.zeroVector,
-			length = 0,
-		},
-		y = {
-			position = Vec3.zeroVector,
-			normal = Vec3.zeroVector,
-			length = 0,
-		},
-		z = {
-			position = Vec3.zeroVector,
-			normal = Vec3.zeroVector,
-			length = 0,
-		},
-	}
-	self:generatePoints()
-	return self
-end
-
-function Box:setPosition(inputPosition: Vec3): ()
-	self.position = inputPosition
-	self:generatePoints()
-end
-
-function Box:setSize(inputSize: Vec3): ()
-	self.size = inputSize
-	self:generatePoints()
-end
-
-function Box:setRotation(inputRotation: Quat): ()
-	self.rotation = inputRotation
-	self:generatePoints()
-end
-
-function Box:setRotationDeg(inputRotation: Vec3): ()
-	self.rotation = Quat.fromEuler(inputRotation.x, inputRotation.y, inputRotation.z)
-	self:generatePoints()
-end
-
-function Box:generatePoints(): ()
-	local shift = { x = self.size.x / 2, y = self.size.y / 2, z = self.size.z / 2 }
-	local newVertexLocations = {
-		Vec3.new(shift.x, shift.y, shift.z),
-		Vec3.new(shift.x, shift.y, -shift.z),
-		Vec3.new(shift.x, -shift.y, shift.z),
-		Vec3.new(shift.x, -shift.y, -shift.z),
-		Vec3.new(-shift.x, shift.y, shift.z),
-		Vec3.new(-shift.x, shift.y, -shift.z),
-		Vec3.new(-shift.x, -shift.y, shift.z),
-		Vec3.new(-shift.x, -shift.y, -shift.z),
-	}
-
-	for i = 1, #newVertexLocations do
-		newVertexLocations[i] = self.rotation:rotateVector(newVertexLocations[i])
-	end
-
-	-- Translate the vertices by the box position.
-	for i = 1, #newVertexLocations do
-		newVertexLocations[i].x = newVertexLocations[i].x + self.position.x
-		newVertexLocations[i].y = newVertexLocations[i].y + self.position.y
-		newVertexLocations[i].z = newVertexLocations[i].z + self.position.z
-	end
-
-	self.vertexLocations = newVertexLocations
-
-	self.locals.x.position = self.vertexLocations[5] - self.vertexLocations[1]
-	self.locals.y.position = self.vertexLocations[3] - self.vertexLocations[1]
-	self.locals.z.position = self.vertexLocations[2] - self.vertexLocations[1]
-
-	for _, l: Local in self.locals :: { Local } do
-		l.normal = l.position:getSafeNormal()
-		l.length = l.position:length()
-	end
-end
-
-function Box:render(r: number, g: number, b: number): ()
-	local lines: { { start: Vec3, finish: Vec3 } } = {
-		{ start = self.vertexLocations[1], finish = self.vertexLocations[2] },
-		{ start = self.vertexLocations[1], finish = self.vertexLocations[3] },
-		{ start = self.vertexLocations[1], finish = self.vertexLocations[5] },
-		{ start = self.vertexLocations[4], finish = self.vertexLocations[2] },
-		{ start = self.vertexLocations[4], finish = self.vertexLocations[3] },
-		{ start = self.vertexLocations[4], finish = self.vertexLocations[8] },
-		{ start = self.vertexLocations[7], finish = self.vertexLocations[8] },
-		{ start = self.vertexLocations[7], finish = self.vertexLocations[3] },
-		{ start = self.vertexLocations[7], finish = self.vertexLocations[5] },
-		{ start = self.vertexLocations[6], finish = self.vertexLocations[5] },
-		{ start = self.vertexLocations[6], finish = self.vertexLocations[2] },
-		{ start = self.vertexLocations[6], finish = self.vertexLocations[8] },
-	}
-
-	WorldDraw.drawPoint(self.position, 0.2, 3, 0.2, 5, 0)
-	for i: number, line: { start: Vec3, finish: Vec3 } in lines do
-		WorldDraw.drawLine(line.start, line.finish, r, g, b, 4, 0)
-	end
-
-	WorldDraw.drawLine(self.position, self.position + self.rotation:getForwardVector() * 100, 1, 0, 0, 10, 0)
-	WorldDraw.drawLine(self.position, self.position + self.rotation:getUpVector() * 100, 0, 1, 0, 10, 0)
-	WorldDraw.drawLine(self.position, self.position + self.rotation:getRightVector() * 100, 0, 0, 1, 10, 0)
-end
-
-function Box:checkPointIntersect(point: Vec3?): boolean
-	if point == nil then
-		return false
-	end
-
-	local zeroPoint: Vec3 = self.vertexLocations[1]
-	local fullPoint: Vec3 = self.vertexLocations[8]
-	local centerPoint: Vec3 = (zeroPoint + fullPoint) / 2
-
-	local projectionVector: Vec3 = point - centerPoint
-
-	local pX: number = math.abs(Vec3.dot(projectionVector, self.locals.x.normal))
-	local pY: number = math.abs(Vec3.dot(projectionVector, self.locals.y.normal))
-	local pZ: number = math.abs(Vec3.dot(projectionVector, self.locals.z.normal))
-
-	if 2 * pX <= self.locals.x.length and 2 * pY <= self.locals.y.length and 2 * pZ <= self.locals.z.length then
-		return true
-	else
-		return false
-	end
-end
-
-Box.empty = Box.new(Vec3.zeroVector, Vec3.zeroVector, Quat.identity)
 
 -- Ball
 local ball: ReplayBall
@@ -851,250 +512,15 @@ type Round = {
 	},
 }
 
-type ArenaTeam = {
-	previousActualScore: number,
-	previousScore: number,
-	score: number,
-	scoreIncrease: boolean,
-	previousRoundsWon: number,
-	roundsWon: number,
-	roundsWonIncrease: boolean,
-	goal: {
-		position: Vec3,
-		rotation: Quat,
-		box: BoxType,
-	},
-	overview: { { position: Vec3, rotation: Quat } },
-	players: { ReplayPlayer },
-}
-
-type Arena = {
-	__index: Arena,
-	type: string,
-
-	slotId: string,
-	gamemode: ModuleStateSpectatorLuaApi,
-	name: string,
-	transform: Transform,
-	box: BoxType,
-	centerBox: BoxType,
-	home: ArenaTeam,
-	away: ArenaTeam,
-	players: { ReplayPlayer },
-
-	lastIsGameActive: boolean,
-	isGameActive: boolean,
-	isKickoff: boolean,
-	isOvertime: boolean,
-	isGracePeriod: boolean,
-
-	gameTimeSeconds: number,
-	lastGameTimeSeconds: number,
-	actionTimerSeconds: number,
-	bestOfAmount: number,
-	matchLengthSeconds: number,
-	mercyScoreDifference: number,
-
-	gracePeriodStartTime: number,
-
-	new: (gamemode: ModuleStateSpectatorLuaApi) -> Arena,
-	tick: (self: Arena) -> (),
-	onGameStart: (self: Arena) -> (),
-	onRoundStart: (self: Arena) -> (),
-	onRoundEnd: (self: Arena) -> (),
-	setTeams: (self: Arena) -> (),
-	sendInfoMessage: (self: Arena) -> (),
-
-	-- Overrides
-	isPointOnHomeSide: (self: Arena, point: Vec3) -> boolean,
-	setupDimensions: (self: Arena) -> (),
-	setupOverviews: (self: Arena) -> (),
-	getTeamRotation: (self: Arena, teamIndex: number) -> Quat,
-
-	GUIChangeDimensions: (self: Arena) -> (), -- Debuging
-}
-
-local Arena: Arena = {} :: Arena
-Arena.__index = Arena
-
-local arenaInstantUpdate: boolean = false
-
 local centerBoxSize = Vec3.new(50, 50, 125)
-
 local overviewOffsets = config.overviewOffsets
 
-function Arena.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self: Arena = setmetatable({}, Arena) :: any
+local CasterArena = {} :: CasterArena
+CasterArena.__index = CasterArena
+setmetatable(CasterArena, { __index = Arena })
 
-	self.slotId = gamemode:getSlotId()
-	self.gamemode = gamemode
-	self.transform = gamemode:getTransform()
-	self.players = {}
-
-	self.home = {
-		previousActualScore = 0,
-		previousScore = 0,
-		score = 0,
-		scoreIncrease = false,
-		previousRoundsWon = 0,
-		roundsWon = 0,
-		roundsWonIncrease = false,
-		goal = {
-			position = Vec3.zeroVector,
-			rotation = Quat.identity,
-			box = Box.empty,
-		},
-		overview = {},
-		players = {},
-	}
-
-	self.away = {
-		previousActualScore = 0,
-		previousScore = 0,
-		score = 0,
-		scoreIncrease = false,
-		previousRoundsWon = 0,
-		roundsWon = 0,
-		roundsWonIncrease = false,
-		goal = {
-			position = Vec3.zeroVector,
-			rotation = Quat.identity,
-			box = Box.empty,
-		},
-		overview = {},
-		players = {},
-	}
-
-	self.gracePeriodStartTime = 0
-	self.isOvertime = false
-	self.isKickoff = false
-	self.isGracePeriod = false
-
-	print(`made arena {self.slotId}`)
-
-	return self
-end
-
-function Arena:tick()
-	local currentTime = os.clock()
-	self.lastIsGameActive = self.isGameActive
-	self.isGameActive = self.gamemode:getIsGameRunning()
-
-	if arenaInstantUpdate then
-		self.lastIsGameActive = self.isGameActive
-	end
-
-	if not self.isKickoff and not self.lastIsGameActive and self.isGameActive then
-		self.isKickoff = true
-	end
-
-	local started = self.isGameActive and not self.lastIsGameActive
-
-	if started and self.home.roundsWon == 0 and self.away.roundsWon == 0 then
-		self:onGameStart()
-	elseif started then
-		self:onRoundStart()
-	end
-
-	local gameTimeComponent = self.gamemode:getGameTimeComponent()
-
-	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
-	self.mercyScoreDifference = self.gamemode:getNumberConfigVariable("mercyscoredifference")
-	if gameTimeComponent then
-		if self.gameTimeSeconds and self.isGameActive then
-			self.lastGameTimeSeconds = self.gameTimeSeconds
-		elseif self.matchLengthSeconds then
-			self.lastGameTimeSeconds = self.matchLengthSeconds
-		else
-			self.lastGameTimeSeconds = 0
-		end
-		self.gameTimeSeconds = gameTimeComponent:getTimeSeconds()
-		self.actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
-	else
-		self.gameTimeSeconds = 0
-		self.lastGameTimeSeconds = 0
-		self.actionTimerSeconds = 0
-	end
-
-	local homeActualScore = self.gamemode:getTeamScore(TeamIndex.homeTeam)
-	local awayActualScore = self.gamemode:getTeamScore(TeamIndex.awayTeam)
-
-	if homeActualScore ~= self.home.previousActualScore then
-		self.home.previousScore = self.home.score
-		self.home.score = self.gamemode:getTeamScore(TeamIndex.homeTeam)
-	end
-
-	if awayActualScore ~= self.away.previousActualScore then
-		self.away.previousScore = self.away.score
-		self.away.score = self.gamemode:getTeamScore(TeamIndex.awayTeam)
-	end
-
-	if arenaInstantUpdate then
-		self.home.previousActualScore = homeActualScore
-		self.away.previousActualScore = awayActualScore
-		self.lastGameTimeSeconds = self.gameTimeSeconds
-	end
-
-	self.home.scoreIncrease = self.home.previousActualScore ~= homeActualScore and homeActualScore ~= 0
-	self.away.scoreIncrease = self.away.previousActualScore ~= awayActualScore and awayActualScore ~= 0
-
-	self.home.previousActualScore = homeActualScore
-	self.away.previousActualScore = awayActualScore
-
-	if self.home.scoreIncrease or self.away.scoreIncrease then
-		print("goal")
-		self.gracePeriodStartTime = currentTime
-		self.isGracePeriod = true
-	elseif not self.isGracePeriod and self.actionTimerSeconds > 0 and self.isGameActive then
-		self.gracePeriodStartTime = currentTime
-		self.isGracePeriod = true
-	end
-
-	if
-		self.isGracePeriod
-		and ((currentTime - self.gracePeriodStartTime > 6 and self.actionTimerSeconds == 0) or not self.isGameActive)
-	then
-		self.isGracePeriod = false
-	end
-
-	if self.gameTimeSeconds > self.lastGameTimeSeconds and not self.isOvertime then
-		self.isOvertime = true
-	end
-
-	self.home.previousRoundsWon = self.home.roundsWon
-	self.home.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.homeTeam)
-	self.away.previousRoundsWon = self.away.roundsWon
-	self.away.roundsWon = self.gamemode:getTeamRoundsWon(TeamIndex.awayTeam)
-
-	if arenaInstantUpdate then
-		self.home.previousRoundsWon = self.home.roundsWon
-		self.away.previousRoundsWon = self.away.roundsWon
-	end
-
-	self.home.roundsWonIncrease = self.home.roundsWon > self.home.previousRoundsWon
-	self.away.roundsWonIncrease = self.away.roundsWon > self.away.previousRoundsWon
-
-	if self.gamemode:getBoolConfigVariable("busebestof") then
-		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
-	else
-		self.bestOfAmount = 1
-	end
-
-	if not self.isGameActive and self.lastIsGameActive then
-		self:onRoundEnd()
-	end
-
-	self:setTeams()
-	self:sendInfoMessage()
-
-	if arenaInstantUpdate then
-		arenaInstantUpdate = false
-	end
-end
-
-function Arena:onGameStart()
-	print("game start")
-
+function CasterArena:onGameStartHook()
+	print("game start hook")
 	sendSafeMessage(overlayCamera, {
 		info = "stats",
 		value = "clear",
@@ -1104,75 +530,23 @@ function Arena:onGameStart()
 		info = "rounds",
 		value = "clear",
 	})
-
-	self:onRoundStart()
 end
 
-function Arena:onRoundStart()
-	self.isOvertime = false
-	self.home.score = 0
-	self.home.previousScore = 0
-	self.away.score = 0
-	self.away.previousScore = 0
-	print("round start")
-end
+function CasterArena:onRoundStartHook() end
 
-function Arena:onRoundEnd()
-	print("round end")
-	local isRestart = not self.home.roundsWonIncrease and not self.away.roundsWonIncrease
+function CasterArena:onRoundEndHook(isRestart: boolean, isMercy: boolean, homeScore: number, awayScore: number)
+	print("round end hook")
+
 	if isRestart then
-		print("restart")
 		return
 	end
 
-	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
-	local cachedHomeScore
-	local cachedAwayScore
-
-	if endsWithAGoal then
-		cachedHomeScore = self.home.previousScore
-		cachedAwayScore = self.away.previousScore
-	else
-		cachedHomeScore = self.home.score
-		cachedAwayScore = self.away.score
-	end
-
-	local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
-	local isMercy = scoreDifference >= (self.mercyScoreDifference - 1) and endsWithAGoal
-
-	print(`Home pre-score: {self.home.previousScore}`)
-	print(`Away pre-score: {self.away.previousScore}`)
-	print(`Game time: {self.gameTimeSeconds}`)
-	print(`Action time: {self.actionTimerSeconds}`)
-	print(`Ends with goal: {endsWithAGoal}`)
-	print(`Is overtime: {self.isOvertime}`)
-	print(`Is mercy: {isMercy}`)
-
-	if
-		endsWithAGoal
-		and (self.isOvertime or isMercy)
-		and self.home.goal.box:checkPointIntersect(ball.transform.position)
-	then
-		print("Increased away score")
-		cachedAwayScore += 1
-	elseif
-		endsWithAGoal
-		and (self.isOvertime or isMercy)
-		and self.away.goal.box:checkPointIntersect(ball.transform.position)
-	then
-		print("Increased home score")
-		cachedHomeScore += 1
-	end
-
-	print(`Home score: {cachedHomeScore}`)
-	print(`Away score: {cachedAwayScore}`)
-
 	local round: Round = {
 		home = {
-			score = cachedHomeScore,
+			score = homeScore,
 		},
 		away = {
-			score = cachedAwayScore,
+			score = awayScore,
 		},
 	}
 
@@ -1182,40 +556,11 @@ function Arena:onRoundEnd()
 	})
 end
 
-function Arena:setTeams()
-	local tempHome = {}
-	local tempAway = {}
-
-	for _, player in gameData.players do
-		if player.teamIndex == TeamIndex.NoTeam then
-			continue
-		end
-
-		if not self.box:checkPointIntersect(player.root.position) then
-			continue
-		end
-
-		if player.teamIndex == TeamIndex.homeTeam then
-			table.insert(tempHome, player)
-		elseif player.teamIndex == TeamIndex.awayTeam then
-			table.insert(tempAway, player)
-		end
-	end
-
-	self.home.players = tempHome
-	self.away.players = tempAway
-
-	local allPlayers = {}
-	for _, player in self.home.players do
-		table.insert(allPlayers, player)
-	end
-	for _, player in self.away.players do
-		table.insert(allPlayers, player)
-	end
-	self.players = allPlayers
+function CasterArena:postTickHook()
+	(self :: CasterArena):sendInfoMessage()
 end
 
-function Arena:sendInfoMessage()
+function CasterArena:sendInfoMessage()
 	local homePlayerNames = {}
 	local awayPlayerNames = {}
 	for _, player in self.home.players do
@@ -1269,7 +614,11 @@ function Arena:sendInfoMessage()
 	})
 end
 
-type Arena3v3 = Arena & {
+type Arena3v3 = CasterArena & {
+	__index: Arena3v3,
+
+	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena3v3,
+
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
 	boxSize: Vec3,
@@ -1281,7 +630,7 @@ type Arena3v3 = Arena & {
 
 local Arena3v3 = {} :: Arena3v3
 Arena3v3.__index = Arena3v3
-setmetatable(Arena3v3, { __index = Arena })
+setmetatable(Arena3v3, { __index = CasterArena })
 
 Arena3v3.homeRotationOffset = Quat.fromEuler(0, 0, 90)
 Arena3v3.awayRotationOffset = Quat.fromEuler(0, 0, -90)
@@ -1291,10 +640,12 @@ Arena3v3.centerBoxOffset = Vec3.new(0, 0, 300)
 Arena3v3.goalBoxSize = Vec3.new(150, 500, 225)
 Arena3v3.goalPositionOffset = Vec3.new(3250, 0, 175)
 
-function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self: Arena3v3 = setmetatable(Arena.new(gamemode), Arena3v3) :: any
+function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena3v3
+	local self: CasterArena = setmetatable(CasterArena.new(gamemode, frameIndex), Arena3v3) :: any
 	self.type = "3v3"
 	self.name = self.slotId:gsub("TKB_", "")
+	self.home.data = { overview = {} }
+	self.away.data = { overview = {} }
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Arena3v3
@@ -1302,7 +653,7 @@ end
 
 function Arena3v3:isPointOnHomeSide(point: Vec3): boolean
 	local homeDirection = (self.transform.rotation * Arena3v3.homeRotationOffset):getForwardVector()
-	local ballDirection = getForward(self.transform.position, point)
+	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
 	else
@@ -1342,6 +693,9 @@ function Arena3v3:setupDimensions()
 end
 
 function Arena3v3:setupOverviews()
+	self.home.data.overview = {}
+	self.away.data.overview = {}
+
 	for _, overview in overviewOffsets._3v3 do
 		local homeOverview = {
 			position = self.transform.position
@@ -1354,16 +708,16 @@ function Arena3v3:setupOverviews()
 			rotation = (self.transform.rotation * Arena3v3.awayRotationOffset * overview.rotation),
 		}
 
-		table.insert(self.home.overview, homeOverview)
-		table.insert(self.away.overview, awayOverview)
+		table.insert(self.home.data.overview, homeOverview)
+		table.insert(self.away.data.overview, awayOverview)
 	end
 end
 
 function Arena3v3:getTeamRotation(teamIndex: number): Quat
 	local rotation = Quat.identity
-	if teamIndex == TeamIndex.homeTeam then
+	if teamIndex == Util.TeamIndex.HomeTeam then
 		rotation = self.transform.rotation * Arena3v3.homeRotationOffset
-	elseif teamIndex == TeamIndex.awayTeam then
+	elseif teamIndex == Util.TeamIndex.AwayTeam then
 		rotation = self.transform.rotation * Arena3v3.awayRotationOffset
 	end
 
@@ -1390,7 +744,11 @@ function Arena3v3:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
-type Arena4v4 = Arena & {
+type Arena4v4 = CasterArena & {
+	__index: Arena4v4,
+
+	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena4v4,
+
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
 	boxSize: Vec3,
@@ -1402,7 +760,7 @@ type Arena4v4 = Arena & {
 
 local Arena4v4 = {} :: Arena4v4
 Arena4v4.__index = Arena4v4
-setmetatable(Arena4v4, { __index = Arena })
+setmetatable(Arena4v4, { __index = CasterArena })
 
 Arena4v4.homeRotationOffset = Quat.fromEuler(0, 0, -90)
 Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, 90)
@@ -1412,12 +770,14 @@ Arena4v4.centerBoxOffset = Vec3.new(0, 0, 250)
 Arena4v4.goalBoxSize = Vec3.new(220, 450, 225)
 Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
 
-function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self: Arena4v4 = setmetatable(Arena.new(gamemode), Arena4v4) :: any
+function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena4v4
+	local self: Arena4v4 = setmetatable(Arena.new(gamemode, frameIndex), Arena4v4) :: any
 	self.type = "4v4"
 	local nameEnd = self.slotId:find("_") :: number
-
 	self.name = `{self.slotId:sub(1, nameEnd - 1)} {self.slotId:sub(self.slotId:len() - 2)}`
+	self.home.data = { overview = {} }
+	self.away.data = { overview = {} }
+
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Arena4v4
@@ -1425,7 +785,7 @@ end
 
 function Arena4v4:isPointOnHomeSide(point: Vec3): boolean
 	local homeDirection = (self.transform.rotation * Arena4v4.homeRotationOffset):getForwardVector()
-	local ballDirection = getForward(self.transform.position, point)
+	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
 	else
@@ -1465,6 +825,9 @@ function Arena4v4:setupDimensions()
 end
 
 function Arena4v4:setupOverviews()
+	self.home.data.overview = {}
+	self.away.data.overview = {}
+
 	for _, overview in overviewOffsets._4v4 do
 		local homeOverview = {
 			position = self.transform.position
@@ -1477,16 +840,16 @@ function Arena4v4:setupOverviews()
 			rotation = (self.transform.rotation * Arena4v4.awayRotationOffset * overview.rotation),
 		}
 
-		table.insert(self.home.overview, homeOverview)
-		table.insert(self.away.overview, awayOverview)
+		table.insert(self.home.data.overview, homeOverview)
+		table.insert(self.away.data.overview, awayOverview)
 	end
 end
 
 function Arena4v4:getTeamRotation(teamIndex: number?): Quat
 	local rotation = Quat.identity
-	if teamIndex == TeamIndex.homeTeam then
+	if teamIndex == Util.TeamIndex.HomeTeam then
 		rotation = self.transform.rotation * Arena4v4.homeRotationOffset
-	elseif teamIndex == TeamIndex.awayTeam then
+	elseif teamIndex == Util.TeamIndex.AwayTeam then
 		rotation = self.transform.rotation * Arena4v4.awayRotationOffset
 	end
 
@@ -1513,7 +876,11 @@ function Arena4v4:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
-type Driftblitz = Arena & {
+type Driftblitz = CasterArena & {
+	__index: Driftblitz,
+
+	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Driftblitz,
+
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
 	boxSize: Vec3,
@@ -1525,7 +892,7 @@ type Driftblitz = Arena & {
 
 local Driftblitz = {} :: Driftblitz
 Driftblitz.__index = Driftblitz
-setmetatable(Driftblitz, { __index = Arena })
+setmetatable(Driftblitz, { __index = CasterArena })
 
 Driftblitz.homeRotationOffset = Quat.fromEuler(0, 0, 90)
 Driftblitz.awayRotationOffset = Quat.fromEuler(0, 0, -90)
@@ -1535,10 +902,13 @@ Driftblitz.centerBoxOffset = Vec3.new(0, 0, 100)
 Driftblitz.goalBoxSize = Vec3.new(100, 890, 300)
 Driftblitz.goalPositionOffset = Vec3.new(5295, 0, 175)
 
-function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi): Arena
-	local self: Driftblitz = setmetatable(Arena.new(gamemode), Driftblitz) :: any
+function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Driftblitz
+	local self: Driftblitz = setmetatable(Arena.new(gamemode, frameIndex), Driftblitz) :: any
 	self.name = self.slotId
 	self.type = "driftblitz"
+
+	self.home.data = { overview = {} }
+	self.away.data = { overview = {} }
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Driftblitz
@@ -1546,7 +916,7 @@ end
 
 function Driftblitz:isPointOnHomeSide(point: Vec3): boolean
 	local homeDirection = (self.transform.rotation * Driftblitz.homeRotationOffset):getForwardVector()
-	local ballDirection = getForward(self.transform.position, point)
+	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
 	else
@@ -1586,6 +956,9 @@ function Driftblitz:setupDimensions()
 end
 
 function Driftblitz:setupOverviews()
+	self.home.data.overview = {}
+	self.away.data.overview = {}
+
 	for _, overview in overviewOffsets._driftblitz do
 		local homeOverview = {
 			position = self.transform.position
@@ -1598,16 +971,16 @@ function Driftblitz:setupOverviews()
 			rotation = (self.transform.rotation * Driftblitz.awayRotationOffset * overview.rotation),
 		}
 
-		table.insert(self.home.overview, homeOverview)
-		table.insert(self.away.overview, awayOverview)
+		table.insert(self.home.data.overview, homeOverview)
+		table.insert(self.away.data.overview, awayOverview)
 	end
 end
 
 function Driftblitz:getTeamRotation(teamIndex: number): Quat
 	local rotation = Quat.identity
-	if teamIndex == TeamIndex.homeTeam then
+	if teamIndex == Util.TeamIndex.HomeTeam then
 		rotation = self.transform.rotation * Driftblitz.homeRotationOffset
-	elseif teamIndex == TeamIndex.awayTeam then
+	elseif teamIndex == Util.TeamIndex.AwayTeam then
 		rotation = self.transform.rotation * Driftblitz.awayRotationOffset
 	end
 
@@ -1639,20 +1012,20 @@ function Driftblitz:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
-function getArenas(): { [any]: Arena }
-	local arenas: { [any]: Arena } = {}
+function getArenas(): { [any]: CasterArena }
+	local arenas: { [any]: CasterArena } = {}
 	local gamemodes = SpectatorGamemodes.listGamemodes()
 	print("got gamemodes in getArenas")
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
 		if slotId:find("TKB") and not slotId:find("Full") then
-			local arena = Arena3v3.new(gamemode)
+			local arena: CasterArena = Arena3v3.new(gamemode, readLocation) :: Arena3v3
 			arenas[arena.name] = arena
 		elseif slotId:find("Soccer") then
-			local arena = Driftblitz.new(gamemode)
+			local arena: CasterArena = Driftblitz.new(gamemode, readLocation) :: Driftblitz
 			arenas[arena.name] = arena
 		elseif slotId:find("Jakeball") or slotId:find("Driftball") then
-			local arena = Arena4v4.new(gamemode)
+			local arena: CasterArena = Arena4v4.new(gamemode, readLocation) :: Arena4v4
 			arenas[arena.name] = arena
 		end
 	end
@@ -1663,7 +1036,7 @@ function getArenas(): { [any]: Arena }
 end
 
 -- arena
-local arenas: { [any]: Arena }?
+local arenas: { [any]: CasterArena }?
 
 function updateArenaOverviews()
 	overviewOffsets = config.overviewOffsets
@@ -1673,14 +1046,11 @@ function updateArenaOverviews()
 	end
 
 	for _, arena in arenas do
-		arena.home.overview = {}
-		arena.away.overview = {}
-
 		arena:setupOverviews()
 	end
 end
 
-local selectedArena: Arena = nil
+local selectedArena: CasterArena = nil
 
 -- Particles
 local homeTeamDefaultColor: Color = config.homeTeamDefaultColor
@@ -1777,230 +1147,6 @@ local speedLastGearBuffer = false
 local turnVelocity: Vec2 = Vec2.zeroVector
 
 -- Input
-function DeserializeKeybinds(string: string)
-	local keybinds = {}
-
-	for fullEntry in string:gmatch("{(.-:{.-}})}") do
-		local key, content = fullEntry:match("(.-):{(.*)}")
-		if not key or not content then
-			continue
-		end
-
-		local entry = {}
-
-		entry.primary = Input.Key[content:match('primary:"([^"]+)"')]
-		if entry.primary == nil then
-			entry.primary = Input.Gamepad[content:match('primary:"([^"]+)"')]
-		end
-
-		local modifierContent = content:match("modifiers:{(.-)}") or ""
-		entry.modifiers = {}
-
-		for modifier in modifierContent:gmatch('"([^"]+)"') do
-			local modifierKey = Input.Key[modifier]
-			if modifierKey == nil then
-				modifierKey = Input.Gamepad[modifier]
-			end
-
-			table.insert(entry.modifiers, modifierKey)
-		end
-
-		keybinds[key] = entry
-	end
-
-	return keybinds
-end
-
-local keyboardKeys: { string } = {
-	"Tab",
-	"Enter",
-	"Pause",
-	"CapsLock",
-	"Escape",
-	"SpaceBar",
-	"PageUp",
-	"PageDown",
-	"End",
-	"Home",
-	"Left",
-	"Up",
-	"Right",
-	"Down",
-	"Insert",
-	"BackSpace",
-	"Delete",
-	"Zero",
-	"One",
-	"Two",
-	"Three",
-	"Four",
-	"Five",
-	"Six",
-	"Seven",
-	"Eight",
-	"Nine",
-	"A",
-	"B",
-	"C",
-	"D",
-	"E",
-	"F",
-	"G",
-	"H",
-	"I",
-	"J",
-	"K",
-	"L",
-	"M",
-	"N",
-	"O",
-	"P",
-	"Q",
-	"R",
-	"S",
-	"T",
-	"U",
-	"V",
-	"W",
-	"X",
-	"Y",
-	"Z",
-	"NumPadZero",
-	"NumPadOne",
-	"NumPadTwo",
-	"NumPadThree",
-	"NumPadFour",
-	"NumPadFive",
-	"NumPadSix",
-	"NumPadSeven",
-	"NumPadEight",
-	"NumPadNine",
-	"Multiply",
-	"Add",
-	"Subtract",
-	"Decimal",
-	"Divide",
-	"F8",
-	"F9",
-	"F10",
-	"F12",
-	"NumLock",
-	"ScrollLock",
-	"LeftShift",
-	"RightShift",
-	"LeftControl",
-	"RightControl",
-	"LeftAlt",
-	"RightAlt",
-	"LeftCommand",
-	"RightCommand",
-	"Semicolon",
-	"Equals",
-	"Comma",
-	"Hyphen",
-	"Underscore",
-	"Period",
-	"Slash",
-	"Tilde",
-	"LeftBracket",
-	"Backslash",
-	"RightBracket",
-	"Apostrophe",
-	"Quote",
-	"LeftParantheses",
-	"RightParantheses",
-	"Ampersand",
-	"Asterix",
-	"Caret",
-	"Dollar",
-	"Exclamation",
-	"Colon",
-	"A_AccentGrave",
-	"E_AccentGrave",
-	"E_AccentAigu",
-	"C_Cedille",
-	"Section",
-	"LeftMouseButton",
-	"MiddleMouseButton",
-	"RightMouseButton",
-}
-
-function getGamepadKeysDown(): { Key }
-	local bannedInputs =
-		{ -- values to be ignored because their apperances are not predictable or should not be accepted
-			Input.Gamepad.Left2D,
-			Input.Gamepad.Right2D,
-			Input.Gamepad.RightY,
-			Input.Gamepad.RightX,
-			Input.Gamepad.LeftY,
-			Input.Gamepad.LeftX,
-			Input.Gamepad.LeftTriggerAxis,
-			Input.Gamepad.RightTriggerAxis,
-			Input.Gamepad.LeftStick_Down,
-			Input.Gamepad.LeftStick_Left,
-			Input.Gamepad.LeftStick_Right,
-			Input.Gamepad.LeftStick_Up,
-			Input.Gamepad.RightStick_Down,
-			Input.Gamepad.RightStick_Left,
-			Input.Gamepad.RightStick_Right,
-			Input.Gamepad.RightStick_Up,
-		}
-	local inputMeta = getmetatable(Input)
-	local gamepad = inputMeta.__index.Gamepad
-	local inputTable = nil
-	for key, value in pairs(gamepad) do
-		if type(value) == "table" then
-			inputTable = value
-			break
-		end
-	end
-
-	local pressedKeys: { Key } = {}
-
-	for key, _ in pairs(inputTable) do
-		if Input.getKeyDown(Input.Gamepad[key]) then
-			local banned = false
-			for _, bannedValue in pairs(bannedInputs) do
-				if keyToString(bannedValue) == keyToString(Input.Gamepad[key]) then
-					banned = true
-					break
-				end
-			end
-
-			if banned then
-				continue
-			end
-
-			table.insert(pressedKeys, Input.Gamepad[key])
-		end
-	end
-
-	return pressedKeys
-end
-
-function getKeyboardKeysDown(): { Key } -- AnyKey early return?
-	local bannedInputs = {}
-	local pressedKeys: { Key } = {}
-
-	for _, key in pairs(keyboardKeys) do
-		if Input.getKeyDown(Input.Key[key]) then
-			local banned = false
-			for _, bannedValue: Key in pairs(bannedInputs) do
-				if bannedValue == Input.Key[key] then
-					banned = true
-					break
-				end
-			end
-
-			if banned then
-				continue
-			end
-
-			table.insert(pressedKeys, Input.Key[key])
-		end
-	end
-	return pressedKeys
-end
 
 local Vertical: number = 0
 local Horizontal: number = 0
@@ -2008,308 +1154,146 @@ local Up: number = 0
 local deadzone: number = config.deadzone
 local rotEuler: Vec3 = Vec3.zeroVector
 
-local pressedRebindModifiers = {}
-local pressedInputKeys = {}
-
-local modifierKeys = {
-	"LeftAlt",
-	"LeftControl",
-	"LeftShift",
-	"RightAlt",
-	"RightControl",
-	"RightShift",
-	"DPad_Up",
-	"DPad_Down",
-	"DPad_Right",
-	"DPad_Left",
-}
-
-type CasterInput = {
-	name: string,
-	description: string,
-	hotkey: Key,
-	modifiers: { Key },
-	editable: boolean,
-}
-
-function createCasterInput(
-	_name: string,
-	_description: string,
-	_hotkey: Key,
-	_modifires: { Key }?,
-	_editable: boolean?
-): CasterInput
-	if _editable == nil then
-		_editable = true
-	end
-
-	return {
-		name = _name,
-		description = _description,
-		hotkey = _hotkey,
-		modifiers = _modifires,
-		editable = _editable,
-	} :: CasterInput
-end
-
-function compareCasterInputs(a: { hotkey: Key, modifiers: { Key }? }, b: { hotkey: Key, modifiers: { Key }? }): boolean
-	if keyToString(a.hotkey) ~= keyToString(b.hotkey) then
-		return false
-	end
-
-	if (a.modifiers ~= nil) ~= (b.modifiers ~= nil) then
-		return false
-	end
-
-	local isEqual = true
-
-	if a.modifiers and b.modifiers then
-		for _, aKey: Key in a.modifiers do
-			if table.find(b.modifiers, aKey) == nil then
-				isEqual = false
-				break
-			end
-		end
-
-		for _, bKey: Key in b.modifiers do
-			if table.find(a.modifiers, bKey) == nil then
-				isEqual = false
-				break
-			end
-		end
-	end
-
-	return isEqual
-end
-
-function getCasterKey(key: CasterInput): { down: boolean, held: boolean, up: boolean }
-	local primary = key.hotkey
-	local modifiers = key.modifiers
-
-	local inputData = {
-		down = false,
-		held = false,
-		up = false,
-	}
-
-	-- no keys are pressed atm
-	if getDictSize(pressedInputKeys) == 0 then
-		return inputData
-	end
-
-	-- primary key isn't pressed so no point in checking modifiers
-	if pressedInputKeys[keyToString(primary)] == nil then
-		return inputData
-	end
-
-	local currentPrimaryTime = pressedInputKeys[keyToString(primary)].time
-
-	if getDictSize(modifiers) > 0 then
-		-- check for modifier keys not being held down
-		for _, key: Key in modifiers do
-			if not Input.getKeyDown(key) and not Input.getKey(key) then
-				return inputData
-			end
-
-			-- if modifier is pressed after primary we don't allow the input
-			local modTime = pressedInputKeys[keyToString(key)].time
-			if modTime > currentPrimaryTime then
-				return inputData
-			end
-		end
-	else
-		-- check for unwanted modifier keys that are pressed and held down and also CONCIDERED modifiers
-		for _, key: string in modifierKeys do
-			local modifier = pressedInputKeys[key]
-			if modifier == nil then
-				continue
-			end
-
-			-- check if the modifier key is concidered a modifier
-			local isModifier = modifier.isModifier and key ~= keyToString(primary)
-
-			local inputKey = Input.Key[key]
-			if inputKey == nil then
-				inputKey = Input.Gamepad[key]
-			end
-
-			if (Input.getKeyDown(inputKey) or Input.getKey(inputKey)) and isModifier then
-				return inputData
-			end
-		end
-	end
-
-	if Input.getKeyDown(primary) then
-		inputData.down = true
-	end
-
-	if Input.getKey(primary) then
-		inputData.held = true
-	end
-
-	if Input.getKeyUp(primary) then
-		inputData.up = true
-	end
-
-	return inputData
-end
-
-function getCasterAnalog(key: CasterInput): number
-	local primary = key.hotkey
-	local modifiers = key.modifiers
-
-	if modifiers then
-		-- check for modifier keys not being held down
-		for _, key: Key in modifiers do
-			if not Input.getKeyDown(key) and not Input.getKey(key) then
-				return 0
-			end
-		end
-	end
-
-	return Input.getAnalog(primary)
-end
-
-local keyboardKeybindsDeserialized = DeserializeKeybinds(config.keyboardKeybinds)
-local gamepadKeybindsDeserialized = DeserializeKeybinds(config.gamepadKeybinds)
+local keyboardKeybindsDeserialized = InputSystem.deserializeKeybinds(config.keyboardKeybinds)
+local gamepadKeybindsDeserialized = InputSystem.deserializeKeybinds(config.gamepadKeybinds)
 
 if getDictSize(keyboardKeybindsDeserialized) == 0 then
-	keyboardKeybindsDeserialized = defaultKeybinds.keyboard
+	keyboardKeybindsDeserialized = InputSystem.defaultKeybinds.keyboard
 end
 
 if getDictSize(gamepadKeybindsDeserialized) == 0 then
-	gamepadKeybindsDeserialized = defaultKeybinds.gamepad
+	gamepadKeybindsDeserialized = InputSystem.defaultKeybinds.gamepad
 end
 
-local inputs = {
+InputSystem.inputs = {
 	keyboard = {
-		forwards = createCasterInput(
+		forwards = InputSystem.createCustomInput(
 			"Move Forwards",
 			"Move camera forward",
 			keyboardKeybindsDeserialized["forwards"].primary,
 			keyboardKeybindsDeserialized["forwards"].modifiers
 		),
-		right = createCasterInput(
+		right = InputSystem.createCustomInput(
 			"Move Right",
 			"Move camera right",
 			keyboardKeybindsDeserialized["right"].primary,
 			keyboardKeybindsDeserialized["right"].modifiers
 		),
-		left = createCasterInput(
+		left = InputSystem.createCustomInput(
 			"Move Left",
 			"Move camera left",
 			keyboardKeybindsDeserialized["left"].primary,
 			keyboardKeybindsDeserialized["left"].modifiers
 		),
-		backwards = createCasterInput(
+		backwards = InputSystem.createCustomInput(
 			"Move Backwards",
 			"Move camera backward",
 			keyboardKeybindsDeserialized["backwards"].primary,
 			keyboardKeybindsDeserialized["backwards"].modifiers
 		),
-		up = createCasterInput(
+		up = InputSystem.createCustomInput(
 			"Move Up",
 			"Move camera up",
 			keyboardKeybindsDeserialized["up"].primary,
 			keyboardKeybindsDeserialized["up"].modifiers
 		),
-		down = createCasterInput(
+		down = InputSystem.createCustomInput(
 			"Move Down",
 			"Move camera down",
 			keyboardKeybindsDeserialized["down"].primary,
 			keyboardKeybindsDeserialized["down"].modifiers
 		),
-		nextPlayer = createCasterInput(
+		nextPlayer = InputSystem.createCustomInput(
 			"Next Player",
 			"Cycle to next player (POV mode)",
 			keyboardKeybindsDeserialized["nextPlayer"].primary,
 			keyboardKeybindsDeserialized["nextPlayer"].modifiers
 		),
-		previousPlayer = createCasterInput(
+		previousPlayer = InputSystem.createCustomInput(
 			"Previous Player",
 			"Cycle to previous player (POV mode)",
 			keyboardKeybindsDeserialized["previousPlayer"].primary,
 			keyboardKeybindsDeserialized["previousPlayer"].modifiers
 		),
-		lineOfSight = createCasterInput(
+		lineOfSight = InputSystem.createCustomInput(
 			"Line of Sight",
 			"Target: Player in line of sight",
 			keyboardKeybindsDeserialized["lineOfSight"].primary,
 			keyboardKeybindsDeserialized["lineOfSight"].modifiers
 		),
-		playerBallDistance = createCasterInput(
+		playerBallDistance = InputSystem.createCustomInput(
 			"Closest to Ball",
 			"Target: Player nearest ball",
 			keyboardKeybindsDeserialized["playerBallDistance"].primary,
 			keyboardKeybindsDeserialized["playerBallDistance"].modifiers
 		),
-		speedUp = createCasterInput(
+		speedUp = InputSystem.createCustomInput(
 			"Speed Up",
 			"Increase camera speed",
 			keyboardKeybindsDeserialized["speedUp"].primary,
 			keyboardKeybindsDeserialized["speedUp"].modifiers
 		),
-		speedDown = createCasterInput(
+		speedDown = InputSystem.createCustomInput(
 			"Speed Down",
 			"Decrease camera speed",
 			keyboardKeybindsDeserialized["speedDown"].primary,
 			keyboardKeybindsDeserialized["speedDown"].modifiers
 		),
-		thirdPerson = createCasterInput(
+		thirdPerson = InputSystem.createCustomInput(
 			"Third Person",
 			"Toggle third-person view",
 			keyboardKeybindsDeserialized["thirdPerson"].primary,
 			keyboardKeybindsDeserialized["thirdPerson"].modifiers
 		),
-		firstPerson = createCasterInput(
+		firstPerson = InputSystem.createCustomInput(
 			"First Person",
 			"Toggle first-person view",
 			keyboardKeybindsDeserialized["firstPerson"].primary,
 			keyboardKeybindsDeserialized["firstPerson"].modifiers
 		),
-		freeCam = createCasterInput(
+		freeCam = InputSystem.createCustomInput(
 			"Free Cam",
 			"Toggle free-cam view",
 			keyboardKeybindsDeserialized["freeCam"].primary,
 			keyboardKeybindsDeserialized["freeCam"].modifiers
 		),
-		overview1 = createCasterInput(
+		overview1 = InputSystem.createCustomInput(
 			"Overview 1",
 			"Jump to first overview position",
 			keyboardKeybindsDeserialized["overview1"].primary,
 			keyboardKeybindsDeserialized["overview1"].modifiers
 		),
-		overview2 = createCasterInput(
+		overview2 = InputSystem.createCustomInput(
 			"Overview 2",
 			"Jump to second overview position",
 			keyboardKeybindsDeserialized["overview2"].primary,
 			keyboardKeybindsDeserialized["overview2"].modifiers
 		),
-		overview3 = createCasterInput(
+		overview3 = InputSystem.createCustomInput(
 			"Overview 3",
 			"Jump to third overview position",
 			keyboardKeybindsDeserialized["overview3"].primary,
 			keyboardKeybindsDeserialized["overview3"].modifiers
 		),
-		getClosestArena = createCasterInput(
+		getClosestArena = InputSystem.createCustomInput(
 			"Select Arena",
 			"Select closest arena",
 			keyboardKeybindsDeserialized["getClosestArena"].primary,
 			keyboardKeybindsDeserialized["getClosestArena"].modifiers
 		),
-		clearOverlayInfo = createCasterInput(
+		clearOverlayInfo = InputSystem.createCustomInput(
 			"Clear Overlay Data",
 			"Remove overlay data",
 			keyboardKeybindsDeserialized["clearOverlayInfo"].primary,
 			keyboardKeybindsDeserialized["clearOverlayInfo"].modifiers
 		),
-		lookAround = createCasterInput(
+		lookAround = InputSystem.createCustomInput(
 			"Look Around",
 			"Hold to rotate camera",
 			keyboardKeybindsDeserialized["lookAround"].primary,
 			keyboardKeybindsDeserialized["lookAround"].modifiers
 		),
-		resetFOV = createCasterInput(
+		resetFOV = InputSystem.createCustomInput(
 			"Reset FOV",
 			"Reset field of view",
 			keyboardKeybindsDeserialized["resetFOV"].primary,
@@ -2317,143 +1301,143 @@ local inputs = {
 		),
 	},
 	gamepad = {
-		moveY = createCasterInput(
+		moveY = InputSystem.createCustomInput(
 			"MoveY",
 			"Move Camera Forwards/Backwards",
 			gamepadKeybindsDeserialized["moveY"].primary,
 			gamepadKeybindsDeserialized["moveY"].modifiers,
 			false
 		),
-		moveX = createCasterInput(
+		moveX = InputSystem.createCustomInput(
 			"MoveX",
 			"Move Camera Left/Right",
 			gamepadKeybindsDeserialized["moveX"].primary,
 			gamepadKeybindsDeserialized["moveX"].modifiers,
 			false
 		),
-		up = createCasterInput(
+		up = InputSystem.createCustomInput(
 			"Move Up",
 			"Move Camera Up",
 			gamepadKeybindsDeserialized["up"].primary,
 			gamepadKeybindsDeserialized["up"].modifiers
 		),
-		down = createCasterInput(
+		down = InputSystem.createCustomInput(
 			"Move Down",
 			"Move Camera Down",
 			gamepadKeybindsDeserialized["down"].primary,
 			gamepadKeybindsDeserialized["down"].modifiers
 		),
-		nextPlayer = createCasterInput(
+		nextPlayer = InputSystem.createCustomInput(
 			"Next Player",
 			"Cycle to next player (POV mode)",
 			gamepadKeybindsDeserialized["nextPlayer"].primary,
 			gamepadKeybindsDeserialized["nextPlayer"].modifiers
 		),
-		previousPlayer = createCasterInput(
+		previousPlayer = InputSystem.createCustomInput(
 			"Previous Player",
 			"Cycle to previous player (POV mode)",
 			gamepadKeybindsDeserialized["previousPlayer"].primary,
 			gamepadKeybindsDeserialized["previousPlayer"].modifiers
 		),
-		lineOfSight = createCasterInput(
+		lineOfSight = InputSystem.createCustomInput(
 			"Line Of Sight",
 			"Target: Player in line of sight",
 			gamepadKeybindsDeserialized["lineOfSight"].primary,
 			gamepadKeybindsDeserialized["lineOfSight"].modifiers
 		),
-		playerBallDistance = createCasterInput(
+		playerBallDistance = InputSystem.createCustomInput(
 			"Closest to Ball",
 			"Target: Player nearest ball",
 			gamepadKeybindsDeserialized["playerBallDistance"].primary,
 			gamepadKeybindsDeserialized["playerBallDistance"].modifiers
 		),
-		speedUp = createCasterInput(
+		speedUp = InputSystem.createCustomInput(
 			"Speed Up",
 			"Increase camera speed",
 			gamepadKeybindsDeserialized["speedUp"].primary,
 			gamepadKeybindsDeserialized["speedUp"].modifiers
 		),
-		speedDown = createCasterInput(
+		speedDown = InputSystem.createCustomInput(
 			"Speed Down",
 			"Decrease camera speed",
 			gamepadKeybindsDeserialized["speedDown"].primary,
 			gamepadKeybindsDeserialized["speedDown"].modifiers
 		),
-		lookY = createCasterInput(
+		lookY = InputSystem.createCustomInput(
 			"LookY",
 			"Look Up/Down",
 			gamepadKeybindsDeserialized["lookY"].primary,
 			gamepadKeybindsDeserialized["lookY"].modifiers,
 			false
 		),
-		lookX = createCasterInput(
+		lookX = InputSystem.createCustomInput(
 			"LookX",
 			"Look Left/Right",
 			gamepadKeybindsDeserialized["lookX"].primary,
 			gamepadKeybindsDeserialized["lookX"].modifiers,
 			false
 		),
-		zoomIn = createCasterInput(
+		zoomIn = InputSystem.createCustomInput(
 			"Zoom In",
 			"Increase field of view",
 			gamepadKeybindsDeserialized["zoomIn"].primary,
 			gamepadKeybindsDeserialized["zoomIn"].modifiers
 		),
-		zoomOut = createCasterInput(
+		zoomOut = InputSystem.createCustomInput(
 			"Zoom Out",
 			"Decrease field of view",
 			gamepadKeybindsDeserialized["zoomOut"].primary,
 			gamepadKeybindsDeserialized["zoomOut"].modifiers
 		),
-		resetFOV = createCasterInput(
+		resetFOV = InputSystem.createCustomInput(
 			"Reser FOV",
 			"Reset field of view",
 			gamepadKeybindsDeserialized["resetFOV"].primary,
 			gamepadKeybindsDeserialized["resetFOV"].modifiers
 		),
-		freeCam = createCasterInput(
+		freeCam = InputSystem.createCustomInput(
 			"Free Cam",
 			"Toggle free-cam view",
 			gamepadKeybindsDeserialized["freeCam"].primary,
 			gamepadKeybindsDeserialized["freeCam"].modifiers
 		),
-		firstPerson = createCasterInput(
+		firstPerson = InputSystem.createCustomInput(
 			"First Person",
 			"Toggle first-person view",
 			gamepadKeybindsDeserialized["firstPerson"].primary,
 			gamepadKeybindsDeserialized["firstPerson"].modifiers
 		),
-		thirdPerson = createCasterInput(
+		thirdPerson = InputSystem.createCustomInput(
 			"Third Person",
 			"Toggle third-person view",
 			gamepadKeybindsDeserialized["thirdPerson"].primary,
 			gamepadKeybindsDeserialized["thirdPerson"].modifiers
 		),
-		overview1 = createCasterInput(
+		overview1 = InputSystem.createCustomInput(
 			"Overview 1",
 			"Jump to first overview position",
 			gamepadKeybindsDeserialized["overview1"].primary,
 			gamepadKeybindsDeserialized["overview1"].modifiers
 		),
-		overview2 = createCasterInput(
+		overview2 = InputSystem.createCustomInput(
 			"Overview 2",
 			"Jump to second overview position",
 			gamepadKeybindsDeserialized["overview2"].primary,
 			gamepadKeybindsDeserialized["overview2"].modifiers
 		),
-		overview3 = createCasterInput(
+		overview3 = InputSystem.createCustomInput(
 			"Overview 3",
 			"Jump to third overview position",
 			gamepadKeybindsDeserialized["overview3"].primary,
 			gamepadKeybindsDeserialized["overview3"].modifiers
 		),
-		getClosestArena = createCasterInput(
+		getClosestArena = InputSystem.createCustomInput(
 			"Select Arena",
 			"Select closest arena",
 			gamepadKeybindsDeserialized["getClosestArena"].primary,
 			gamepadKeybindsDeserialized["getClosestArena"].modifiers
 		),
-		clearOverlayInfo = createCasterInput(
+		clearOverlayInfo = InputSystem.createCustomInput(
 			"Clear Overlay Data",
 			"Remove Overlay Data",
 			gamepadKeybindsDeserialized["clearOverlayInfo"].primary,
@@ -2513,51 +1497,6 @@ local inputOrder = {
 		"clearOverlayInfo",
 	},
 }
-
-local keyToBeRebinded = {
-	key = "",
-	type = "",
-}
-
---example: "{key:{primary:"keybind",modifiers:{"keybind","keybind"}}}"
-function SerializeKeybinds()
-	local serializedKeyboardString = ""
-	for key, value: CasterInput in inputs.keyboard :: { CasterInput } do
-		serializedKeyboardString ..= "{" .. `{key}:` .. "{" .. `primary:"{keyToString(value.hotkey)}",modifiers:` .. "{"
-
-		if value.modifiers then
-			for i, modifier: Key in value.modifiers do
-				serializedKeyboardString ..= `"{keyToString(modifier)}"`
-				if i ~= #value.modifiers then
-					serializedKeyboardString ..= `,`
-				end
-			end
-		end
-
-		serializedKeyboardString ..= "}}}"
-	end
-
-	local serializedGamepadString = ""
-	for key, value: CasterInput in inputs.gamepad :: { CasterInput } do
-		serializedGamepadString ..= "{" .. `{key}:` .. "{" .. `primary:"{keyToString(value.hotkey)}",modifiers:` .. "{"
-
-		if value.modifiers then
-			for i, modifier: Key in value.modifiers do
-				serializedGamepadString ..= `"{keyToString(modifier)}"`
-				if i ~= #value.modifiers then
-					serializedGamepadString ..= `,`
-				end
-			end
-		end
-
-		serializedGamepadString ..= "}}}"
-	end
-
-	return {
-		keybord = serializedKeyboardString,
-		gamepad = serializedGamepadString,
-	}
-end
 
 --  Keyboard (debug)
 local one = Input.Key.One
@@ -2624,17 +1563,6 @@ function main()
 	end
 end
 
-function getLastEnumValue(enum): number
-	local lastValue: number = 0
-	for key, value in enum do
-		if value > lastValue then
-			lastValue = value
-		end
-	end
-
-	return lastValue
-end
-
 function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globalOverviewRotation: Quat): string
 	if not selectedArena.box:checkPointIntersect(globalOverviewPosition) then
 		return "Overviews cannot be outside an arena!"
@@ -2646,9 +1574,9 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 	local translatedOverviewRotation
 	local flipQuat
 	if isOnHomeSide then
-		flipQuat = selectedArena:getTeamRotation(TeamIndex.homeTeam):inverse()
+		flipQuat = selectedArena:getTeamRotation(Util.TeamIndex.HomeTeam):inverse()
 	else
-		flipQuat = selectedArena:getTeamRotation(TeamIndex.awayTeam):inverse()
+		flipQuat = selectedArena:getTeamRotation(Util.TeamIndex.AwayTeam):inverse()
 	end
 
 	translatedOverviewPosition = flipQuat:rotateVector(globalOverviewPosition - selectedArena.transform.position)
@@ -2670,7 +1598,7 @@ function resetPlayersWithBall()
 	ballCollisionInfo.away.previous = nil
 end
 
-function setSelectedArena(arena: Arena)
+function setSelectedArena(arena: CasterArena)
 	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
 		sendSafeMessage(overlayCamera, {
@@ -2681,7 +1609,7 @@ function setSelectedArena(arena: Arena)
 			info = "slotId",
 			value = arena.slotId,
 		})
-		arenaInstantUpdate = true
+		arena.instantUpdate = true
 	end
 	selectedArena = arena
 end
@@ -2722,127 +1650,11 @@ function onGui()
 		end
 
 		if keyboardControls then
-			if Gui.beginTable("KeyboardControls", 3) then
-				Gui.tableSetupColumn("Name")
-				Gui.tableSetupColumn("Description")
-				Gui.tableSetupColumn("Hotkey")
-				Gui.tableHeadersRow()
-
-				for _, casterInputKey: string in inputOrder.keyboard do
-					local casterInput = inputs.keyboard[casterInputKey]
-
-					Gui.tableNextRow()
-					Gui.tableNextColumn()
-					Gui.text(casterInput.name)
-					Gui.tableNextColumn()
-					Gui.text(casterInput.description)
-					Gui.tableNextColumn()
-
-					local buttonLabel = ""
-					if casterInput.modifiers then
-						for _, input: Key in casterInput.modifiers do
-							buttonLabel = buttonLabel .. `{keyToString(input)} + `
-						end
-					end
-					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
-
-					if keyToBeRebinded.key == casterInputKey and keyToBeRebinded.type == "keyboard" then
-						buttonLabel = "..."
-					end
-
-					if Gui.button(`{buttonLabel}##{casterInputKey}`) then
-						if keyToBeRebinded.key ~= casterInputKey then
-							keyToBeRebinded.key = casterInputKey
-							keyToBeRebinded.type = "keyboard"
-						else
-							keyToBeRebinded.key = ""
-						end
-					end
-
-					Gui.sameLine()
-
-					if
-						not compareCasterInputs({
-							hotkey = casterInput.hotkey,
-							modifiers = casterInput.modifiers,
-						}, {
-							hotkey = defaultKeybinds.keyboard[casterInputKey].primary,
-							modifiers = defaultKeybinds.keyboard[casterInputKey].modifiers,
-						}) and Gui.button(`{Icon.Undo}##{casterInputKey}`)
-					then
-						local defaultValue = defaultKeybinds.keyboard[casterInputKey]
-						inputs.keyboard[casterInputKey].modifiers = defaultValue.modifiers
-						inputs.keyboard[casterInputKey].hotkey = defaultValue.primary
-					end
-				end
-				Gui.endTable()
-			end
+			InputSystem.guiKeyboardInputs(inputOrder.keyboard)
 		end
 
 		if controllerControls then
-			if Gui.beginTable("ControllerControls", 3) then
-				Gui.tableSetupColumn("Name")
-				Gui.tableSetupColumn("Description")
-				Gui.tableSetupColumn("Hotkey")
-				Gui.tableHeadersRow()
-
-				for _, casterInputKey: string in inputOrder.gamepad do
-					local casterInput: CasterInput = inputs.gamepad[casterInputKey]
-
-					Gui.tableNextRow()
-					Gui.tableNextColumn()
-					Gui.text(casterInput.name)
-					Gui.tableNextColumn()
-					Gui.text(casterInput.description)
-					Gui.tableNextColumn()
-
-					local buttonLabel = ""
-					if casterInput.modifiers then
-						for _, input: Key in casterInput.modifiers do
-							buttonLabel = buttonLabel .. `{keyToString(input)} + `
-						end
-					end
-					buttonLabel = buttonLabel .. `{keyToString(casterInput.hotkey)}`
-
-					if keyToBeRebinded.key == casterInputKey and keyToBeRebinded.type == "gamepad" then
-						buttonLabel = "..."
-					end
-
-					if not casterInput.editable then
-						Gui.beginDisabled()
-					end
-
-					if Gui.button(`{buttonLabel}##{casterInputKey}`) then
-						if keyToBeRebinded.key ~= casterInputKey then
-							keyToBeRebinded.key = casterInputKey
-							keyToBeRebinded.type = "gamepad"
-						else
-							keyToBeRebinded.key = ""
-						end
-					end
-
-					if not casterInput.editable then
-						Gui.endDisabled()
-					end
-
-					Gui.sameLine()
-
-					if
-						not compareCasterInputs({
-							hotkey = casterInput.hotkey,
-							modifiers = casterInput.modifiers,
-						}, {
-							hotkey = defaultKeybinds.gamepad[casterInputKey].primary,
-							modifiers = defaultKeybinds.gamepad[casterInputKey].modifiers,
-						}) and Gui.button(`{Icon.Undo}##{casterInputKey}`)
-					then
-						local defaultValue = defaultKeybinds.gamepad[casterInputKey]
-						inputs.gamepad[casterInputKey].modifiers = defaultValue.modifiers
-						inputs.gamepad[casterInputKey].hotkey = defaultValue.primary
-					end
-				end
-				Gui.endTable()
-			end
+			InputSystem.guiGamepadInputs(inputOrder.gamepad)
 		end
 
 		return
@@ -2864,7 +1676,7 @@ function onGui()
 				if i ~= readLocation then
 					arenas = nil
 					arenaLoadTime = os.clock()
-					arenaInstantUpdate = true
+					selectedArena.instantUpdate = true
 				end
 				readLocation = i
 			end
@@ -2890,7 +1702,7 @@ function onGui()
 	end
 	if Gui.beginCombo("Selected Arena", arenaName) then
 		if arenas then
-			for _, arena: Arena in arenas do
+			for _, arena: CasterArena in arenas do
 				if Gui.selectable(arena.name, arena.name == selectedArena.name) then
 					setSelectedArena(arena)
 				end
@@ -3266,7 +2078,7 @@ function onGui()
 			})
 		end
 		if Gui.button("Print Pressed Keys") then
-			print(pressedInputKeys)
+			print(InputSystem.pressedInputKeys)
 		end
 		if Gui.treeNode("Print ball collision info") then
 			if Gui.treeNode("Home") then
@@ -3393,57 +2205,7 @@ function onTransitionBegin(transitionInfo: Transition)
 	camera.showNameTags = true
 end
 
-function getReplayFrameFromIndex(replayIndex)
-	replayIndex = math.clamp(replayIndex, 0, #Replay.listLoaded())
-	local replay = Replay.getByIndex(replayIndex)
-	if replay then
-		return replay:getCurrentFrame(true)
-	else
-		-- 0 = live game
-		return getGameData()
-	end
-end
-
-function getDist(point1: Vec3, point2: Vec3): number
-	local x: number = math.abs(point1.x - point2.x) ^ 2
-	local y: number = math.abs(point1.y - point2.y) ^ 2
-	local z: number = (point1.z - point2.z) ^ 2
-	return math.sqrt(x + y + z)
-end
-
-function isBetweenVector(n: Vec3, min: Vec3, max: Vec3, up: Vec3): boolean
-	local nHeight = n:dot(up)
-	local minHeight = min:dot(up)
-	local maxHeight = max:dot(up)
-
-	return nHeight >= minHeight and nHeight <= maxHeight
-end
-
-function isBetween(n: number, min: number, max: number): boolean
-	if n > min and n < max then
-		return true
-	else
-		return false
-	end
-end
-
-function getForward(positionA: Vec3, positionB: Vec3): Vec3
-	local forward: Vec3 = Vec3.new((positionB.x - positionA.x), (positionB.y - positionA.y), positionB.z - positionA.z)
-		:normalize()
-	return forward
-end
-
-function findPlayerInTable(table: { ReplayPlayer }, player: ReplayPlayer): number?
-	local index = nil
-	for i, tablePlayer: ReplayPlayer in table do
-		if tablePlayer.playerId == player.playerId then
-			index = i
-		end
-	end
-	return index
-end
-
-function getClosestArena(targetPosition: Vec3): Arena -- Remove this function when/if we get the arena from the player
+function getClosestArena(targetPosition: Vec3): CasterArena
 	local closestArenaDistance = math.huge
 	local closestArena = nil
 
@@ -3451,65 +2213,22 @@ function getClosestArena(targetPosition: Vec3): Arena -- Remove this function wh
 		return closestArena
 	end
 
-	for _, arena: Arena in pairs(arenas) do
-		local distance = getDist(targetPosition, arena.transform.position)
-		-- because some arenas are directly above others
-		-- we limit the arenas to those where the player is between the arenas floor and roof position
-		if not arena.box:checkPointIntersect(targetPosition) then
-			continue
+	for _, arena: CasterArena in pairs(arenas) do
+		if arena.box:checkPointIntersect(targetPosition) then
+			return arena
 		end
+	end
+
+	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
+	for _, arena: CasterArena in pairs(arenas) do
+		local distance = Util.getDist(targetPosition, arena.transform.position)
 		if distance < closestArenaDistance then
 			closestArenaDistance = distance
 			closestArena = arena
 		end
 	end
 
-	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
-	if closestArena == nil then
-		for _, arena: Arena in pairs(arenas) do
-			local distance = getDist(targetPosition, arena.transform.position)
-			if distance < closestArenaDistance then
-				closestArenaDistance = distance
-				closestArena = arena
-			end
-		end
-	end
-
 	return closestArena
-end
-
-function getClosestBall(targetPosition: Vec3, frameData: ReplayFrame): ReplayBall
-	local balls = frameData.balls
-	local closestBallDistance = math.huge
-	local clostestBall: ReplayBall = nil
-	for i in balls do
-		local ball = balls[i]
-		local distance = getDist(targetPosition, ball.transform.position)
-		if distance < closestBallDistance then
-			closestBallDistance = distance
-			clostestBall = ball
-		end
-	end
-	return clostestBall
-end
-
-function getClosestArenaBall(targetPosition: Vec3, frameData: ReplayFrame)
-	local balls = frameData.balls
-	local closestBallDistance = math.huge
-	local clostestBall: ReplayBall = nil
-	for i in balls do
-		local ball = balls[i]
-
-		if not selectedArena.box:checkPointIntersect(ball.transform.position) then
-			continue
-		end
-		local distance = getDist(targetPosition, ball.transform.position)
-		if distance < closestBallDistance and parseBallJSON(ball:toJson()).type ~= 2 then
-			closestBallDistance = distance
-			clostestBall = ball
-		end
-	end
-	return clostestBall
 end
 
 -- Remember: ball radius is 17.5, use an extra 10 for player contact
@@ -3524,9 +2243,9 @@ function getClosestPlayerToBall(maximumDistance: number?): ReplayPlayer?
 		local leftHandPosition = root.rotation:rotateVector(player.leftHand.position) + root.position
 		local rightHandPosition = root.rotation:rotateVector(player.rightHand.position) + root.position
 
-		local headDistance = getDist(ball.transform.position, headPosition)
-		local leftHandDistance = getDist(ball.transform.position, leftHandPosition)
-		local rightHandDistance = getDist(ball.transform.position, rightHandPosition)
+		local headDistance = Util.getDist(ball.transform.position, headPosition)
+		local leftHandDistance = Util.getDist(ball.transform.position, leftHandPosition)
+		local rightHandDistance = Util.getDist(ball.transform.position, rightHandPosition)
 
 		local minimumDistance = math.min(headDistance, leftHandDistance, rightHandDistance)
 
@@ -3552,9 +2271,9 @@ function getClosestPlayerToLineOfSight(): ReplayPlayer?
 			continue
 		end
 
-		local playerDistance = getDist(camera.position, player.root.position)
+		local playerDistance = Util.getDist(camera.position, player.root.position)
 		local calculatedScreenPosition = camera.position + (cameraForward * playerDistance)
-		local lineOfSightDistance = getDist(calculatedScreenPosition, player.root.position)
+		local lineOfSightDistance = Util.getDist(calculatedScreenPosition, player.root.position)
 
 		if lineOfSightDistance < closestPlayerDistance then
 			closestPlayerDistance = lineOfSightDistance
@@ -3583,7 +2302,7 @@ function getPlayer()
 	else
 		return
 	end
-	local playerIndex = findPlayerInTable(selectedArena.players, tryGetPlayer)
+	local playerIndex = Util.findPlayerInTable(selectedArena.players, tryGetPlayer)
 	if playerIndex == nil then
 		return
 	end
@@ -3869,38 +2588,53 @@ function readInput()
 end
 
 function readOtherInputs()
-	if keyToBeRebinded.key ~= "" then
+	if InputSystem.keyToBeRebinded.key ~= "" then
 		-- don't read inputs on rebind
 		return
 	end
 
 	cameraFOV -= Input.getAnalog(mouseWheelAxis) * 10
 
-	if getCasterKey(inputs.gamepad.zoomIn).held and getCasterKey(inputs.gamepad.zoomOut).held then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.gamepad.zoomIn).held
+		and InputSystem.getCustomKey(InputSystem.inputs.gamepad.zoomOut).held
+	then
 		cameraFOV += 0
-	elseif getCasterKey(inputs.gamepad.zoomIn).held then
+	elseif InputSystem.getCustomKey(InputSystem.inputs.gamepad.zoomIn).held then
 		cameraFOV -= 50 * deltaTime
-	elseif getCasterKey(inputs.gamepad.zoomOut).held then
+	elseif InputSystem.getCustomKey(InputSystem.inputs.gamepad.zoomOut).held then
 		cameraFOV += 50 * deltaTime
 	end
 
 	cameraFOV = math.clamp(cameraFOV, 1, 179)
 
-	if getCasterKey(inputs.keyboard.resetFOV).down or getCasterKey(inputs.gamepad.resetFOV).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.resetFOV).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.resetFOV).down
+	then
 		cameraFOV = config.cameraFOV
 	end
 
-	if getCasterKey(inputs.keyboard.speedUp).down or getCasterKey(inputs.gamepad.speedUp).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.speedUp).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.speedUp).down
+	then
 		if targetSpeedIndex == #speedGears - 2 then
 			speedLastGearBuffer = true
 		end
 		targetSpeedIndex = math.min(targetSpeedIndex + 1, #speedGears - 1)
 	end
-	if getCasterKey(inputs.keyboard.speedDown).down or getCasterKey(inputs.gamepad.speedDown).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.speedDown).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.speedDown).down
+	then
 		targetSpeedIndex = math.max(targetSpeedIndex - 1, 1)
 	end
 
-	if getCasterKey(inputs.keyboard.speedUp).up or getCasterKey(inputs.gamepad.speedUp).up then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.speedUp).up
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.speedUp).up
+	then
 		if speedLastGearBuffer then
 			speedLastGearBuffer = false
 		end
@@ -3911,7 +2645,10 @@ function readOtherInputs()
 	end
 
 	if
-		(getCasterKey(inputs.keyboard.speedUp).held or getCasterKey(inputs.gamepad.speedUp).held)
+		(
+			InputSystem.getCustomKey(InputSystem.inputs.keyboard.speedUp).held
+			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.speedUp).held
+		)
 		and targetSpeedIndex >= #speedGears - 1
 		and not speedLastGearBuffer
 	then
@@ -3922,68 +2659,99 @@ function readOtherInputs()
 		return
 	end
 
-	if getCasterKey(inputs.keyboard.getClosestArena).down or getCasterKey(inputs.gamepad.getClosestArena).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.getClosestArena).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.getClosestArena).down
+	then
 		setSelectedArena(getClosestArena(camera.position))
 	end
 
-	if getCasterKey(inputs.keyboard.clearOverlayInfo).down or getCasterKey(inputs.gamepad.clearOverlayInfo).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.clearOverlayInfo).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.clearOverlayInfo).down
+	then
 		sendMessage(overlayCamera, {
 			info = "stats",
 			value = "clear",
 		})
 	end
 
-	if ball and (getCasterKey(inputs.keyboard.overview1).down or getCasterKey(inputs.gamepad.overview1).down) then
+	if
+		ball
+		and (
+			InputSystem.getCustomKey(InputSystem.inputs.keyboard.overview1).down
+			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview1).down
+		)
+	then
 		if playerFollow then
 			stopFollow()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.overview[1].position
-			setGlobalCameraRotation(selectedArena.home.overview[1].rotation)
+			cameraPosition = selectedArena.home.data.overview[1].position
+			setGlobalCameraRotation(selectedArena.home.data.overview[1].rotation)
 		else
-			cameraPosition = selectedArena.away.overview[1].position
-			setGlobalCameraRotation(selectedArena.away.overview[1].rotation)
+			cameraPosition = selectedArena.away.data.overview[1].position
+			setGlobalCameraRotation(selectedArena.away.data.overview[1].rotation)
 		end
 	end
-	if ball and (getCasterKey(inputs.keyboard.overview2).down or getCasterKey(inputs.gamepad.overview2).down) then
+	if
+		ball
+		and (
+			InputSystem.getCustomKey(InputSystem.inputs.keyboard.overview2).down
+			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview2).down
+		)
+	then
 		if playerFollow then
 			stopFollow()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.overview[2].position
-			setGlobalCameraRotation(selectedArena.home.overview[2].rotation)
+			cameraPosition = selectedArena.home.data.overview[2].position
+			setGlobalCameraRotation(selectedArena.home.data.overview[2].rotation)
 		else
-			cameraPosition = selectedArena.away.overview[2].position
-			setGlobalCameraRotation(selectedArena.away.overview[2].rotation)
+			cameraPosition = selectedArena.away.data.overview[2].position
+			setGlobalCameraRotation(selectedArena.away.data.overview[2].rotation)
 		end
 	end
-	if ball and (getCasterKey(inputs.keyboard.overview3).down or getCasterKey(inputs.gamepad.overview3).down) then
+	if
+		ball
+		and (
+			InputSystem.getCustomKey(InputSystem.inputs.keyboard.overview3).down
+			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview3).down
+		)
+	then
 		if playerFollow then
 			stopFollow()
 		end
 		toggleSmoothing(false, false)
 		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.overview[3].position
-			setGlobalCameraRotation(selectedArena.home.overview[3].rotation)
+			cameraPosition = selectedArena.home.data.overview[3].position
+			setGlobalCameraRotation(selectedArena.home.data.overview[3].rotation)
 		else
-			cameraPosition = selectedArena.away.overview[3].position
-			setGlobalCameraRotation(selectedArena.away.overview[3].rotation)
+			cameraPosition = selectedArena.away.data.overview[3].position
+			setGlobalCameraRotation(selectedArena.away.data.overview[3].rotation)
 		end
 	end
 
-	if getCasterKey(inputs.keyboard.lineOfSight).down or getCasterKey(inputs.gamepad.lineOfSight).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.lineOfSight).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.lineOfSight).down
+	then
 		getBallVariant = GetBallVariant.LineOfSight
 	end
 
 	if
-		getCasterKey(inputs.keyboard.playerBallDistance).down or getCasterKey(inputs.gamepad.playerBallDistance).down
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.playerBallDistance).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.playerBallDistance).down
 	then
 		getBallVariant = GetBallVariant.PlayerBallDistance
 	end
 
-	if getCasterKey(inputs.keyboard.thirdPerson).down or getCasterKey(inputs.gamepad.thirdPerson).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.thirdPerson).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.thirdPerson).down
+	then
 		if currentPlayer == nil or cameraMode == thirdPersonMode then
 			cameraMode = thirdPersonMode
 			getPlayer()
@@ -3993,7 +2761,10 @@ function readOtherInputs()
 		end
 	end
 
-	if getCasterKey(inputs.keyboard.firstPerson).down or getCasterKey(inputs.gamepad.firstPerson).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.firstPerson).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.firstPerson).down
+	then
 		if currentPlayer == nil or cameraMode == CameraMode.FirstPerson then
 			cameraMode = CameraMode.FirstPerson
 			getPlayer()
@@ -4003,7 +2774,10 @@ function readOtherInputs()
 		end
 	end
 
-	if getCasterKey(inputs.keyboard.freeCam).down or getCasterKey(inputs.gamepad.freeCam).down then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.freeCam).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.freeCam).down
+	then
 		if playerFollow then
 			stopFollow()
 		end
@@ -4011,7 +2785,10 @@ function readOtherInputs()
 
 	if
 		playerFollow
-		and (getCasterKey(inputs.gamepad.previousPlayer).down or getCasterKey(inputs.keyboard.previousPlayer).down)
+		and (
+			InputSystem.getCustomKey(InputSystem.inputs.gamepad.previousPlayer).down
+			or InputSystem.getCustomKey(InputSystem.inputs.keyboard.previousPlayer).down
+		)
 	then
 		currentPlayerIndex -= 1
 		if currentPlayerIndex < 1 then
@@ -4022,7 +2799,10 @@ function readOtherInputs()
 	end
 	if
 		playerFollow
-		and (getCasterKey(inputs.gamepad.nextPlayer).down or getCasterKey(inputs.keyboard.nextPlayer).down)
+		and (
+			InputSystem.getCustomKey(InputSystem.inputs.gamepad.nextPlayer).down
+			or InputSystem.getCustomKey(InputSystem.inputs.keyboard.nextPlayer).down
+		)
 	then
 		currentPlayerIndex += 1
 		if currentPlayerIndex > #selectedArena.players then
@@ -4034,32 +2814,39 @@ function readOtherInputs()
 end
 
 function readMoveInput()
-	if keyToBeRebinded.key ~= "" then
+	if InputSystem.keyToBeRebinded.key ~= "" then
 		-- don't read inputs on rebind
 		return
 	end
 
-	local input = math.abs(getCasterAnalog(inputs.gamepad.moveY)) + math.abs(getCasterAnalog(inputs.gamepad.moveX))
+	local input = math.abs(InputSystem.getCustomAnalog(InputSystem.inputs.gamepad.moveY))
+		+ math.abs(InputSystem.getCustomAnalog(InputSystem.inputs.gamepad.moveX))
 	if input > deadzone then
-		Vertical = getCasterAnalog(inputs.gamepad.moveY)
-		Horizontal = getCasterAnalog(inputs.gamepad.moveX)
+		Vertical = InputSystem.getCustomAnalog(InputSystem.inputs.gamepad.moveY)
+		Horizontal = InputSystem.getCustomAnalog(InputSystem.inputs.gamepad.moveX)
 		return
 	else
-		if getCasterKey(inputs.keyboard.forwards).held and getCasterKey(inputs.keyboard.backwards).held then
+		if
+			InputSystem.getCustomKey(InputSystem.inputs.keyboard.forwards).held
+			and InputSystem.getCustomKey(InputSystem.inputs.keyboard.backwards).held
+		then
 			Vertical = 0
-		elseif getCasterKey(inputs.keyboard.forwards).held then
+		elseif InputSystem.getCustomKey(InputSystem.inputs.keyboard.forwards).held then
 			Vertical = 1
-		elseif getCasterKey(inputs.keyboard.backwards).held then
+		elseif InputSystem.getCustomKey(InputSystem.inputs.keyboard.backwards).held then
 			Vertical = -1
 		else
 			Vertical = 0
 		end
 
-		if getCasterKey(inputs.keyboard.right).held and getCasterKey(inputs.keyboard.left).held then
+		if
+			InputSystem.getCustomKey(InputSystem.inputs.keyboard.right).held
+			and InputSystem.getCustomKey(InputSystem.inputs.keyboard.left).held
+		then
 			Horizontal = 0
-		elseif getCasterKey(inputs.keyboard.right).held then
+		elseif InputSystem.getCustomKey(InputSystem.inputs.keyboard.right).held then
 			Horizontal = 1
-		elseif getCasterKey(inputs.keyboard.left).held then
+		elseif InputSystem.getCustomKey(InputSystem.inputs.keyboard.left).held then
 			Horizontal = -1
 		else
 			Horizontal = 0
@@ -4068,17 +2855,23 @@ function readMoveInput()
 end
 
 function readUpInput()
-	if keyToBeRebinded.key ~= "" then
+	if InputSystem.keyToBeRebinded.key ~= "" then
 		-- don't read inputs on rebind
 		return
 	end
 
-	if getCasterKey(inputs.gamepad.down).held or getCasterKey(inputs.gamepad.up).held then
-		if getCasterKey(inputs.gamepad.down).held and getCasterKey(inputs.gamepad.up).held then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.gamepad.down).held
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.up).held
+	then
+		if
+			InputSystem.getCustomKey(InputSystem.inputs.gamepad.down).held
+			and InputSystem.getCustomKey(InputSystem.inputs.gamepad.up).held
+		then
 			Up = 0
-		elseif getCasterKey(inputs.gamepad.up).held then
+		elseif InputSystem.getCustomKey(InputSystem.inputs.gamepad.up).held then
 			Up = 1
-		elseif getCasterKey(inputs.gamepad.down).held then
+		elseif InputSystem.getCustomKey(InputSystem.inputs.gamepad.down).held then
 			Up = -1
 		else
 			Up = 0
@@ -4086,11 +2879,14 @@ function readUpInput()
 		return
 	end
 
-	if getCasterKey(inputs.keyboard.down).held and getCasterKey(inputs.keyboard.up).held then
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.down).held
+		and InputSystem.getCustomKey(InputSystem.inputs.keyboard.up).held
+	then
 		Up = 0
-	elseif getCasterKey(inputs.keyboard.up).held then
+	elseif InputSystem.getCustomKey(InputSystem.inputs.keyboard.up).held then
 		Up = 1
-	elseif getCasterKey(inputs.keyboard.down).held then
+	elseif InputSystem.getCustomKey(InputSystem.inputs.keyboard.down).held then
 		Up = -1
 	else
 		Up = 0
@@ -4135,7 +2931,7 @@ end
 
 local rotDelta: Vec3 = Vec3.zeroVector
 function rotateCamera()
-	if keyToBeRebinded.key ~= "" then
+	if InputSystem.keyToBeRebinded.key ~= "" then
 		-- don't read input on rebind
 		return
 	end
@@ -4152,15 +2948,16 @@ function rotateCamera()
 	end
 
 	-- Keyboard
-	if getCasterKey(inputs.keyboard.lookAround).held then
+	if InputSystem.getCustomKey(InputSystem.inputs.keyboard.lookAround).held then
 		turnVelocity = Vec2.new(mouse.x, mouse.y) * 10
 		rotDelta += Vec3.new(0, turnVelocity.y, turnVelocity.x) * mouseSensitivity
 	end
 
 	-- Gamepad
-	turnVelocity = Vec2.new(getCasterAnalog(inputs.gamepad.lookX), getCasterAnalog(inputs.gamepad.lookY))
-		* controllerSensitivity
-		* 2
+	turnVelocity = Vec2.new(
+		InputSystem.getCustomAnalog(InputSystem.inputs.gamepad.lookX),
+		InputSystem.getCustomAnalog(InputSystem.inputs.gamepad.lookY)
+	) * controllerSensitivity * 2
 
 	if invertControllerLookHorizontal then
 		turnVelocity.x = -turnVelocity.x
@@ -4182,19 +2979,6 @@ function rotateCamera()
 
 	rotEuler.y = math.clamp(rotEuler.y, -89.99, 89.99)
 	camera.rotation = gravityChaser * Quat.fromEuler(rotEuler.x, rotEuler.y, rotEuler.z)
-end
-
--- Custom function to extract the primary color
-function extractPrimaryColor(json: string): Color
-	local r: number? = tonumber(json:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)'))
-	local g: number? = tonumber(json:match('"primary"%s*:%s*{.-"g"%s*:%s*(%d+)'))
-	local b: number? = tonumber(json:match('"primary"%s*:%s*{.-"b"%s*:%s*(%d+)'))
-
-	if r == nil or g == nil or b == nil then
-		return { r = 0, b = 0, g = 0 }
-	end
-
-	return { r = r / 255, g = g / 255, b = b / 255 } :: Color
 end
 
 function followPlayer()
@@ -4224,7 +3008,7 @@ function followPlayer()
 end
 
 function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
-	if player1.teamIndex == TeamIndex.NoTeam or player2.teamIndex == TeamIndex.NoTeam then
+	if player1.teamIndex == Util.TeamIndex.NoTeam or player2.teamIndex == Util.TeamIndex.NoTeam then
 		return false
 	end
 
@@ -4243,7 +3027,7 @@ function checkBallContact()
 
 	local contactTime = os.clock()
 
-	if contactPlayer.teamIndex == TeamIndex.homeTeam then
+	if contactPlayer.teamIndex == Util.TeamIndex.HomeTeam then
 		if
 			ballCollisionInfo.home.current
 			and contactPlayer.playerId == ballCollisionInfo.home.current.player.playerId
@@ -4257,7 +3041,7 @@ function checkBallContact()
 			contactTime = contactTime,
 			player = contactPlayer,
 		}
-	elseif contactPlayer.teamIndex == TeamIndex.awayTeam then
+	elseif contactPlayer.teamIndex == Util.TeamIndex.AwayTeam then
 		if
 			ballCollisionInfo.away.current
 			and contactPlayer.playerId == ballCollisionInfo.away.current.player.playerId
@@ -4347,14 +3131,14 @@ function checkForGoalPotential(): boolean
 	end
 
 	if homeGoalPotentialEnter and not previousHomeGoalPotentialEnter then
-		if possessionTeam.current.player.teamIndex == TeamIndex.awayTeam then
+		if possessionTeam.current.player.teamIndex == Util.TeamIndex.AwayTeam then
 			goalPlayer = possessionTeam.current.player
 			successfulPotential = true
 		end
 	end
 
 	if awayGoalPotentialEnter and not previousAwayGoalPotentialEnter then
-		if possessionTeam.current.player.teamIndex == TeamIndex.homeTeam then
+		if possessionTeam.current.player.teamIndex == Util.TeamIndex.HomeTeam then
 			goalPlayer = possessionTeam.current.player
 			successfulPotential = true
 		end
@@ -4369,13 +3153,13 @@ function checkForSave(goal: { team: string, dist: number }): boolean
 
 	local successfulSave = false
 
-	if goal.team == "home" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == TeamIndex.awayTeam then
+	if goal.team == "home" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == Util.TeamIndex.AwayTeam then
 		if
 			not homeGoalPotentialEnter
 			and previousHomeGoalPotentialEnter
 			and goal.dist <= 600
 			and goalie
-			and goalie.teamIndex == TeamIndex.homeTeam
+			and goalie.teamIndex == Util.TeamIndex.HomeTeam
 		then
 			successfulSave = true
 
@@ -4390,13 +3174,13 @@ function checkForSave(goal: { team: string, dist: number }): boolean
 				},
 			})
 		end
-	elseif goal.team == "away" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == TeamIndex.homeTeam then
+	elseif goal.team == "away" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == Util.TeamIndex.HomeTeam then
 		if
 			not awayGoalPotentialEnter
 			and previousAwayGoalPotentialEnter
 			and goal.dist <= 600
 			and goalie
-			and goalie.teamIndex == TeamIndex.awayTeam
+			and goalie.teamIndex == Util.TeamIndex.AwayTeam
 		then
 			successfulSave = true
 
@@ -4432,8 +3216,8 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		return
 	end
 
-	local ballToHomeGoalDist = getDist(ball.transform.position, homeGoalBox.position)
-	local ballToAwayGoalDist = getDist(ball.transform.position, awayGoalBox.position)
+	local ballToHomeGoalDist = Util.getDist(ball.transform.position, homeGoalBox.position)
+	local ballToAwayGoalDist = Util.getDist(ball.transform.position, awayGoalBox.position)
 	local closestGoal = {}
 
 	if ballToHomeGoalDist < ballToAwayGoalDist then
@@ -4451,7 +3235,7 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		if homeHit.successful then
 			local velocityDotNormal = ball.velocity:dot(homeHit.normal)
 			local reflectedVelocityNormalized = (ball.velocity - (homeHit.normal * (2 * velocityDotNormal))):normalize()
-			local distanceLeft = getDist(homeHit.position, homeGoalBox.position)
+			local distanceLeft = Util.getDist(homeHit.position, homeGoalBox.position)
 
 			ballHomePotentialPosition = homeHit.position + (reflectedVelocityNormalized * distanceLeft)
 		end
@@ -4473,7 +3257,7 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 		if awayHit.successful then
 			local velocityDotNormal = ball.velocity:dot(awayHit.normal)
 			local reflectedVelocityNormalized = (ball.velocity - (awayHit.normal * (2 * velocityDotNormal))):normalize()
-			local distanceLeft = getDist(awayHit.position, awayGoalBox.position)
+			local distanceLeft = Util.getDist(awayHit.position, awayGoalBox.position)
 
 			ballAwayPotentialPosition = awayHit.position + (reflectedVelocityNormalized * distanceLeft)
 		end
@@ -4534,7 +3318,7 @@ function goalScoreCheck()
 
 		local shotDistance: number = 0
 		if shotFrom then
-			shotDistance = getDist(shotFrom, ball.transform.position) / 100
+			shotDistance = Util.getDist(shotFrom, ball.transform.position) / 100
 		end
 
 		local assistPlayer = getAssistPlayer("away")
@@ -4599,7 +3383,7 @@ function goalScoreCheck()
 
 		local shotDistance: number = 0
 		if shotFrom then
-			shotDistance = getDist(shotFrom, ball.transform.position) / 100
+			shotDistance = Util.getDist(shotFrom, ball.transform.position) / 100
 		end
 
 		local assistPlayer = getAssistPlayer("home")
@@ -4658,7 +3442,7 @@ function getTeamColors()
 	if #selectedArena.home.players > 0 then
 		local firstPlayer = selectedArena.home.players[1]
 		local playerJson = firstPlayer:toJson()
-		homeTeamPrimaryColor = extractPrimaryColor(playerJson)
+		homeTeamPrimaryColor = Util.extractPrimaryPlayerColor(playerJson)
 	else
 		homeTeamPrimaryColor = homeTeamDefaultColor
 	end
@@ -4666,183 +3450,9 @@ function getTeamColors()
 	if #selectedArena.away.players > 0 then
 		local firstPlayer = selectedArena.away.players[1]
 		local playerJson = firstPlayer:toJson()
-		awayTeamPrimaryColor = extractPrimaryColor(playerJson)
+		awayTeamPrimaryColor = Util.extractPrimaryPlayerColor(playerJson)
 	else
 		awayTeamPrimaryColor = awayTeamDefaultColor
-	end
-end
-
-function setNewInputTimes(newInputs: { Key })
-	for _, newInput in newInputs do
-		if newInput then
-			local newInputString = keyToString(newInput)
-
-			local conciderModifier = true
-			if table.find(modifierKeys, newInputString) ~= nil then
-				for key: string, pressedInput in pressedInputKeys :: { [string]: any } do
-					if table.find(modifierKeys, key) == nil then
-						conciderModifier = false
-					end
-				end
-			else
-				conciderModifier = false
-			end
-
-			pressedInputKeys[newInputString] = {
-				time = os.clock(),
-				isModifier = conciderModifier,
-			}
-		end
-	end
-end
-
-function removeOldInputTimes()
-	local removeKeys = {}
-	for keyKey: string, _ in pressedInputKeys do
-		local key: Key
-		if Input.Key[keyKey] then
-			key = Input.Key[keyKey]
-		else
-			key = Input.Gamepad[keyKey]
-		end
-
-		if Input.getKeyDown(key) or Input.getKey(key) then
-			continue
-		end
-
-		table.insert(removeKeys, keyKey)
-	end
-
-	for _, removeKeyKey: string in removeKeys do
-		pressedInputKeys[removeKeyKey] = nil
-	end
-end
-
-function saveKeybinds()
-	local keybindsSerilazied = SerializeKeybinds()
-	config.keyboardKeybinds = keybindsSerilazied.keybord
-	config.gamepadKeybinds = keybindsSerilazied.gamepad
-	saveConfig()
-end
-
-function removeGamepadKeys(keysList: { Key }): { Key }
-	local removeIndexes: { number } = {}
-	for i, key: Key in keysList do
-		local keyString = keyToString(key)
-		if table.find(keyboardKeys, keyString) == nil then
-			table.insert(removeIndexes, i)
-		end
-	end
-
-	for _, index in removeIndexes do
-		table.remove(keysList, index)
-	end
-
-	return keysList
-end
-
-function removeKeyboardKeys(keysList: { Key })
-	local removeIndexes: { number } = {}
-	for i, key: Key in keysList do
-		local keyString = keyToString(key)
-		if table.find(keyboardKeys, keyString) ~= nil then
-			table.insert(removeIndexes, i)
-		end
-	end
-
-	for _, index in removeIndexes do
-		table.remove(keysList, index)
-	end
-
-	return keysList
-end
-
-function rebind(primary: string, modifiers: { Key }?)
-	if keyToBeRebinded.type == "keyboard" then
-		if table.find(keyboardKeys, primary) == nil then
-			return
-		end
-
-		if modifiers then
-			modifiers = removeGamepadKeys(modifiers)
-		end
-
-		inputs.keyboard[keyToBeRebinded.key].modifiers = modifiers
-		inputs.keyboard[keyToBeRebinded.key].hotkey = Input.Key[primary]
-	elseif keyToBeRebinded.type == "gamepad" then
-		if table.find(keyboardKeys, primary) ~= nil then
-			return
-		end
-
-		if modifiers then
-			modifiers = removeKeyboardKeys(modifiers)
-		end
-
-		inputs.gamepad[keyToBeRebinded.key].modifiers = modifiers
-		inputs.gamepad[keyToBeRebinded.key].hotkey = Input.Gamepad[primary]
-	end
-
-	keyToBeRebinded.key = ""
-	pressedRebindModifiers = {}
-	saveKeybinds()
-end
-
-function doRebind()
-	if getDictSize(pressedInputKeys) == 0 then
-		if getDictSize(pressedRebindModifiers) ~= 0 then
-			local primary: string
-			local biggestTime = 0
-
-			for key: string, pressedRebindInput in pressedRebindModifiers :: { [string]: { time: number } } do
-				if pressedRebindInput.time > biggestTime then
-					biggestTime = pressedRebindInput.time
-					primary = key
-				end
-			end
-
-			local modifiers = {}
-			for key, _ in pressedRebindModifiers do
-				if key ~= primary then
-					table.insert(modifiers, Input.Key[key])
-				end
-			end
-
-			rebind(primary, modifiers)
-		end
-
-		return
-	end
-
-	local newestKey: string
-	local biggestTime = 0
-	for key, pressedInputInfo in pressedInputKeys do
-		if pressedInputInfo.time > biggestTime then
-			biggestTime = pressedInputInfo.time
-			newestKey = key
-		end
-	end
-
-	-- newest key is primary
-	if table.find(modifierKeys, newestKey) == nil then
-		local modifiers = {}
-
-		for key, pressedInputInfo in pressedInputKeys do
-			if table.find(modifierKeys, key) ~= nil and pressedInputInfo.isModifier then
-				local modifierKey = Input.Key[key]
-				if modifierKey == nil then
-					modifierKey = Input.Gamepad[key]
-				end
-
-				table.insert(modifiers, modifierKey)
-			end
-		end
-
-		rebind(newestKey, modifiers)
-	else
-		-- store modifier
-		pressedRebindModifiers[newestKey] = {
-			time = biggestTime,
-		}
 	end
 end
 
@@ -4856,7 +3466,7 @@ function drawBallOutline()
 	local ballUIPosition = ui:worldToHUD(ball.transform.position)
 
 	local ballRadius = 17.5
-	local ballDistance = getDist(camera.position, ball.transform.position)
+	local ballDistance = Util.getDist(camera.position, ball.transform.position)
 	local segments = 20
 	local radius = getApparentRaidus(ballRadius, ballDistance, ui.depth)
 	local thickness = radius / 4
@@ -4899,17 +3509,12 @@ function tick(dt)
 		end
 	end
 
-	setNewInputTimes(getKeyboardKeysDown())
-	setNewInputTimes(getGamepadKeysDown())
-
-	if keyToBeRebinded.key ~= "" then
-		doRebind()
-	end
+	InputSystem.readInputStart()
 
 	deltaTime = dt
 	camera.fieldOfView = cameraFOV
 
-	gameData = getReplayFrameFromIndex(readLocation)
+	gameData = Util.getReplayFrameFromIndex(readLocation)
 
 	if selectedArena == nil then
 		toggleSmoothing(true, true)
@@ -4917,11 +3522,12 @@ function tick(dt)
 
 		moveCamera()
 		rotateCamera()
+		InputSystem.readInputEnd()
 		return
 	end
 
-	ball = getClosestArenaBall(selectedArena.transform.position, gameData)
 	selectedArena:tick()
+	ball = selectedArena.ball
 
 	getTeamColors()
 
@@ -4971,7 +3577,7 @@ function tick(dt)
 		goalScoreCheck()
 	end
 
-	removeOldInputTimes()
+	InputSystem.readInputEnd()
 
 	if arenas and boundingBoxDebug then
 		for _, arena in arenas do
