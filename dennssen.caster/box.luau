@@ -1,6 +1,6 @@
 --!strict
 
-export type Local = {
+type Local = {
 	position: Vec3,
 	normal: Vec3,
 	length: number,
