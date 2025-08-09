@@ -98,6 +98,7 @@ function Box:generatePoints(): ()
 	}
 
 	for i = 1, #newVertexLocations do
+		-- d: using rotateVector instead of the matrix method
 		newVertexLocations[i] = self.rotation:rotateVector(newVertexLocations[i])
 	end
 
@@ -110,6 +111,7 @@ function Box:generatePoints(): ()
 
 	self.vertexLocations = newVertexLocations
 
+	-- d: caching "locals" for a small performance increase
 	self.locals.x.position = self.vertexLocations[5] - self.vertexLocations[1]
 	self.locals.y.position = self.vertexLocations[3] - self.vertexLocations[1]
 	self.locals.z.position = self.vertexLocations[2] - self.vertexLocations[1]
@@ -141,6 +143,7 @@ function Box:render(r: number, g: number, b: number): ()
 		WorldDraw.drawLine(line.start, line.finish, r, g, b, 4, 0)
 	end
 
+	-- d: added directional lines
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getForwardVector() * 100, 1, 0, 0, 10, 0)
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getUpVector() * 100, 0, 1, 0, 10, 0)
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getRightVector() * 100, 0, 0, 1, 10, 0)
@@ -168,6 +171,7 @@ function Box:checkPointIntersect(point: Vec3?): boolean
 	end
 end
 
+-- d: new method that clamps a world point inside the box. forceSurfaceClamp will put the point on the nearest face even if the point is inside the box.
 function Box:clampPointToBox(point: Vec3, forceSurfaceClamp: boolean): Vec3
 	local pointOffset = point - self.position
 	local localPoint = self.rotation:inverse():rotateVector(pointOffset)
