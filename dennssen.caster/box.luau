@@ -27,6 +27,7 @@ export type BoxType = {
 	generatePoints: (self: BoxType) -> (),
 	render: (self: BoxType, r: number, g: number, b: number) -> (),
 	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
+	clampPointToBox: (self: BoxType, point: Vec3, surfaceOnly: boolean) -> Vec3,
 
 	empty: BoxType,
 }
@@ -165,6 +166,48 @@ function Box:checkPointIntersect(point: Vec3?): boolean
 	else
 		return false
 	end
+end
+
+function Box:clampPointToBox(point: Vec3, forceSurfaceClamp: boolean): Vec3
+	local pointOffset = point - self.position
+	local localPoint = self.rotation:inverse():rotateVector(pointOffset)
+	local boxExtents = Vec3.new(self.size.x / 2, self.size.y / 2, self.size.z / 2)
+
+	local clamped = Vec3.new(
+		math.clamp(localPoint.x, -boxExtents.x, boxExtents.x),
+		math.clamp(localPoint.y, -boxExtents.y, boxExtents.y),
+		math.clamp(localPoint.z, -boxExtents.z, boxExtents.z)
+	)
+
+	if forceSurfaceClamp and self:checkPointIntersect(localPoint) then
+		local dx = math.min(boxExtents.x - localPoint.x, localPoint.x + boxExtents.x)
+		local dy = math.min(boxExtents.y - localPoint.y, localPoint.y + boxExtents.y)
+		local dz = math.min(boxExtents.z - localPoint.z, localPoint.z + boxExtents.z)
+
+		if dx <= dy and dx <= dz then
+			if localPoint.x > 0 then
+				clamped.x = boxExtents.x
+			else
+				clamped.x = -boxExtents.x
+			end
+		elseif dy <= dz then
+			if localPoint.y > 0 then
+				clamped.y = boxExtents.y
+			else
+				clamped.y = -boxExtents.y
+			end
+		else
+			if localPoint.z > 0 then
+				clamped.z = boxExtents.z
+			else
+				clamped.z = -boxExtents.z
+			end
+		end
+	end
+
+	local worldClosest = self.rotation:rotateVector(clamped) + self.position
+
+	return worldClosest
 end
 
 Box.empty = Box.new(Vec3.zeroVector, Vec3.zeroVector, Quat.identity)
