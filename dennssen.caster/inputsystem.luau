@@ -309,10 +309,6 @@ function InputSystem.getKeyboardKeysDown(): { Key }
 	local bannedInputs = {}
 	local pressedKeys: { Key } = {}
 
-	if not Input.getKey(Input.Key.AnyKey) then
-		return pressedKeys
-	end
-
 	for _, key in pairs(keyboardKeys) do
 		if Input.getKeyDown(Input.Key[key]) then
 			local banned = false
