@@ -2122,12 +2122,14 @@ function onGui()
 			Gui.treePop()
 		end
 		if selectedArena then
-			Gui.text(
-				`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(ball.transform.position)}`
-			)
-			Gui.text(
-				`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(ball.transform.position)}`
-			)
+			if ball then
+				Gui.text(
+					`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(ball.transform.position)}`
+				)
+				Gui.text(
+					`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(ball.transform.position)}`
+				)
+			end
 			if Gui.button("Print Selected Arena") then
 				print(selectedArena)
 			end
@@ -3555,7 +3557,7 @@ function tick(dt)
 		stopFollow()
 	end
 
-	if debugFreecam then
+	if ball and debugFreecam then
 		drawBallOutline()
 		return
 	end
@@ -3569,11 +3571,11 @@ function tick(dt)
 		moveCamera()
 		rotateCamera()
 	end
-	drawBallOutline()
 
 	particleAffect()
 	ballInCenterCheck()
 	if ball then
+		drawBallOutline()
 		goalScoreCheck()
 	end
 
