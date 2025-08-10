@@ -299,56 +299,10 @@ function checkVersion(version: string, versionExpression: string, cameraName: st
 	return { success = true, msg = "" }
 end
 
-function getDictSize(dict): number
-	local i = 0
-
-	if dict == nil then
-		return i
-	end
-
-	for _, _ in dict do
-		i += 1
-	end
-
-	return i
-end
-
-function getDictIndex(dict, index: number)
-	local i = 0
-	local dictSize = getDictSize(dict)
-	local dictItem = nil
-
-	if index < 0 or index > dictSize then
-		return dictItem
-	end
-
-	for _, item in dict do
-		if i == index then
-			dictItem = item
-			break
-		end
-
-		i += 1
-	end
-
-	return dictItem
-end
-
 function capitalize(s: string): string
 	local firstLetter = s:sub(1, 1):upper()
 	s = s:sub(2)
 	return `{firstLetter}{s}`
-end
-
--- math.lerp is nil for some reason
-function lerp(a: number, b: number, t: number): number
-	if a == nil then
-		return b
-	end
-	if b == nil then
-		return a
-	end
-	return a * (1.0 - t) + b * t
 end
 
 function getApparentRaidus(radius: number, distance: number, HUDDepth: number): number
@@ -1157,11 +1111,11 @@ local rotEuler: Vec3 = Vec3.zeroVector
 local keyboardKeybindsDeserialized = InputSystem.deserializeKeybinds(config.keyboardKeybinds)
 local gamepadKeybindsDeserialized = InputSystem.deserializeKeybinds(config.gamepadKeybinds)
 
-if getDictSize(keyboardKeybindsDeserialized) == 0 then
+if Util.getDictSize(keyboardKeybindsDeserialized) == 0 then
 	keyboardKeybindsDeserialized = InputSystem.defaultKeybinds.keyboard
 end
 
-if getDictSize(gamepadKeybindsDeserialized) == 0 then
+if Util.getDictSize(gamepadKeybindsDeserialized) == 0 then
 	gamepadKeybindsDeserialized = InputSystem.defaultKeybinds.gamepad
 end
 
@@ -2914,7 +2868,7 @@ function moveCamera()
 		end
 	end
 
-	local speedMultiplier = lerp(
+	local speedMultiplier = Util.lerp(
 		speedGears[math.max(currentSpeedIndex - 1, 1)],
 		speedGears[currentSpeedIndex],
 		gearShiftTime / gearShiftTimeRequired
@@ -3505,8 +3459,8 @@ function tick(dt)
 		local currentTime = os.clock()
 		if currentTime >= arenaLoadTime + getArenaDelay then
 			arenas = getArenas()
-			if getDictSize(arenas) > 0 then
-				setSelectedArena(getDictIndex(arenas, 1))
+			if Util.getDictSize(arenas) > 0 then
+				setSelectedArena(Util.getDictIndex(arenas, 1))
 			end
 		end
 	end
