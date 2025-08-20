@@ -488,12 +488,8 @@ end
 
 function CasterArena:onRoundStartHook() end
 
-function CasterArena:onRoundEndHook(isRestart: boolean, isMercy: boolean, homeScore: number, awayScore: number)
+function CasterArena:onRoundEndHook(isMercy: boolean, homeScore: number, awayScore: number)
 	print("round end hook")
-
-	if isRestart then
-		return
-	end
 
 	local round: Round = {
 		home = {

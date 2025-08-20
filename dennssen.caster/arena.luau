@@ -6,7 +6,6 @@ type BoxType = typeof(Box)
 local Util = require("util")
 
 export type ArenaTeam<T = {}> = {
-	previousActualScore: number,
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
@@ -73,7 +72,6 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	onRoundStartHook: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onRoundEndHook: (
 		self: Arena<ArenaData, HomeData, AwayData>,
-		isRestart: boolean,
 		isMercy: boolean,
 		homeScore: number,
 		awayScore: number
@@ -102,7 +100,6 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 	self.players = {}
 
 	self.home = {
-		previousActualScore = 0,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -120,7 +117,6 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 	}
 
 	self.away = {
-		previousActualScore = 0,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -183,7 +179,7 @@ function Arena:tick()
 	if self.instantUpdate then
 		self.lastIsGameActive = self.isGameActive
 	end
-
+	
 	if not self.isKickoff and not self.lastIsGameActive and self.isGameActive then
 		self.isKickoff = true
 	end
@@ -216,43 +212,6 @@ function Arena:tick()
 		self.actionTimerSeconds = 0
 	end
 
-	local homeActualScore = self.gamemode:getTeamScore(Util.TeamIndex.HomeTeam)
-	local awayActualScore = self.gamemode:getTeamScore(Util.TeamIndex.AwayTeam)
-
-	if homeActualScore ~= self.home.previousActualScore then
-		self.home.previousScore = self.home.score
-		self.home.score = self.gamemode:getTeamScore(Util.TeamIndex.HomeTeam)
-	end
-
-	if awayActualScore ~= self.away.previousActualScore then
-		self.away.previousScore = self.away.score
-		self.away.score = self.gamemode:getTeamScore(Util.TeamIndex.AwayTeam)
-	end
-
-	if self.instantUpdate then
-		self.home.previousActualScore = homeActualScore
-		self.away.previousActualScore = awayActualScore
-		self.lastGameTimeSeconds = self.gameTimeSeconds
-	end
-
-	self.home.scoreIncrease = self.home.previousActualScore ~= homeActualScore and homeActualScore ~= 0
-	self.away.scoreIncrease = self.away.previousActualScore ~= awayActualScore and awayActualScore ~= 0
-
-	self.home.previousActualScore = homeActualScore
-	self.away.previousActualScore = awayActualScore
-
-	if self.home.scoreIncrease or self.away.scoreIncrease then
-		local scoredTeamIndex = self.home.scoreIncrease and Util.TeamIndex.HomeTeam or Util.TeamIndex.AwayTeam
-		self.gracePeriodStartTime = currentTime
-		self.isGracePeriod = true
-		if self.onGoalScoredHook then
-			self:onGoalScoredHook(scoredTeamIndex)
-		end
-	elseif not self.isGracePeriod and self.actionTimerSeconds > 0 and self.isGameActive then
-		self.gracePeriodStartTime = currentTime
-		self.isGracePeriod = true
-	end
-
 	if
 		self.isGracePeriod
 		and ((currentTime - self.gracePeriodStartTime > 6 and self.actionTimerSeconds == 0) or not self.isGameActive)
@@ -280,8 +239,22 @@ function Arena:tick()
 	if self.gamemode:getBoolConfigVariable("busebestof") then
 		self.bestOfAmount = self.gamemode:getNumberConfigVariable("roundspermatch")
 	else
-		self.bestOfAmount = 1
+		self.bestOfAmount = 0
 	end
+
+	self.home.previousScore = self.home.score
+	self.home.score = self.gamemode:getTeamScore(Util.TeamIndex.HomeTeam)
+	self.away.previousScore = self.away.score
+	self.away.score = self.gamemode:getTeamScore(Util.TeamIndex.AwayTeam)
+
+	if self.instantUpdate then
+		self.home.previousScore = self.home.score
+		self.away.previousScore = self.away.score
+		self.lastGameTimeSeconds = self.gameTimeSeconds
+	end
+
+	self.home.scoreIncrease = self.home.score > self.home.previousScore
+	self.away.scoreIncrease = self.away.score > self.away.previousScore
 
 	if not self.isGameActive and self.lastIsGameActive then
 		self:onRoundEnd()
@@ -322,54 +295,53 @@ function Arena:onRoundStart()
 end
 
 function Arena:onRoundEnd()
-	print("round end")
-	local isRestart = not self.home.roundsWonIncrease and not self.away.roundsWonIncrease
-	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
-	local cachedHomeScore
-	local cachedAwayScore
+    print("round end")
+    local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
+    local cachedHomeScore
+    local cachedAwayScore
 
-	if endsWithAGoal then
-		cachedHomeScore = self.home.previousScore
-		cachedAwayScore = self.away.previousScore
-	else
-		cachedHomeScore = self.home.score
-		cachedAwayScore = self.away.score
-	end
+    if endsWithAGoal then
+        cachedHomeScore = self.home.score
+        cachedAwayScore = self.away.score
+    else
+        cachedHomeScore = self.home.previousScore
+        cachedAwayScore = self.away.previousScore
+    end
 
-	local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
-	local isMercy = scoreDifference >= (self.mercyScoreDifference - 1) and endsWithAGoal
+    local scoreDifference = math.abs(cachedHomeScore - cachedAwayScore)
+    local isMercy = scoreDifference >= (self.mercyScoreDifference - 1) and endsWithAGoal
 
-	print(`Home pre-score: {self.home.previousScore}`)
-	print(`Away pre-score: {self.away.previousScore}`)
-	print(`Game time: {self.gameTimeSeconds}`)
-	print(`Action time: {self.actionTimerSeconds}`)
-	print(`Ends with goal: {endsWithAGoal}`)
-	print(`Is overtime: {self.isOvertime}`)
-	print(`Is mercy: {isMercy}`)
+    print(`Best of amount: {self.bestOfAmount}`)
+    print(`Home pre-score: {cachedHomeScore}`)
+    print(`Away pre-score: {cachedAwayScore}`)
+    print(`Home rounds won: {self.home.roundsWon}`)
+    print(`Away rounds won: {self.away.roundsWon}`)
+    print(`Game time: {self.gameTimeSeconds}`)
+    print(`Action time: {self.actionTimerSeconds}`)
+    print(`Ends with goal: {endsWithAGoal}`)
+    print(`Is overtime: {self.isOvertime}`)
+    print(`Is mercy: {isMercy}`)
 
-	if not isRestart then
-		if
-			endsWithAGoal
-			and (self.isOvertime or isMercy)
-			and self.home.goal.box:checkPointIntersect(self.ball.transform.position)
-		then
-			print("Increased away score")
-			cachedAwayScore += 1
-		elseif
-			endsWithAGoal
-			and (self.isOvertime or isMercy)
-			and self.away.goal.box:checkPointIntersect(self.ball.transform.position)
-		then
-			print("Increased home score")
-			cachedHomeScore += 1
-		end
-	end
-
-	print(`Home score: {cachedHomeScore}`)
-	print(`Away score: {cachedAwayScore}`)
+    if
+        endsWithAGoal
+        and (self.isOvertime or isMercy)
+        and self.home.goal.box:checkPointIntersect(self.ball.transform.position)
+    then
+        print("Increased away score")
+        cachedAwayScore += 1
+    elseif
+        endsWithAGoal
+        and (self.isOvertime or isMercy)
+        and self.away.goal.box:checkPointIntersect(self.ball.transform.position)
+    then
+        print("Increased home score")
+        cachedHomeScore += 1
+    end
+    print(`Home submited score: {cachedHomeScore}`)
+    print(`Away submited score: {cachedAwayScore}`)
 
 	if self.onRoundEndHook then
-		self:onRoundEndHook(isRestart, isMercy, cachedHomeScore, cachedAwayScore)
+		self:onRoundEndHook(isMercy, cachedHomeScore, cachedAwayScore)
 	end
 end
 
