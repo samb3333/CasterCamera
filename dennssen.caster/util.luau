@@ -84,6 +84,16 @@ function Util.getDictIndex(dict, index: number)
 	return dictItem
 end
 
+function Util.getDictKey(value, table): string
+	local key = ""
+	for k, v in pairs(table) do
+		if v == value then
+			key = k
+		end
+	end
+	return key
+end
+
 function Util.deepStructureCopy(structureTable, normalTable): boolean
 	local adjusted = false
 	if typeof(structureTable) == "table" then
@@ -139,30 +149,12 @@ function Util.initializeConfig(defaultConfig: { [any]: any })
 	end
 end
 
-function Util.isBetweenVector(n: Vec3, min: Vec3, max: Vec3, up: Vec3): boolean
-	local nHeight = n:dot(up)
-	local minHeight = min:dot(up)
-	local maxHeight = max:dot(up)
-
-	return nHeight >= minHeight and nHeight <= maxHeight
-end
-
-function Util.isBetweenVec2(v1: Vec2, v2: Vec2, point: Vec2)
-	return v1.x < point.x and v2.x > point.x and v1.y < point.y and v2.y > point.y
-end
-
 function Util.isBetween(n: number, min: number, max: number): boolean
 	if n > min and n < max then
 		return true
 	else
 		return false
 	end
-end
-
-function Util.getForward(positionA: Vec3, positionB: Vec3): Vec3
-	local forward: Vec3 = Vec3.new((positionB.x - positionA.x), (positionB.y - positionA.y), positionB.z - positionA.z)
-		:normalize()
-	return forward
 end
 
 function Util.findPlayerInTable(table: { ReplayPlayer }, player: ReplayPlayer): number?
@@ -203,14 +195,10 @@ function Util.multispacing(amount: number)
 	end
 end
 
-function Util.getKey(value, table): string
-	local key = ""
-	for k, v in pairs(table) do
-		if v == value then
-			key = k
-		end
-	end
-	return key
+function Util.getForward(positionA: Vec3, positionB: Vec3): Vec3
+	local forward: Vec3 = Vec3.new((positionB.x - positionA.x), (positionB.y - positionA.y), positionB.z - positionA.z)
+		:normalize()
+	return forward
 end
 
 -- clamps every axis in the vector to be between max and min
@@ -232,16 +220,61 @@ function Util.vec3Clamp(vec: Vec3, min: number, max: number): Vec3
 	return vec
 end
 
-function Util.vec3ClampLength(vec: Vec3, maxLength: number): Vec3
-	if vec:length() > maxLength then
-		vec = vec:normalize() * maxLength
+function Util.clampMagnitude3(vec: Vec3, maxMagnitude: number): Vec3
+	if vec:length() > maxMagnitude then
+		return vec:normalize() * maxMagnitude
+	else
+		return vec
 	end
+end
 
-	return vec
+function Util.angleBetweenVec3s(a: Vec3, b: Vec3): number
+	local cross = a:cross(b)
+	local dot = a:dot(b)
+	return math.atan2(cross:length(), dot)
+end
+
+function Util.isBetweenVector(n: Vec3, min: Vec3, max: Vec3, up: Vec3): boolean
+	local nHeight = n:dot(up)
+	local minHeight = min:dot(up)
+	local maxHeight = max:dot(up)
+
+	return nHeight >= minHeight and nHeight <= maxHeight
+end
+
+function Util.clampMagnitude2(vec: Vec2, maxMagnitude: number): Vec2
+	if vec:length() > maxMagnitude then
+		return vec:normalize() * maxMagnitude
+	else
+		return vec
+	end
+end
+
+function Util.rotateVec2(vec: Vec2, angle: number): Vec2
+	return Vec2.new(
+		(vec.x * math.cos(angle)) - (vec.y * math.sin(angle)),
+		(vec.x * math.sin(angle)) + (vec.y * math.cos(angle))
+	)
+end
+
+function Util.isBetweenVec2(v1: Vec2, v2: Vec2, point: Vec2)
+	return v1.x < point.x and v2.x > point.x and v1.y < point.y and v2.y > point.y
 end
 
 function Util.quatFromVec3(vec: Vec3): Quat
 	return Quat.fromEuler(vec.x, vec.y, vec.z)
+end
+
+function Util.QuatToAngleAxis(quat: Quat): { angle: number, axis: Vec3 }
+	local angle = 2 * math.acos(quat.w)
+
+	if angle == 0 or angle == 180 then
+		return { angle = angle, axis = Vec3.upVector }
+	end
+
+	local axis = Vec3.new(quat.x / math.sin(angle / 2), quat.y / math.sin(angle / 2), quat.z / math.sin(angle / 2))
+
+	return { angle = angle, axis = axis }
 end
 
 function Util.dateTimeDeltaSeconds(past: DateTime, future: DateTime): number

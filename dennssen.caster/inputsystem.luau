@@ -36,7 +36,7 @@ export type InputSystem = {
 	keyToString: (key: Key) -> string,
 
 	setDefaultKeybinds: (keyboard: { [string]: Keybind }, gamepad: { [string]: Keybind }) -> (),
-	deserializeKeybinds: (keybinds: string) -> { [string]: Keybind },
+	decodeKeybinds: (keybinds: string) -> { [string]: Keybind },
 	getKeyboardKeysDown: () -> { Key },
 	getGamepadKeysDown: () -> { Key },
 	createCustomInput: (
@@ -49,7 +49,7 @@ export type InputSystem = {
 	compareCustomInputs: (a: Keybind, b: Keybind) -> boolean,
 	getCustomKey: (key: CustomInput) -> { down: boolean, held: boolean, up: boolean },
 	getCustomAnalog: (key: CustomInput) -> number,
-	serializeKeybinds: () -> { keyboard: string, gamepad: string },
+	encodeKeybinds: () -> { keyboard: string, gamepad: string },
 	setNewInputTimes: (newInputs: { Key }) -> (),
 	removeOldInputTimes: () -> (),
 	saveKeybinds: () -> (),
@@ -218,7 +218,7 @@ function InputSystem.setDefaultKeybinds(keyboard: { [string]: Keybind }, gamepad
 	InputSystem.defaultKeybinds.gamepad = gamepad
 end
 
-function InputSystem.deserializeKeybinds(string: string): { [string]: Keybind }
+function InputSystem.decodeKeybinds(string: string): { [string]: Keybind }
 	local keybinds: { [string]: Keybind } = {}
 
 	for fullEntry in string:gmatch("{(.-:{.-}})}") do
@@ -467,7 +467,7 @@ function InputSystem.getCustomAnalog(key: CustomInput): number
 	return Input.getAnalog(primary)
 end
 
-function InputSystem.serializeKeybinds(): { keyboard: string, gamepad: string }
+function InputSystem.encodeKeybinds(): { keyboard: string, gamepad: string }
 	local serializedKeyboardString = ""
 	for key, value: CustomInput in InputSystem.inputs.keyboard :: { [string]: CustomInput } do
 		serializedKeyboardString ..= "{" .. `{key}:` .. "{" .. `primary:"{InputSystem.keyToString(value.hotkey)}",modifiers:` .. "{"
@@ -553,7 +553,7 @@ function InputSystem.removeOldInputTimes()
 end
 
 function InputSystem.saveKeybinds()
-	local keybindsSerilazied = InputSystem.serializeKeybinds()
+	local keybindsSerilazied = InputSystem.encodeKeybinds()
 	config.keyboardKeybinds = keybindsSerilazied.keyboard
 	config.gamepadKeybinds = keybindsSerilazied.gamepad
 	saveConfig()
