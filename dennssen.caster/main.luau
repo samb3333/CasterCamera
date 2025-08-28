@@ -1104,8 +1104,8 @@ local Up: number = 0
 local deadzone: number = config.deadzone
 local rotEuler: Vec3 = Vec3.zeroVector
 
-local keyboardKeybindsDeserialized = InputSystem.deserializeKeybinds(config.keyboardKeybinds)
-local gamepadKeybindsDeserialized = InputSystem.deserializeKeybinds(config.gamepadKeybinds)
+local keyboardKeybindsDeserialized = InputSystem.decodeKeybinds(config.keyboardKeybinds)
+local gamepadKeybindsDeserialized = InputSystem.decodeKeybinds(config.gamepadKeybinds)
 
 if Util.getDictSize(keyboardKeybindsDeserialized) == 0 then
 	keyboardKeybindsDeserialized = InputSystem.defaultKeybinds.keyboard
