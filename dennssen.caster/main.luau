@@ -44,26 +44,26 @@ local version: string = "2.0.0"
 -- Back to back overtime (0-0) it will not count the second round if the same team wins twice.
 
 -- Dependencies
-local Util = require("util")
+local Util = require("Deps/util")
 
-local InputSystem = require("inputsystem")
+local InputSystem = require("Deps/inputsystem")
 type Keybind = InputSystem.Keybind
 type CustomInput = InputSystem.CustomInput
 type InputSystem = InputSystem.InputSystem
 
-local Box = require("box")
+local Box = require("Deps/box")
 type BoxType = typeof(Box)
 
 type OverviewData = {
 	overview: { { position: Vec3, rotation: Quat } },
 }
-local Arena = require("arena")
+local Arena = require("Deps/arena")
 type CasterArena = Arena.Arena<{}, OverviewData, OverviewData> & {
 	sendInfoMessage: (self: CasterArena) -> (),
 	setupOverviews: (self: CasterArena) -> (),
 }
 
-local HUD = require("hud")
+local HUD = require("Deps/hud")
 type HUD = HUD.HUD
 
 -- GameData
