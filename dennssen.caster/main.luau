@@ -2940,8 +2940,6 @@ function followPlayer()
 		showNameTags = true,
 		muteSelf = false,
 		targetPlayer = currentPlayer,
-		positionSmoothing = 0,
-		rotationSmoothing = 0,
 		cameraFOV = followFOV,
 		cameraMode = cameraMode,
 		radius = followRadius,
