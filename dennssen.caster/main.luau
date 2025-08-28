@@ -3,17 +3,15 @@
 local version: string = "2.0.0"
 
 --TODO:
--- Normal Win (h ~= a)
--- Mercy Win (h - a >= 6)
--- Overtime Win (h == a)
--- Normal Reset ()
+-- check for score fix in 4v4
 
 -- Do a full scale test of 3v3
 -- Do a full scale test of 4v4
 
 -- Spell check overlay
 
--- Create release message for follow pluss.
+-- merge caster branches
+
 -- Create release message for caster update:
 -- - Include info about the update
 -- - Patch notes
@@ -37,11 +35,8 @@ local version: string = "2.0.0"
 -- Known Issues:
 -- No replay compatibility
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
--- Overtime goals don't have particle affects
--- Game crashes when joining a second server in the same session (join server -> Quit to menu -> join server -> crash)
+-- Overtime goals don't have particle affects (think this is fixed)
 -- Goal explosion in Driftblitz does not match the goal size and shape
--- Scores can be inaccurate when selecting an arena if the arenas previous round was in overtime or was a mercy win
--- Back to back overtime (0-0) it will not count the second round if the same team wins twice.
 
 -- Dependencies
 local Util = require("util")
