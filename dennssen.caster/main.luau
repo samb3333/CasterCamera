@@ -488,9 +488,7 @@ end
 
 function CasterArena:onRoundStartHook() end
 
-function CasterArena:onRoundEndHook(isMercy: boolean, homeScore: number, awayScore: number)
-	print("round end hook")
-
+function CasterArena:onRoundEndHook(homeScore: number, awayScore: number)
 	local round: Round = {
 		home = {
 			score = homeScore,
