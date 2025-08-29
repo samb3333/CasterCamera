@@ -256,6 +256,11 @@ function Arena:tick()
 	self.home.scoreIncrease = self.home.score > self.home.previousScore
 	self.away.scoreIncrease = self.away.score > self.away.previousScore
 
+	if self.home.scoreIncrease or self.away.scoreIncrease then
+		local teamIndex = self.home.scoreIncrease and Util.TeamIndex.HomeTeam or Util.TeamIndex.AwayTeam
+		self:onGoalScoredHook(teamIndex)
+	end
+
 	if not self.isGameActive and self.lastIsGameActive then
 		self:onRoundEnd()
 	end
