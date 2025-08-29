@@ -309,8 +309,6 @@ end
 local deltaTime: number = 0
 
 local loadTime: number = 0
-local arenaLoadTime: number = 0
-local getArenaDelay: number = 7
 local transitionTime: number
 local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
@@ -958,6 +956,8 @@ function Driftblitz:GUIChangeDimensions()
 
 	self:setupDimensions()
 end
+
+local cachedGamemodesAmount: number = 0
 
 function getArenas(): { [any]: CasterArena }
 	local arenas: { [any]: CasterArena } = {}
@@ -1658,11 +1658,6 @@ function onGui()
 		Gui.endCombo()
 	end
 	Gui.setItemTooltip("The currently selected arena")
-
-	local currentTime = os.clock()
-	if math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100) < 100 then
-		Gui.text(`Loading Arenas... ({math.round(((currentTime - arenaLoadTime) / getArenaDelay) * 100)}%)`)
-	end
 
 	Gui.newLine()
 	cameraFOV = Gui.sliderFloat("Field Of View", cameraFOV, 1, 179)
@@ -3449,14 +3444,12 @@ function tick(dt)
 
 	WorldDraw.clear()
 
-	if arenas == nil then
-		local currentTime = os.clock()
-		if currentTime >= arenaLoadTime + getArenaDelay then
-			arenas = getArenas()
-			if Util.getDictSize(arenas) > 0 then
-				setSelectedArena(Util.getDictIndex(arenas, 1))
-			end
+	if cachedGamemodesAmount ~= #SpectatorGamemodes.listGamemodeIds() then
+		arenas = getArenas()
+		if Util.getDictSize(arenas) > 0 then
+			setSelectedArena(Util.getDictIndex(arenas, 1))
 		end
+		cachedGamemodesAmount = #SpectatorGamemodes.listGamemodeIds()
 	end
 
 	InputSystem.readInputStart()
