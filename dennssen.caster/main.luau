@@ -482,7 +482,9 @@ function CasterArena:onGameStartHook()
 	})
 end
 
-function CasterArena:onRoundStartHook() end
+function CasterArena:onRoundStartHook()
+	print("round start hook")
+end
 
 function CasterArena:onRoundEndHook(homeScore: number, awayScore: number)
 	local round: Round = {
