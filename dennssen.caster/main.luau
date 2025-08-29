@@ -25,6 +25,7 @@ local version: string = "2.0.0"
 
 -- Known Issues:
 -- No replay compatibility
+-- Ball outline does not show in POV mode
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
 -- Goal explosion in Driftblitz does not match the goal size and shape
@@ -3505,6 +3506,7 @@ function tick(dt)
 
 	if playerFollow then
 		readOtherInputs()
+		drawBallOutline()
 	else
 		toggleSmoothing(true, true)
 		readInput()
