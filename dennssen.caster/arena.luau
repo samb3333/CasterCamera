@@ -70,7 +70,12 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	postTickHook: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onGameStartHook: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onRoundStartHook: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
-	onRoundEndHook: (self: Arena<ArenaData, HomeData, AwayData>, homeScore: number, awayScore: number) -> (),
+	onRoundEndHook: (
+		self: Arena<ArenaData, HomeData, AwayData>,
+		isRestart: boolean,
+		homeScore: number,
+		awayScore: number
+	) -> (),
 	onGoalScoredHook: (self: Arena<ArenaData, HomeData, AwayData>, scoredTeamIndex: number) -> (),
 
 	-- Overrides
@@ -291,7 +296,17 @@ end
 
 function Arena:onRoundEnd()
 	print("round end")
+	local isRestart = false
+	local isMercy = math.abs(self.home.score - self.away.score) >= self.mercyScoreDifference
 	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
+
+	if self.home.score == self.away.score then
+		isRestart = true -- scores are equal so no one has won, therefore it has to be a restart
+	end
+
+	if not isMercy and self.gameTimeSeconds > 0 then
+		isRestart = true
+	end
 
 	print(`Best of amount: {self.bestOfAmount}`)
 	print(`Home rounds won: {self.home.roundsWon}`)
@@ -300,11 +315,13 @@ function Arena:onRoundEnd()
 	print(`Action time: {self.actionTimerSeconds}`)
 	print(`Ends with goal: {endsWithAGoal}`)
 	print(`Is overtime: {self.isOvertime}`)
-	print(`Home submited score: {self.home.score}`)
-	print(`Away submited score: {self.away.score}`)
+	print(`Is mercy: {isMercy}`)
+	print(`Is restart: {isRestart}`)
+	print(`Final home score: {self.home.score}`)
+	print(`Final away score: {self.away.score}`)
 
 	if self.onRoundEndHook then
-		self:onRoundEndHook(self.home.score, self.away.score)
+		self:onRoundEndHook(isRestart, self.home.score, self.away.score)
 	end
 end
 
