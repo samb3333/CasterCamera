@@ -140,8 +140,6 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 	self.isKickoff = false
 	self.isGracePeriod = false
 
-	print(`made arena {self.slotId}`)
-
 	return self
 end
 
@@ -279,8 +277,6 @@ function Arena:tick()
 end
 
 function Arena:onGameStart()
-	print("game start")
-
 	if self.onGameStartHook then
 		self:onGameStartHook()
 	end
@@ -289,7 +285,6 @@ function Arena:onGameStart()
 end
 
 function Arena:onRoundStart()
-	print("round start")
 	self.isOvertime = false
 	self.home.score = 0
 	self.home.previousScore = 0
@@ -302,10 +297,8 @@ function Arena:onRoundStart()
 end
 
 function Arena:onRoundEnd()
-	print("round end")
 	local isRestart = false
 	local isMercy = math.abs(self.home.score - self.away.score) >= self.mercyScoreDifference
-	local endsWithAGoal = self.home.scoreIncrease or self.away.scoreIncrease
 
 	if self.home.score == self.away.score then
 		isRestart = true -- scores are equal so no one has won, therefore it has to be a restart
@@ -314,18 +307,6 @@ function Arena:onRoundEnd()
 	if not isMercy and self.gameTimeSeconds > 0 then
 		isRestart = true
 	end
-
-	print(`Best of amount: {self.bestOfAmount}`)
-	print(`Home rounds won: {self.home.roundsWon}`)
-	print(`Away rounds won: {self.away.roundsWon}`)
-	print(`Game time: {self.gameTimeSeconds}`)
-	print(`Action time: {self.actionTimerSeconds}`)
-	print(`Ends with goal: {endsWithAGoal}`)
-	print(`Is overtime: {self.isOvertime}`)
-	print(`Is mercy: {isMercy}`)
-	print(`Is restart: {isRestart}`)
-	print(`Final home score: {self.home.score}`)
-	print(`Final away score: {self.away.score}`)
 
 	if self.onRoundEndHook then
 		self:onRoundEndHook(isRestart, self.home.score, self.away.score)

@@ -467,7 +467,6 @@ CasterArena.__index = CasterArena
 setmetatable(CasterArena, { __index = Arena })
 
 function CasterArena:onGameStartHook()
-	print("game start hook")
 	sendSafeMessage(overlayCamera, {
 		info = "stats",
 		value = "clear",
@@ -479,9 +478,7 @@ function CasterArena:onGameStartHook()
 	})
 end
 
-function CasterArena:onRoundStartHook()
-	print("round start hook")
-end
+function CasterArena:onRoundStartHook() end
 
 function CasterArena:onRoundEndHook(isRestart: boolean, homeScore: number, awayScore: number)
 	if isRestart then
@@ -964,7 +961,6 @@ local cachedGamemodesAmount: number = 0
 function getArenas(): { [any]: CasterArena }
 	local arenas: { [any]: CasterArena } = {}
 	local gamemodes = SpectatorGamemodes.listGamemodes()
-	print("got gamemodes in getArenas")
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
 		if slotId:find("TKB") and not slotId:find("Full") then
@@ -978,8 +974,6 @@ function getArenas(): { [any]: CasterArena }
 			arenas[arena.name] = arena
 		end
 	end
-
-	print("got arenas")
 
 	return arenas
 end
