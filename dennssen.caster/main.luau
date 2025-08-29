@@ -1703,7 +1703,7 @@ function onGui()
 		Gui.newLine()
 	end
 
-	if Gui.collapsingHeader("Accessibility") then
+	if Gui.collapsingHeader("HUD") then
 		Gui.indent()
 		ballOutline = Gui.checkbox("Ball Outline", ballOutline)
 		Gui.setItemTooltip("Toggles an outline around the arena ball that shows it's position through walls.")
