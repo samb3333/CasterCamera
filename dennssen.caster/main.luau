@@ -2942,6 +2942,7 @@ function followPlayer()
 		cameraMode = cameraMode,
 		radius = followRadius,
 		threshold = 5,
+		positionSmoothing = followPosititonSmoothing,
 		cameraPositionOffset = tostring(Vec3.zeroVector),
 		cameraEulerOffset = tostring(Vec3.zeroVector),
 		gestureControls = false,
