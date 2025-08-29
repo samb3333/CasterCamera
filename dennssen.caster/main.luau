@@ -1489,7 +1489,7 @@ function main()
 		local result = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
 		if not result.success then
 			followPlussWarning =
-				`WARNING: {result.msg}. If you are experiencing issues please install the recommended version.`
+				`WARNING: {result.msg}.\nIf you are experiencing issues please install the recommended version.`
 		end
 	else
 		followPlussWarning =
@@ -1505,7 +1505,7 @@ function main()
 		local result = checkVersion(overlayVersion, requiredOverlayVersion, "Overlay Info")
 		if not result.success then
 			overlayWarning =
-				`WARNING: {result.msg}. If you are experiencing issues please install the recommended version.`
+				`WARNING: {result.msg}.\nIf you are experiencing issues please install the recommended version.`
 		end
 	end
 end
