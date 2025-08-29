@@ -3506,7 +3506,6 @@ function tick(dt)
 
 	if playerFollow then
 		readOtherInputs()
-		drawBallOutline()
 	else
 		toggleSmoothing(true, true)
 		readInput()
