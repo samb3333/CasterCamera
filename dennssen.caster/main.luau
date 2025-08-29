@@ -3,11 +3,6 @@
 local version: string = "2.0.0"
 
 --TODO:
--- check for score fix in 4v4
-
--- Do a full scale test of 3v3
--- Do a full scale test of 4v4
-
 -- Spell check overlay
 
 -- merge caster branches
@@ -34,7 +29,6 @@ local version: string = "2.0.0"
 
 -- Known Issues:
 -- No replay compatibility
--- Restarting will submit a round to the overlay
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
 -- Goal explosion in Driftblitz does not match the goal size and shape
@@ -3249,10 +3243,6 @@ end
 function goalScoreCheck()
 	local homeGoalBox: BoxType = selectedArena.home.goal.box
 	local awayGoalBox: BoxType = selectedArena.away.goal.box
-
-	if not selectedArena.isGameActive or selectedArena.actionTimerSeconds > 0 then
-		return
-	end
 
 	checkPotentialStatChange(homeGoalBox, awayGoalBox)
 
