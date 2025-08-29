@@ -1476,7 +1476,6 @@ local overviewMessage = {
 
 function main()
 	loadTime = os.clock()
-	arenaLoadTime = os.clock()
 	camera.position = defaultPosition
 	camera.rotation = defaultRotation
 	camera.rotationSmoothing = 0
