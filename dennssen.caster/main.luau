@@ -256,31 +256,32 @@ function checkVersion(version: string, versionExpression: string, cameraName: st
 		exMinor :: number
 	)
 
+	msg = `Your {cameraName} version is {release}.{major}.{minor}`
 	if exLogic == "=" then
-		msg = `Recommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor}`
+		msg ..= `\nRecommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor}`
 		if comparison ~= 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == ">=" then
-		msg = `Recommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or higher`
+		msg ..= `\nRecommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or higher`
 
 		if comparison < 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == "<=" then
-		msg = `Recommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or lower`
+		msg ..= `\nRecommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or lower`
 
 		if comparison > 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == ">" then
-		msg = `Recommended version of {cameraName} is higher than {exRelease}.{exMajor}.{exMinor}`
+		msg ..= `\nRecommended version of {cameraName} is higher than {exRelease}.{exMajor}.{exMinor}`
 
 		if comparison <= 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == "<" then
-		msg = `Recommended version of {cameraName} is lower than {exRelease}.{exMajor}.{exMinor}`
+		msg ..= `\nRecommended version of {cameraName} is lower than {exRelease}.{exMajor}.{exMinor}`
 
 		if comparison >= 0 then
 			return { success = false, msg = msg }
@@ -1488,11 +1489,11 @@ function main()
 		local result = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
 		if not result.success then
 			followPlussWarning =
-				`WARNING: {result.msg}.\nIf you are experiencing issues please install the recommended version.`
+				`WARNING:\n{result.msg}.\nIf you are experiencing issues please install the recommended version.`
 		end
 	else
 		followPlussWarning =
-			"WARNING: Follow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
+			"WARNING:\nFollow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
 	end
 	overlayCamera = getCameraById(overlayId)
 	if overlayCamera then
@@ -1504,7 +1505,7 @@ function main()
 		local result = checkVersion(overlayVersion, requiredOverlayVersion, "Overlay Info")
 		if not result.success then
 			overlayWarning =
-				`WARNING: {result.msg}.\nIf you are experiencing issues please install the recommended version.`
+				`WARNING:\n{result.msg}.\nIf you are experiencing issues please install the recommended version.`
 		end
 	end
 end
@@ -1621,7 +1622,6 @@ function onGui()
 			if Gui.selectable("Replay " .. i, i == readLocation) then
 				if i ~= readLocation then
 					arenas = nil
-					arenaLoadTime = os.clock()
 					selectedArena.instantUpdate = true
 				end
 				readLocation = i
