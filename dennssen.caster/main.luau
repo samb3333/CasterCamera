@@ -3,8 +3,6 @@
 local version: string = "2.0.0"
 
 --TODO:
--- merge caster branches
-
 -- Create release message for caster update:
 -- - Include info about the update
 -- - Patch notes
