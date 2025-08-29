@@ -123,6 +123,8 @@ function onMessageReceived(messageTable: { info: string, value: any })
 	elseif info == "rounds" then
 		if value == "clear" then
 			currentConfig.extraArenaInfo.rounds = {}
+		elseif value == "remove" then
+			table.remove(currentConfig.extraArenaInfo.rounds)
 		else
 			table.insert(currentConfig.extraArenaInfo.rounds, value)
 		end
