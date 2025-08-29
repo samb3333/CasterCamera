@@ -3,8 +3,6 @@
 local version: string = "2.0.0"
 
 --TODO:
--- Spell check overlay
-
 -- merge caster branches
 
 -- Create release message for caster update:
