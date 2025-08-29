@@ -229,8 +229,15 @@ function checkVersion(version: string, versionExpression: string, cameraName: st
 	local exLogic: string?, exRelease: string? | number, exMajor: string? | number, exMinor: string? | number =
 		versionExpression:match("([=<>]+)(%d+)%.(%d+)%.(%d+)")
 
-	if not release or not major or not minor or not exRelease or not exMajor or not exMinor then
-		return { success = false, msg = "Wrong version format" }
+	if not exRelease or not exMajor or not exMinor then
+		return { success = false, msg = `Required version expression is wrong, please contact the dev of this issue` }
+	end
+
+	if not release or not major or not minor then
+		return {
+			success = false,
+			msg = `Your version of {cameraName} is outdated, the recommended version is {exRelease}.{exMajor}.{exMinor}`,
+		}
 	end
 
 	release = tonumber(release)
