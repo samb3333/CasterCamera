@@ -34,6 +34,7 @@ local version: string = "2.0.0"
 
 -- Known Issues:
 -- No replay compatibility
+-- Restarting will submit a round to the overlay
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
 -- Goal explosion in Driftblitz does not match the goal size and shape
@@ -1895,10 +1896,17 @@ function onGui()
 			Gui.newLine()
 
 			if not addRound then
-				if Gui.button("Add Previous Round") then
+				if Gui.button(Icon.Plus .. "Add Previous Round") then
 					addRound = true
 				end
 				Gui.setItemTooltip("Add info about a round that ended before you started casting")
+				if Gui.button(Icon.Trash .. "Remove Previous Round") then
+					sendMessage(overlayCamera, {
+						info = "rounds",
+						value = "remove",
+					})
+				end
+				Gui.setItemTooltip("Remove info about the previous round like it never happened")
 			else
 				Gui.text("Previous Round Info")
 				homePreviousRoundScore = Gui.dragInt("Home Score", homePreviousRoundScore, 1, 0, 100)
