@@ -1,6 +1,6 @@
 --!strict
 
-local version: string = "2.0.0"
+local version: string = "2.0.1"
 
 --TODO:
 -- Create release message for caster update:
@@ -121,14 +121,14 @@ Util.initializeConfig({
 	cameraFOV = 90,
 	deadzone = 0,
 	followFOV = 100,
-	followPosititonSmoothing = 0.01,
+	followPosititonSmoothing = 0.1,
 	followRadius = 20,
 	mouseSensitivity = 1,
 	invertMouseLookHorizontal = false,
 	invertMouseLookVertical = false,
 	invertControllerLookHorizontal = false,
 	invertControllerLookVertical = false,
-	controllerSensitivity = 0.5,
+	controllerSensitivity = 1,
 	positionSmoothing = 0.02,
 	lookSmoothness = 0.25,
 	ballOutline = true,
@@ -371,7 +371,7 @@ end
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
-local requiredFollowPlussVersion: string = "=1.9.0"
+local requiredFollowPlussVersion: string = ">=1.9.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
 local playerFollow = false
