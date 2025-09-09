@@ -3403,12 +3403,13 @@ function drawBallOutline()
 
 	ui:tick()
 
-	local ballUIPosition = ui:worldToHUD(ball.transform.position)
+	local desmoothedBallPosition = ball.transform.position - (ball.velocity * (deltaTime / 2))
+	local ballUIPosition = ui:worldToHUD(desmoothedBallPosition)
 
 	local ballRadius = 17.5
-	local ballDistance = Util.getDist(camera.position, ball.transform.position)
 	local segments = 20
-	local radius = getApparentRaidus(ballRadius, ballDistance, ui.depth)
+	local radius =
+		ui:getApparentLength(ballRadius, ball.transform.position, Util.getDist(camera.position, ballUIPosition))
 	local thickness = radius / 4
 
 	local angleStep = (2 * math.pi) / segments

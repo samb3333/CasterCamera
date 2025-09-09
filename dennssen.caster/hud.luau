@@ -26,7 +26,7 @@ export type HUD = {
 	worldToHUD: (self: HUD, worldPosition: Vec3) -> Vec3,
 	convertOffsetToHUD: (self: HUD, offset: Vec2) -> Vec3,
 	convertHUDToOffset: (self: HUD, point: Vec3) -> Vec2,
-	getApparentLenght: (self: HUD, length: number, point: Vec3) -> number,
+	getApparentLength: (self: HUD, length: number, point: Vec3, depth: number?) -> number,
 }
 
 local HUD: HUD = {} :: HUD
@@ -158,7 +158,13 @@ function HUD:convertHUDToOffset(position: Vec3): Vec2
 	return Vec2.new(offsetX, offsetY)
 end
 
-function HUD:getApparentLenght(length: number, point: Vec3): number
+function HUD:getApparentLength(length: number, point: Vec3, depth: number?): number
+	local _depth: number
+	if depth then
+		_depth = depth
+	else
+		_depth = self.depth
+	end
 	local _camera
 	if self.cameraId ~= "" then
 		_camera = getCameraById(self.cameraId)
@@ -168,7 +174,7 @@ function HUD:getApparentLenght(length: number, point: Vec3): number
 
 	local distance = Util.getDist(_camera.position, point)
 
-	return self.depth * (length / distance)
+	return _depth * (length / distance)
 end
 
 return HUD
