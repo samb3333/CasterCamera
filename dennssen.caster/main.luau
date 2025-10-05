@@ -1,6 +1,6 @@
 --!strict
 
-local version: string = "2.0.1"
+local version: string = "2.0.2"
 
 --Notes:
 -- clean up config with more "Categories" like post processing has (Now possible with new config initialization)
