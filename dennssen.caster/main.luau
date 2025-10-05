@@ -2,26 +2,20 @@
 
 local version: string = "2.0.1"
 
---TODO:
--- Create release message for caster update:
--- - Include info about the update
--- - Patch notes
--- - Known issues
--- Create forum and release message for overlay.
--- Launch everything.
-
 --Notes:
 -- clean up config with more "Categories" like post processing has (Now possible with new config initialization)
 -- ballCam?
 
 --Add:
 -- When exiting POV set the camera to look at the ball. make an option under accessibility.
+-- Accessibility setting that sets cooldowns on POV switching
 -- Black box behind player names to make it easier to read
 
 -- Future ideas:
 -- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
 -- Send who last touched the ball to overlay.
--- Make a template minimap for the overlay
+-- Make a template minimap for the overlay.
+-- Add possession to stats.
 
 -- Known Issues:
 -- No replay compatibility
@@ -29,6 +23,7 @@ local version: string = "2.0.1"
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
 -- Goal explosion in Driftblitz does not match the goal size and shape
+-- Goal explosions trigger at the start of each match (need to figure out why)
 
 -- Dependencies
 local Util = require("util")
@@ -717,8 +712,17 @@ Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena4v4
 	local self: Arena4v4 = setmetatable(Arena.new(gamemode, frameIndex), Arena4v4) :: any
 	self.type = "4v4"
-	local nameEnd = self.slotId:find("_") :: number
-	self.name = `{self.slotId:sub(1, nameEnd - 1)} {self.slotId:sub(self.slotId:len() - 2)}`
+
+	local name: string = ""
+
+	if self.slotId:find("TKB") then
+		name = self.slotId:gsub("TKB_", "")
+	else
+		local nameEnd = self.slotId:find("_") :: number
+		name = `{self.slotId:sub(1, nameEnd - 1)} {self.slotId:sub(self.slotId:len() - 2)}`
+	end
+
+	self.name = name
 	self.home.data = { overview = {} }
 	self.away.data = { overview = {} }
 
@@ -963,13 +967,16 @@ function getArenas(): { [any]: CasterArena }
 	local gamemodes = SpectatorGamemodes.listGamemodes()
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
-		if slotId:find("TKB") and not slotId:find("Full") then
+		if slotId:find("TKB") and not slotId:find("Driftplex") and not slotId:find("Full") then
 			local arena: CasterArena = Arena3v3.new(gamemode, readLocation) :: Arena3v3
 			arenas[arena.name] = arena
 		elseif slotId:find("Soccer") then
 			local arena: CasterArena = Driftblitz.new(gamemode, readLocation) :: Driftblitz
 			arenas[arena.name] = arena
-		elseif slotId:find("Jakeball") or slotId:find("Driftball") then
+		elseif
+			(slotId:find("Jakeball") or slotId:find("Driftball"))
+			or (slotId:find("TKB") and slotId:find("Driftplex") and not slotId:find("Full"))
+		then
 			local arena: CasterArena = Arena4v4.new(gamemode, readLocation) :: Arena4v4
 			arenas[arena.name] = arena
 		end
