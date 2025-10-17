@@ -26,6 +26,7 @@ export type BoxType = {
 	setRotationDeg: (self: BoxType, inputRotation: Vec3) -> (),
 	generatePoints: (self: BoxType) -> (),
 	render: (self: BoxType, r: number, g: number, b: number) -> (),
+	renderFaces: (self: BoxType, color: LinearColor) -> (),
 	checkPointIntersect: (self: BoxType, point: Vec3) -> boolean,
 	clampPointToBox: (self: BoxType, point: Vec3, surfaceOnly: boolean) -> Vec3,
 
@@ -144,6 +145,36 @@ function Box:render(r: number, g: number, b: number): ()
 	end
 
 	-- d: added directional lines
+	WorldDraw.drawLine(self.position, self.position + self.rotation:getForwardVector() * 100, 1, 0, 0, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + self.rotation:getUpVector() * 100, 0, 1, 0, 10, 0)
+	WorldDraw.drawLine(self.position, self.position + self.rotation:getRightVector() * 100, 0, 0, 1, 10, 0)
+end
+
+function Box:renderFaces(color: LinearColor)
+	local renderRadius = math.max(self.size.x, self.size.y, self.size.z) + 500
+	if self.position:distance(camera.position) > renderRadius then
+		return
+	end
+
+	local faces: { { left: Vec3, right: Vec3, top: Vec3 } } = {
+		{ left = self.vertexLocations[3], right = self.vertexLocations[5], top = self.vertexLocations[1] }, -- top 1
+		{ left = self.vertexLocations[5], right = self.vertexLocations[3], top = self.vertexLocations[7] }, -- top 2
+		{ left = self.vertexLocations[4], right = self.vertexLocations[6], top = self.vertexLocations[2] }, -- bottom 1
+		{ left = self.vertexLocations[6], right = self.vertexLocations[4], top = self.vertexLocations[8] }, -- bottom 2
+		{ left = self.vertexLocations[3], right = self.vertexLocations[2], top = self.vertexLocations[1] }, -- front 1
+		{ left = self.vertexLocations[2], right = self.vertexLocations[3], top = self.vertexLocations[4] }, -- front 2
+		{ left = self.vertexLocations[7], right = self.vertexLocations[6], top = self.vertexLocations[5] }, -- back 1
+		{ left = self.vertexLocations[6], right = self.vertexLocations[7], top = self.vertexLocations[8] }, -- back 2
+		{ left = self.vertexLocations[8], right = self.vertexLocations[3], top = self.vertexLocations[7] }, -- left 1
+		{ left = self.vertexLocations[3], right = self.vertexLocations[8], top = self.vertexLocations[4] }, -- left 2
+		{ left = self.vertexLocations[1], right = self.vertexLocations[6], top = self.vertexLocations[5] }, -- right 1
+		{ left = self.vertexLocations[6], right = self.vertexLocations[1], top = self.vertexLocations[2] }, -- rigth 2
+	}
+
+	for _, face: { left: Vec3, right: Vec3, top: Vec3 } in faces do
+		WorldDraw.drawTriangle(face.left, face.right, face.top, color, 0)
+	end
+
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getForwardVector() * 100, 1, 0, 0, 10, 0)
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getUpVector() * 100, 0, 1, 0, 10, 0)
 	WorldDraw.drawLine(self.position, self.position + self.rotation:getRightVector() * 100, 0, 0, 1, 10, 0)
