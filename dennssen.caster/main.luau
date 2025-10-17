@@ -5,6 +5,11 @@ local version: string = "2.0.2"
 --Notes:
 -- clean up config with more "Categories" like post processing has (Now possible with new config initialization)
 -- ballCam?
+-- Arena dimensions and the following functions should be tied to the main arena class.
+-- getTeamRotation
+-- setupDimensions
+-- isPointOnHomeSide
+-- potentially GUIChangeDimensions
 
 --Add:
 -- When exiting POV set the camera to look at the ball. make an option under accessibility.
@@ -310,6 +315,17 @@ local transitionTime: number
 local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
 local defaultRotation = Quat.fromEuler(0, 0, 90)
+local rotDelta: Vec3 = Vec3.zeroVector
+local perservedGravityUp: Quat = gravity.upRotation
+
+function getGravityUp(): Quat
+	if gravity.strength > 0 then
+		perservedGravityUp = gravity.upRotation
+		return gravity.upRotation
+	else
+		return perservedGravityUp
+	end
+end
 
 local cameraPosition: Vec3 = defaultPosition
 local cameraVelocity: Vec3 = Vec3.zeroVector
@@ -1667,7 +1683,7 @@ function onGui()
 	cameraPosition = Gui.dragFloat3("Camera Position", cameraPosition, 1, -math.huge, math.huge)
 	local newRot = Gui.dragFloat3("Camera Rotation", rotEuler, 1, -180, 180)
 	if Gui.isItemActive() then
-		gravityChaser = gravity.upRotation
+		gravityChaser = getGravityUp()
 		rotEuler = newRot
 		camera.rotation = Quat.fromEuler(rotEuler.x, rotEuler.y, rotEuler.z)
 	end
@@ -2088,6 +2104,9 @@ function onGui()
 				Gui.treePop()
 			end
 		end
+		Gui.text(`Gravity Direction: {gravity.upDirection}`)
+		Gui.text(`Gravity Rotation: {gravity.upRotation:euler()}`)
+		Gui.text(`Gravity Strenght: {gravity.strength}`)
 		Gui.text(tostring("Vertical:" .. Vertical))
 		Gui.text(tostring("Horizontal: " .. Horizontal))
 		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
@@ -2529,7 +2548,8 @@ end
 
 function setGlobalCameraRotation(globalRotation)
 	camera.rotation = globalRotation
-	local localRotation = gravity.upRotation:inverse() * globalRotation
+	perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
+	local localRotation = getGravityUp():inverse() * globalRotation
 	rotEuler = localRotation:euler()
 end
 
@@ -2881,7 +2901,6 @@ function moveCamera()
 	camera.position = Vec3.lerp(camera.position, cameraPosition, deltaTime / (cameraPositionSmoothing + deltaTime))
 end
 
-local rotDelta: Vec3 = Vec3.zeroVector
 function rotateCamera()
 	if InputSystem.keyToBeRebinded.key ~= "" then
 		-- don't read input on rebind
@@ -2923,8 +2942,8 @@ function rotateCamera()
 
 	local nextLookDiff = rotDelta * math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1)
 
-	gravityChaser =
-		Quat.slerp(gravityChaser, gravity.upRotation, math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1))
+	local upRotation = getGravityUp()
+	gravityChaser = Quat.slerp(gravityChaser, upRotation, math.min((1 - adjustedLookSmoothness) * deltaTime * 60, 1))
 
 	rotEuler += nextLookDiff
 	rotDelta -= nextLookDiff
@@ -3527,7 +3546,7 @@ function tick(dt)
 
 	if arenas and boundingBoxDebug then
 		for _, arena in arenas do
-			arena.box:render(1, 0, 1)
+			arena.box:renderFaces(LinearColor.new(1, 0, 1, 0.5))
 			arena.centerBox:render(0, 1, 0)
 			arena.home.goal.box:render(1, 0, 0)
 			arena.away.goal.box:render(0, 0, 1)
