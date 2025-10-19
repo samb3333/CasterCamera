@@ -13,7 +13,7 @@ The **Caster Camera** is a fully fletched spectator freecam type camera that inc
 As the name suggests the Caster Camera is specifically designed to make casting much easier for the caster, and to give viewers of such casting a better experience. Using tools such as POV and overviews will create a much better experience for everyone.
 
 ## Dependencies
-For POV to work you will need to have installed the newest version of Follow+ which can be found [here](https://github.com/dennssen/FollowPluss)
+For POV to work you will need to have installed the newest version of Follow+ which can be found [here](https://github.com/dennssen/Follow-Pluss)
 
 ## Installation
 Download the file called `dennssen.caster.zip` from the [release page](https://github.com/dennssen/CasterCamera/releases) and place it in this directory on your computer: `Documents\Another-Axiom\A2\Cameras\Behaviors`. Then extract the `.zip` file in there so that a folder with the name `dennssen.caster` apears.
