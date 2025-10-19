@@ -13,10 +13,10 @@ The **Caster Camera** is a fully fletched spectator freecam type camera that inc
 As the name suggests the Caster Camera is specifically designed to make casting much easier for the caster, and to give viewers of such casting a better experience. Using tools such as POV and overviews will create a much better experience for everyone.
 
 ## Dependencies
-For POV to work you will need to have installed the newest version of Follow+ which can be found [here](link to Follow+ Repo)
+For POV to work you will need to have installed the newest version of Follow+ which can be found [here](https://github.com/dennssen/FollowPluss)
 
 ## Installation
-If you have never installed a spectator script before, grab the file that ends with `.zip` and place it in this directory on your computer: `Documents\Another-Axiom\A2\Cameras\Behaviors`. Then extract the `.zip` file in there so that a folder with the name `dennssen.caster` apears.
+Download the file called `dennssen.caster.zip` from the [release page](https://github.com/dennssen/CasterCamera/releases) and place it in this directory on your computer: `Documents\Another-Axiom\A2\Cameras\Behaviors`. Then extract the `.zip` file in there so that a folder with the name `dennssen.caster` apears.
 
 If you don't see it in the spectator client make sure that when you open the `dennssen.caster` folder it contains files like `main.luau` and `package.json`. If there is another folder inside instead then it won't work.
 
