@@ -2,26 +2,6 @@
 
 local version: string = "2.0.2"
 
---Notes:
--- clean up config with more "Categories" like post processing has (Now possible with new config initialization)
--- ballCam?
--- Arena dimensions and the following functions should be tied to the main arena class.
--- getTeamRotation
--- setupDimensions
--- isPointOnHomeSide
--- potentially GUIChangeDimensions
-
---Add:
--- When exiting POV set the camera to look at the ball. make an option under accessibility.
--- Accessibility setting that sets cooldowns on POV switching
--- Black box behind player names to make it easier to read
-
--- Future ideas:
--- Addon script that let's you make your own gamemodes (Set bounding boxes, goals, and overviews)
--- Send who last touched the ball to overlay.
--- Make a template minimap for the overlay.
--- Add possession to stats.
-
 -- Known Issues:
 -- No replay compatibility
 -- Ball outline does not show in POV mode
@@ -188,6 +168,20 @@ Util.initializeConfig({
 			{
 				position = Vec3.new(4500, 3135, 620),
 				rotation = Quat.fromEuler(0, -15, -90),
+			},
+		},
+		_zdrift = {
+			{
+				position = Vec3.new(5425, -3355, 1445),
+				rotation = Quat.fromEuler(0, -15, 75),
+			},
+			{
+				position = Vec3.new(8845, 0, 630),
+				rotation = Quat.fromEuler(0, 5, -180),
+			},
+			{
+				position = Vec3.new(4915, 1560, 1640),
+				rotation = Quat.fromEuler(0, -8.5, -170),
 			},
 		},
 	},
@@ -976,6 +970,141 @@ function Driftblitz:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
+type ZDrift = CasterArena & {
+	__index: ZDrift,
+
+	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> ZDrift,
+
+	homeRotationOffset: Quat,
+	awayRotationOffset: Quat,
+	boxSize: Vec3,
+	boxOffset: Vec3,
+	centerBoxOffset: Vec3,
+	goalBoxSize: Vec3,
+	goalPositionOffset: Vec3,
+}
+
+local ZDrift = {} :: ZDrift
+ZDrift.__index = ZDrift
+setmetatable(ZDrift, { __index = CasterArena })
+
+ZDrift.homeRotationOffset = Quat.fromEuler(0, 0, 90)
+ZDrift.awayRotationOffset = Quat.fromEuler(0, 0, -90)
+ZDrift.boxSize = Vec3.new(7180, 17800, 1710)
+ZDrift.boxOffset = Vec3.new(0, 0, 880)
+ZDrift.centerBoxOffset = Vec3.new(0, 0, 500)
+ZDrift.goalBoxSize = Vec3.new(600, 600, 600)
+ZDrift.goalPositionOffset = Vec3.new(8200, 0, 585)
+
+function ZDrift.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): ZDrift
+	local self: ZDrift = setmetatable(Arena.new(gamemode, frameIndex), ZDrift) :: any
+	self.type = "zdrift"
+
+	local name: string = self.slotId:gsub("_", " ")
+
+	self.name = name
+	self.home.data = { overview = {} }
+	self.away.data = { overview = {} }
+
+	self:setupDimensions()
+	self:setupOverviews()
+
+	return self :: ZDrift
+end
+
+function ZDrift:isPointOnHomeSide(point: Vec3): boolean
+	local homeDirection = (self.transform.rotation * ZDrift.homeRotationOffset):getForwardVector()
+	local ballDirection = Util.getForward(self.transform.position, point)
+	if homeDirection:dot(ballDirection) >= 0 then
+		return true
+	else
+		return false
+	end
+end
+
+function ZDrift:setupDimensions()
+	self.box = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(ZDrift.boxOffset),
+		ZDrift.boxSize,
+		self.transform.rotation
+	)
+
+	self.centerBox = Box.new(
+		self.transform.position + self.transform.rotation:rotateVector(ZDrift.centerBoxOffset),
+		centerBoxSize,
+		self.transform.rotation
+	)
+
+	self.home.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * ZDrift.homeRotationOffset):rotateVector(ZDrift.goalPositionOffset),
+		rotation = self.transform.rotation * ZDrift.homeRotationOffset:inverse(),
+		box = Box.empty,
+	}
+
+	self.home.goal.box = Box.new(self.home.goal.position, ZDrift.goalBoxSize, self.home.goal.rotation)
+
+	self.away.goal = {
+		position = self.transform.position
+			+ (self.transform.rotation * ZDrift.awayRotationOffset):rotateVector(ZDrift.goalPositionOffset),
+		rotation = self.transform.rotation * ZDrift.awayRotationOffset:inverse(),
+		box = Box.empty,
+	}
+	self.away.goal.box = Box.new(self.away.goal.position, ZDrift.goalBoxSize, self.away.goal.rotation)
+end
+
+function ZDrift:setupOverviews()
+	self.home.data.overview = {}
+	self.away.data.overview = {}
+
+	for _, overview in overviewOffsets._zdrift do
+		local homeOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * ZDrift.homeRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * ZDrift.homeRotationOffset * overview.rotation),
+		}
+		local awayOverview = {
+			position = self.transform.position
+				+ (self.transform.rotation * ZDrift.awayRotationOffset):rotateVector(overview.position),
+			rotation = (self.transform.rotation * ZDrift.awayRotationOffset * overview.rotation),
+		}
+
+		table.insert(self.home.data.overview, homeOverview)
+		table.insert(self.away.data.overview, awayOverview)
+	end
+end
+
+function ZDrift:getTeamRotation(teamIndex: number?): Quat
+	local rotation = Quat.identity
+	if teamIndex == Util.TeamIndex.HomeTeam then
+		rotation = self.transform.rotation * ZDrift.homeRotationOffset
+	elseif teamIndex == Util.TeamIndex.AwayTeam then
+		rotation = self.transform.rotation * ZDrift.awayRotationOffset
+	end
+
+	return rotation
+end
+
+function ZDrift:GUIChangeDimensions()
+	ZDrift.boxSize = Gui.dragFloat3("ZDrift Arena Size", ZDrift.boxSize, 1, -math.huge, math.huge)
+	ZDrift.boxOffset = Gui.dragFloat3("ZDrift Position Offset", ZDrift.boxOffset, 1, -math.huge, math.huge)
+	ZDrift.centerBoxOffset =
+		Gui.dragFloat3("ZDrift Place Ball Box Position Offset", ZDrift.centerBoxOffset, 1, -math.huge, math.huge)
+	ZDrift.goalBoxSize = Gui.dragFloat3("ZDrift Goal Size", ZDrift.goalBoxSize, 1, -math.huge, math.huge)
+	ZDrift.goalPositionOffset =
+		Gui.dragFloat3("ZDrift Goal Position Offset", ZDrift.goalPositionOffset, 1, -math.huge, math.huge)
+
+	if Gui.button("Print Dimensions") then
+		print(`boxSize: {ZDrift.boxSize}`)
+		print(`boxOffset: {ZDrift.boxOffset}`)
+		print(`centerBoxOffset: {ZDrift.centerBoxOffset}`)
+		print(`goalBoxSize: {ZDrift.goalBoxSize}`)
+		print(`goalPositionOffset: {ZDrift.goalPositionOffset}`)
+	end
+
+	self:setupDimensions()
+end
+
 local cachedGamemodesAmount: number = 0
 
 function getArenas(): { [any]: CasterArena }
@@ -983,7 +1112,12 @@ function getArenas(): { [any]: CasterArena }
 	local gamemodes = SpectatorGamemodes.listGamemodes()
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
-		if slotId:find("TKB") and not slotId:find("Driftplex") and not slotId:find("Full") then
+		if
+			slotId:find("TKB")
+			and not slotId:find("Driftplex")
+			and not slotId:find("Full")
+			and not slotId:find("Playground")
+		then
 			local arena: CasterArena = Arena3v3.new(gamemode, readLocation) :: Arena3v3
 			arenas[arena.name] = arena
 		elseif slotId:find("Soccer") then
@@ -994,6 +1128,9 @@ function getArenas(): { [any]: CasterArena }
 			or (slotId:find("TKB") and slotId:find("Driftplex") and not slotId:find("Full"))
 		then
 			local arena: CasterArena = Arena4v4.new(gamemode, readLocation) :: Arena4v4
+			arenas[arena.name] = arena
+		elseif slotId:find("ZDrift") then
+			local arena: CasterArena = ZDrift.new(gamemode, readLocation) :: ZDrift
 			arenas[arena.name] = arena
 		end
 	end
@@ -1666,10 +1803,53 @@ function onGui()
 	end
 	if Gui.beginCombo("Selected Arena", arenaName) then
 		if arenas then
+			local _3v3Arenas: { Arena3v3 } = {}
+			local _4v4Arenas: { Arena4v4 } = {}
+			local DriftblitzArenas: { Driftblitz } = {}
+			local ZDriftArenas: { ZDrift } = {}
 			for _, arena: CasterArena in arenas do
-				if Gui.selectable(arena.name, arena.name == selectedArena.name) then
-					setSelectedArena(arena)
+				if arena.type == "3v3" then
+					table.insert(_3v3Arenas, arena :: Arena3v3)
+				elseif arena.type == "4v4" then
+					table.insert(_4v4Arenas, arena :: Arena4v4)
+				elseif arena.type == "driftblitz" then
+					table.insert(DriftblitzArenas, arena :: Driftblitz)
+				elseif arena.type == "zdrift" then
+					table.insert(ZDriftArenas, arena :: ZDrift)
 				end
+			end
+
+			if Gui.beginCombo("##3v3", "3v3 Arenas...") then
+				for _, arena: CasterArena in _3v3Arenas do
+					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
+						setSelectedArena(arena)
+					end
+				end
+				Gui.endCombo()
+			end
+			if Gui.beginCombo("##4v4", "4v4 Arenas...") then
+				for _, arena: CasterArena in _4v4Arenas do
+					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
+						setSelectedArena(arena)
+					end
+				end
+				Gui.endCombo()
+			end
+			if Gui.beginCombo("##Driftblitz", "Driftblitz Arenas...") then
+				for _, arena: CasterArena in DriftblitzArenas do
+					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
+						setSelectedArena(arena)
+					end
+				end
+				Gui.endCombo()
+			end
+			if Gui.beginCombo("##ZDrift", "ZDrift Arenas...") then
+				for _, arena: CasterArena in ZDriftArenas do
+					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
+						setSelectedArena(arena)
+					end
+				end
+				Gui.endCombo()
 			end
 		end
 		Gui.endCombo()
@@ -3527,6 +3707,7 @@ function tick(dt)
 
 	if playerFollow then
 		readOtherInputs()
+		print(followPlussCamera:getSmoothedPosition():distance(camera:getSmoothedPosition()))
 	else
 		toggleSmoothing(true, true)
 		readInput()
