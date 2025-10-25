@@ -1,6 +1,6 @@
 --!strict
 
-local version: string = "2.1.0"
+local version: string = "2.1.1"
 
 -- Known Issues:
 -- No replay compatibility
