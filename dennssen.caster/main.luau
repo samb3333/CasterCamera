@@ -2659,6 +2659,10 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 200)
 	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 400)
 
+	if selectedArena.type == "driftblitz" or selectedArena.type == "zdrift" then
+		return
+	end
+
 	--goal outline
 	local goalSpeed = 20
 	for i = 1, 3 do
