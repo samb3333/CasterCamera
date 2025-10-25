@@ -105,7 +105,7 @@ function HUD:worldToHUD(worldPosition: Vec3): Vec3
 	local rayDir = (worldPosition - camPos):getSafeNormal()
 	local denom = camForward:dot(rayDir)
 
-	if denom <= 0 then
+	if denom <= 1e-3 then
 		return Vec3.zeroVector
 	end
 
