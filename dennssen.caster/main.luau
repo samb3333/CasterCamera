@@ -3707,7 +3707,6 @@ function tick(dt)
 
 	if playerFollow then
 		readOtherInputs()
-		print(followPlussCamera:getSmoothedPosition():distance(camera:getSmoothedPosition()))
 	else
 		toggleSmoothing(true, true)
 		readInput()
