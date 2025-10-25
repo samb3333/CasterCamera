@@ -3616,6 +3616,10 @@ function drawBallOutline()
 	local desmoothedBallPosition = ball.transform.position - (ball.velocity * (deltaTime / 2))
 	local ballUIPosition = ui:worldToHUD(desmoothedBallPosition)
 
+	if ballUIPosition == Vec3.zeroVector then
+		return -- ball is behind viewport, don't render
+	end
+
 	local ballRadius = 17.5
 	local segments = 20
 	local radius =
