@@ -6,6 +6,7 @@ type BoxType = typeof(Box)
 local Util = require("util")
 
 export type ArenaTeam<T = {}> = {
+	teamIndex: number,
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
@@ -100,6 +101,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 	self.players = {}
 
 	self.home = {
+		teamIndex = Util.TeamIndex.HomeTeam,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -117,6 +119,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 	}
 
 	self.away = {
+		teamIndex = Util.TeamIndex.AwayTeam,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
