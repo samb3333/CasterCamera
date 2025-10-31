@@ -464,6 +464,12 @@ type Round = {
 	},
 }
 
+local ARENA_TYPES = {
+	Arena3v3 = "3v3",
+	Arena4v4 = "4v4",
+	Driftblitz = "driftblitz",
+	ZDrift = "zdrift",
+}
 local centerBoxSize = Vec3.new(50, 50, 125)
 local overviewOffsets = config.overviewOffsets
 
@@ -1808,13 +1814,13 @@ function onGui()
 			local DriftblitzArenas: { Driftblitz } = {}
 			local ZDriftArenas: { ZDrift } = {}
 			for _, arena: CasterArena in arenas do
-				if arena.type == "3v3" then
+				if arena.type == ARENA_TYPES.Arena3v3 then
 					table.insert(_3v3Arenas, arena :: Arena3v3)
-				elseif arena.type == "4v4" then
+				elseif arena.type == ARENA_TYPES.Arena4v4 then
 					table.insert(_4v4Arenas, arena :: Arena4v4)
-				elseif arena.type == "driftblitz" then
+				elseif arena.type == ARENA_TYPES.Driftblitz then
 					table.insert(DriftblitzArenas, arena :: Driftblitz)
-				elseif arena.type == "zdrift" then
+				elseif arena.type == ARENA_TYPES.ZDrift then
 					table.insert(ZDriftArenas, arena :: ZDrift)
 				end
 			end
@@ -2659,7 +2665,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 200)
 	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 400)
 
-	if selectedArena.type == "driftblitz" or selectedArena.type == "zdrift" then
+	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
 		return
 	end
 
