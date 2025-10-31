@@ -25,6 +25,7 @@ type OverviewData = {
 	overview: { { position: Vec3, rotation: Quat } },
 }
 local Arena = require("arena")
+type ArenaTeam = Arena.ArenaTeam<OverviewData>
 type CasterArena = Arena.Arena<{}, OverviewData, OverviewData> & {
 	sendInfoMessage: (self: CasterArena) -> (),
 	setupOverviews: (self: CasterArena) -> (),
@@ -3167,6 +3168,25 @@ function followPlayer()
 	camera:followCamera(followPlussCamera)
 end
 
+function DoGoalExplosion(team: ArenaTeam)
+	local goalExplosionPosition: Vec3
+	local goalExplosionColor: Color
+
+	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
+		goalExplosionPosition = ball.transform.position
+	else
+		goalExplosionPosition = team.goal.position + Vec3.new(0, 0, -60)
+	end
+
+	if team.teamIndex == Util.TeamIndex.HomeTeam then
+		goalExplosionColor = awayTeamPrimaryColor
+	else
+		goalExplosionColor = homeTeamPrimaryColor
+	end
+
+	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation, goalExplosionColor)
+end
+
 function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
 	if player1.teamIndex == Util.TeamIndex.NoTeam or player2.teamIndex == Util.TeamIndex.NoTeam then
 		return false
@@ -3457,11 +3477,7 @@ function goalScoreCheck()
 
 	-- the ball has newely scored
 	if selectedArena.away.scoreIncrease then
-		GoalExplosionEffect(
-			selectedArena.home.goal.position + Vec3.new(0, 0, -60),
-			selectedArena.home.goal.rotation,
-			awayTeamPrimaryColor
-		)
+		DoGoalExplosion(selectedArena.home)
 
 		local shooterName = ""
 		local assistName = ""
@@ -3522,11 +3538,7 @@ function goalScoreCheck()
 	end
 
 	if selectedArena.home.scoreIncrease then
-		GoalExplosionEffect(
-			selectedArena.away.goal.position + Vec3.new(0, 0, -60),
-			selectedArena.away.goal.rotation,
-			homeTeamPrimaryColor
-		)
+		DoGoalExplosion(selectedArena.away)
 
 		local shooterName = ""
 		local assistName = ""
@@ -3691,19 +3703,11 @@ function tick(dt)
 	getTeamColors()
 
 	if Input.getKeyDown(one) then
-		GoalExplosionEffect(
-			selectedArena.home.goal.position + Vec3.new(0, 0, -60),
-			selectedArena.home.goal.rotation,
-			awayTeamPrimaryColor
-		)
+		DoGoalExplosion(selectedArena.home)
 	end
 
 	if Input.getKeyDown(two) then
-		GoalExplosionEffect(
-			selectedArena.away.goal.position + Vec3.new(0, 0, -60),
-			selectedArena.away.goal.rotation,
-			homeTeamPrimaryColor
-		)
+		DoGoalExplosion(selectedArena.away)
 	end
 
 	if Input.getKeyDown(three) then
