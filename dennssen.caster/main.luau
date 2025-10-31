@@ -2706,7 +2706,7 @@ function GameStartEffect()
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.7,
-		Vec3.new(0, 0, 10),
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
 		colourAverage,
 		ParticleVariant.Rings,
 		600
@@ -2715,7 +2715,7 @@ function GameStartEffect()
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.7,
-		Vec3.new(0, 0, 2),
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
 		colourAverage,
 		ParticleVariant.Rings,
 		400
