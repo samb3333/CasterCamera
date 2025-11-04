@@ -2190,6 +2190,7 @@ function onGui()
 
 	if Gui.treeNode("Debug") then
 		speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
+		camera.nearClippingPlane = Gui.dragFloat("Near Clipping Plane", camera.nearClippingPlane, 1, 0, 999999)
 		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
 		if Gui.button("Follow Freecam") then
 			debugFreecam = true
