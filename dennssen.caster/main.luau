@@ -588,8 +588,8 @@ local Arena3v3 = {} :: Arena3v3
 Arena3v3.__index = Arena3v3
 setmetatable(Arena3v3, { __index = CasterArena })
 
-Arena3v3.homeRotationOffset = Quat.fromEuler(0, 0, 90)
-Arena3v3.awayRotationOffset = Quat.fromEuler(0, 0, -90)
+Arena3v3.homeRotationOffset = Quat.fromEuler(0, 0, -90)
+Arena3v3.awayRotationOffset = Quat.fromEuler(0, 0, 90)
 Arena3v3.boxSize = Vec3.new(5100, 6750, 1440)
 Arena3v3.boxOffset = Vec3.new(0, 0, 650)
 Arena3v3.centerBoxOffset = Vec3.new(0, 0, 300)
@@ -718,8 +718,8 @@ local Arena4v4 = {} :: Arena4v4
 Arena4v4.__index = Arena4v4
 setmetatable(Arena4v4, { __index = CasterArena })
 
-Arena4v4.homeRotationOffset = Quat.fromEuler(0, 0, -90)
-Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, 90)
+Arena4v4.homeRotationOffset = Quat.fromEuler(0, 0, 90)
+Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, -90)
 Arena4v4.boxSize = Vec3.new(6110, 8400, 1490)
 Arena4v4.boxOffset = Vec3.new(0, 0, 600)
 Arena4v4.centerBoxOffset = Vec3.new(0, 0, 250)
