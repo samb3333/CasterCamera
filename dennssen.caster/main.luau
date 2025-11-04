@@ -3175,8 +3175,10 @@ function DoGoalExplosion(team: ArenaTeam)
 
 	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
 		goalExplosionPosition = ball.transform.position
-	else
-		goalExplosionPosition = team.goal.position + Vec3.new(0, 0, -60)
+	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
+		goalExplosionPosition = selectedArena.away.goal.position + Vec3.new(0, 0, -60)
+	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
+		goalExplosionPosition = selectedArena.home.goal.position + Vec3.new(0, 0, -60)
 	end
 
 	if team.teamIndex == Util.TeamIndex.HomeTeam then
@@ -3704,11 +3706,11 @@ function tick(dt)
 	getTeamColors()
 
 	if Input.getKeyDown(one) then
-		DoGoalExplosion(selectedArena.home)
+		DoGoalExplosion(selectedArena.away)
 	end
 
 	if Input.getKeyDown(two) then
-		DoGoalExplosion(selectedArena.away)
+		DoGoalExplosion(selectedArena.home)
 	end
 
 	if Input.getKeyDown(three) then
