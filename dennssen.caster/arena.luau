@@ -259,6 +259,7 @@ function Arena:tick()
 
 	if self.home.scoreIncrease or self.away.scoreIncrease then
 		local teamIndex = self.home.scoreIncrease and Util.TeamIndex.HomeTeam or Util.TeamIndex.AwayTeam
+		self.isGracePeriod = true
 		if self.onGoalScoredHook then
 			self:onGoalScoredHook(teamIndex)
 		end
