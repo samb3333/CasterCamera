@@ -2234,6 +2234,16 @@ function onGui()
 		if Gui.button("Print Pressed Keys") then
 			print(InputSystem.pressedInputKeys)
 		end
+
+		if Gui.button("Print arena ball json") then
+			print(ball:toJson())
+		end
+
+		if selectedArena and Gui.button("Print closest ball json") then
+			local closestBall = Util.getClosestBall(selectedArena.transform.position, gameData)
+			print(closestBall:toJson())
+		end
+
 		if Gui.treeNode("Print ball collision info") then
 			if Gui.treeNode("Home") then
 				if Gui.treeNode("Current##Home") then
