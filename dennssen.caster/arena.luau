@@ -153,11 +153,15 @@ function Arena:getArenaBall()
 	for i in balls do
 		local ball = balls[i]
 
+		if not Util.isArenaBall(ball) then
+			continue
+		end
+
 		if not self.box:checkPointIntersect(ball.transform.position) then
 			continue
 		end
 		local distance = Util.getDist(self.transform.position, ball.transform.position)
-		if distance < closestBallDistance and Util.getBallType(ball:toJson()) ~= 2 then
+		if distance < closestBallDistance then
 			closestBallDistance = distance
 			clostestBall = ball
 		end

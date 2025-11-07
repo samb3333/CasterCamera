@@ -50,18 +50,54 @@ function Util.getReplayFrameFromIndex(index: number): ReplayFrame
 	end
 end
 
---- Gets the `ReplayBall` type using it's JSON data
---- @param json the `ReplayBall`'s JSON
---- @return the type of the `ReplayBall` as a number. A type of 2 is a HeartBall
-function Util.getBallType(json: string): number
-	local typeVal = string.match(json, '"type"%s*:%s*([%d]+)')
-	local ballType: number? = tonumber(typeVal)
+--- Checks whether a ball is an arena ball or not
+--- @param ball the `ReplayBall`
+--- @return `true` or `false` depending on whether the ball is an arena ball or a heartball
+function Util.isArenaBall(ball: ReplayBall): boolean
+	local json: string = ball:toJson()
+	local color1String = json:match('"color1"%s*:%s*(%b{})')
+	local color2String = json:match('"color2"%s*:%s*(%b{})')
 
-	if ballType then
-		return ballType
-	else
-		return 0
+	if not color1String or not color2String then
+		return false
 	end
+
+	local color1 = {
+		r = 0,
+		g = 0,
+		b = 0,
+		a = 0,
+	}
+	local color2 = {
+		r = 0,
+		g = 0,
+		b = 0,
+		a = 0,
+	}
+
+	color1.r = tonumber(color1String:match('"r"%s*:%s*(%d+)')) :: number
+	color1.g = tonumber(color1String:match('"g"%s*:%s*(%d+)')) :: number
+	color1.b = tonumber(color1String:match('"b"%s*:%s*(%d+)')) :: number
+	color1.a = tonumber(color1String:match('"a"%s*:%s*(%d+)')) :: number
+
+	color2.r = tonumber(color2String:match('"r"%s*:%s*(%d+)')) :: number
+	color2.g = tonumber(color2String:match('"g"%s*:%s*(%d+)')) :: number
+	color2.b = tonumber(color2String:match('"b"%s*:%s*(%d+)')) :: number
+	color2.a = tonumber(color2String:match('"a"%s*:%s*(%d+)')) :: number
+
+	for _, value in color1 do
+		if value ~= 255 then
+			return false
+		end
+	end
+
+	for _, value in color2 do
+		if value ~= 255 then
+			return false
+		end
+	end
+
+	return true
 end
 
 --- Converts `LinearColor` to `Vec3` | **This will remove the Alpha value**
