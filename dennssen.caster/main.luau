@@ -2227,6 +2227,13 @@ function onGui()
 				Gui.sameLine()
 			end
 
+			if selectedArena and Gui.button("Print Team Colors Array") then
+				for i, value in selectedArena.gamemode:getTeamColorsArray() do
+					print(i)
+					print(getmetatable(value))
+				end
+			end
+
 			if selectedArena then
 				if ball then
 					Gui.text(
@@ -2320,6 +2327,20 @@ function onGui()
 					Gui.treePop()
 				end
 				Gui.treePop()
+			end
+			Gui.treePop()
+		end
+		if Gui.treeNode("Particles") then
+			if Gui.button("Home Scores") then
+				DoGoalExplosion(selectedArena.home)
+			end
+
+			if Gui.button("Away Scores") then
+				DoGoalExplosion(selectedArena.away)
+			end
+
+			if Gui.button("Round Starts") then
+				GameStartEffect()
 			end
 			Gui.treePop()
 		end
@@ -3740,18 +3761,6 @@ function tick(dt)
 	ball = selectedArena.ball
 
 	getTeamColors()
-
-	if Input.getKeyDown(one) then
-		DoGoalExplosion(selectedArena.away)
-	end
-
-	if Input.getKeyDown(two) then
-		DoGoalExplosion(selectedArena.home)
-	end
-
-	if Input.getKeyDown(three) then
-		GameStartEffect()
-	end
 
 	if #gameData.players < 1 and playerFollow then
 		stopFollow()
