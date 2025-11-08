@@ -8,9 +8,6 @@ local version: string = "2.1.1"
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
 
--- TODO:
--- PLEASE FOR THE LOVE OF GOD AND ALL THAT'S MIGHTY SORT THE GOD DAMN DEBUG MENU!!!!
-
 -- Dependencies
 local Util = require("util")
 
@@ -2190,95 +2187,135 @@ function onGui()
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
-		speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
-		camera.nearClippingPlane = Gui.dragFloat("Near Clipping Plane", camera.nearClippingPlane, 1, 0, 999999)
-		boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
-		if Gui.button("Follow Freecam") then
-			debugFreecam = true
-			ui:setCamera("anotheraxiom.freecam")
-			camera:followCamera(getCameraById("anotheraxiom.freecam"))
+		if Gui.treeNode("Camera") then
+			Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
+			Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
+			Gui.text("Camera Rotation: " .. tostring(camera:getSmoothedRotation():euler()))
+			Gui.text(`Camera Position: {tostring(camera.position)}`)
+			Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
+			Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
+			Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
+			Gui.treePop()
 		end
-		if arenas and Gui.button("Print Arenas") then
-			for _, arena in arenas do
-				print(arena.slotId)
+		if Gui.treeNode("Arena") then
+			if arenas and Gui.button("Print Arenas") then
+				for _, arena in arenas do
+					print(arena.slotId)
+				end
 			end
-		end
-		Gui.sameLine()
-		if Gui.button("Print Gamemode Ids") then
-			for _, gamemode in SpectatorGamemodes.listGamemodes() do
-				print(gamemode:getSlotId())
-			end
-		end
-
-		if selectedArena and Gui.button("Set Orientation to Arena") then
-			cameraPosition = selectedArena.transform.position
-			camera.rotation = selectedArena.transform.rotation
-			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
-		end
-
-		if selectedArena and Gui.button("Print Relative Orientation") then
-			local RelativeLocation =
-				selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
-			local RelativeRotation = camera.rotation * selectedArena.transform.rotation:inverse()
-			print(`Relative Position ({selectedArena.name}):`)
-			print(RelativeLocation)
-			print(`Relative Rotation ({selectedArena.name}):`)
-			print(RelativeRotation:euler())
 			Gui.sameLine()
-		end
-		if Gui.button("Reset All Stats") then
-			sendMessage(overlayCamera, {
-				info = "stats",
-				value = "clear",
-			})
-		end
-		if Gui.button("Print Pressed Keys") then
-			print(InputSystem.pressedInputKeys)
-		end
-
-		if Gui.button("Print arena ball json") then
-			print(ball:toJson())
-		end
-
-		if selectedArena and Gui.button("Print closest ball json") then
-			local closestBall = Util.getClosestBall(selectedArena.transform.position, gameData)
-			print(closestBall:toJson())
-		end
-
-		if Gui.treeNode("Print ball collision info") then
-			if Gui.treeNode("Home") then
-				if Gui.treeNode("Current##Home") then
-					if ballCollisionInfo.home.current then
-						Gui.text(`PlayerName: {ballCollisionInfo.home.current.player.playerName}`)
-						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.current.contactTime}`)
-						Gui.text(`Last Held Position: {ballCollisionInfo.home.current.lastContactPlace}`)
-					end
-					Gui.treePop()
+			if Gui.button("Print Gamemode Ids") then
+				for _, gamemode in SpectatorGamemodes.listGamemodes() do
+					print(gamemode:getSlotId())
 				end
-				if Gui.treeNode("Previous##Home") then
-					if ballCollisionInfo.home.previous then
-						Gui.text(`PlayerName: {ballCollisionInfo.home.previous.player.playerName}`)
-						Gui.text(`Caught Ball Time: {ballCollisionInfo.home.previous.contactTime}`)
-						Gui.text(`Last Held Position: {ballCollisionInfo.home.previous.lastContactPlace}`)
-					end
-					Gui.treePop()
-				end
-				Gui.treePop()
 			end
-			if Gui.treeNode("Away") then
-				if Gui.treeNode("Current##Away") then
-					if ballCollisionInfo.away.current then
-						Gui.text(`PlayerName: {ballCollisionInfo.away.current.player.playerName}`)
-						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.current.contactTime}`)
-						Gui.text(`Last Held Position: {ballCollisionInfo.away.current.lastContactPlace}`)
+
+			if selectedArena and Gui.button("Set Orientation to Arena") then
+				cameraPosition = selectedArena.transform.position
+				camera.rotation = selectedArena.transform.rotation
+				rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
+			end
+
+			if selectedArena and Gui.button("Print Relative Orientation") then
+				local RelativeLocation =
+					selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
+				local RelativeRotation = camera.rotation * selectedArena.transform.rotation:inverse()
+				print(`Relative Position ({selectedArena.name}):`)
+				print(RelativeLocation)
+				print(`Relative Rotation ({selectedArena.name}):`)
+				print(RelativeRotation:euler())
+				Gui.sameLine()
+			end
+
+			if selectedArena then
+				if ball then
+					Gui.text(
+						`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(
+							ball.transform.position
+						)}`
+					)
+					Gui.text(
+						`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(
+							ball.transform.position
+						)}`
+					)
+				end
+				if Gui.button("Print Selected Arena") then
+					print(selectedArena)
+				end
+				if Gui.treeNode("Selected Arena Dimensions") then
+					selectedArena:GUIChangeDimensions()
+					Gui.treePop()
+				end
+
+				Gui.text("Home Team: ")
+				Gui.indent()
+				for i, player in selectedArena.home.players do
+					Gui.text(i .. " " .. player.playerName)
+				end
+				Gui.unindent()
+				Gui.text("Away Team: ")
+				Gui.indent()
+				for i, player in selectedArena.away.players do
+					Gui.text(i .. " " .. player.playerName)
+				end
+				Gui.unindent()
+
+				Gui.text("All Players: ")
+				Gui.indent()
+				for i, player in selectedArena.players do
+					Gui.text(i .. " " .. player.playerName)
+				end
+				Gui.unindent()
+			end
+			Gui.treePop()
+		end
+		if Gui.treeNode("Ball") then
+			if Gui.button("Print arena ball json") then
+				print(ball:toJson())
+			end
+
+			if selectedArena and Gui.button("Print closest ball json") then
+				local closestBall = Util.getClosestBall(selectedArena.transform.position, gameData)
+				print(closestBall:toJson())
+			end
+
+			if Gui.treeNode("Print ball collision info") then
+				if Gui.treeNode("Home") then
+					if Gui.treeNode("Current##Home") then
+						if ballCollisionInfo.home.current then
+							Gui.text(`PlayerName: {ballCollisionInfo.home.current.player.playerName}`)
+							Gui.text(`Caught Ball Time: {ballCollisionInfo.home.current.contactTime}`)
+							Gui.text(`Last Held Position: {ballCollisionInfo.home.current.lastContactPlace}`)
+						end
+						Gui.treePop()
+					end
+					if Gui.treeNode("Previous##Home") then
+						if ballCollisionInfo.home.previous then
+							Gui.text(`PlayerName: {ballCollisionInfo.home.previous.player.playerName}`)
+							Gui.text(`Caught Ball Time: {ballCollisionInfo.home.previous.contactTime}`)
+							Gui.text(`Last Held Position: {ballCollisionInfo.home.previous.lastContactPlace}`)
+						end
+						Gui.treePop()
 					end
 					Gui.treePop()
 				end
-				if Gui.treeNode("Previous##Away") then
-					if ballCollisionInfo.away.previous then
-						Gui.text(`PlayerName: {ballCollisionInfo.away.previous.player.playerName}`)
-						Gui.text(`Caught Ball Time: {ballCollisionInfo.away.previous.contactTime}`)
-						Gui.text(`Last Held Position: {ballCollisionInfo.away.previous.lastContactPlace}`)
+				if Gui.treeNode("Away") then
+					if Gui.treeNode("Current##Away") then
+						if ballCollisionInfo.away.current then
+							Gui.text(`PlayerName: {ballCollisionInfo.away.current.player.playerName}`)
+							Gui.text(`Caught Ball Time: {ballCollisionInfo.away.current.contactTime}`)
+							Gui.text(`Last Held Position: {ballCollisionInfo.away.current.lastContactPlace}`)
+						end
+						Gui.treePop()
+					end
+					if Gui.treeNode("Previous##Away") then
+						if ballCollisionInfo.away.previous then
+							Gui.text(`PlayerName: {ballCollisionInfo.away.previous.player.playerName}`)
+							Gui.text(`Caught Ball Time: {ballCollisionInfo.away.previous.contactTime}`)
+							Gui.text(`Last Held Position: {ballCollisionInfo.away.previous.lastContactPlace}`)
+						end
+						Gui.treePop()
 					end
 					Gui.treePop()
 				end
@@ -2286,56 +2323,44 @@ function onGui()
 			end
 			Gui.treePop()
 		end
-		if selectedArena then
-			if ball then
-				Gui.text(
-					`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(ball.transform.position)}`
-				)
-				Gui.text(
-					`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(ball.transform.position)}`
-				)
+		if Gui.treeNode("Overlay") then
+			if Gui.button("Reset All Stats") then
+				sendMessage(overlayCamera, {
+					info = "stats",
+					value = "clear",
+				})
 			end
-			if Gui.button("Print Selected Arena") then
-				print(selectedArena)
-			end
-			if Gui.treeNode("Selected Arena Dimensions") then
-				selectedArena:GUIChangeDimensions()
-				Gui.treePop()
-			end
+			Gui.treePop()
 		end
-		Gui.text(`Gravity Direction: {gravity.upDirection}`)
-		Gui.text(`Gravity Rotation: {gravity.upRotation:euler()}`)
-		Gui.text(`Gravity Strenght: {gravity.strength}`)
-		Gui.text(tostring("Vertical:" .. Vertical))
-		Gui.text(tostring("Horizontal: " .. Horizontal))
-		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
-		Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
-		Gui.text("Camera Rotation: " .. tostring(camera:getSmoothedRotation():euler()))
-		Gui.text(`Camera Position: {tostring(camera.position)}`)
-		Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
-		Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
-		Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
-		if selectedArena then
-			Gui.text("Home Team: ")
-			Gui.indent()
-			for i, player in selectedArena.home.players do
-				Gui.text(i .. " " .. player.playerName)
+		if Gui.treeNode("Inputs") then
+			if Gui.button("Print Pressed Keys") then
+				print(InputSystem.pressedInputKeys)
 			end
-			Gui.unindent()
-			Gui.text("Away Team: ")
-			Gui.indent()
-			for i, player in selectedArena.away.players do
-				Gui.text(i .. " " .. player.playerName)
+			Gui.text(tostring("Vertical:" .. Vertical))
+			Gui.text(tostring("Horizontal: " .. Horizontal))
+			Gui.treePop()
+		end
+		if Gui.treeNode("Gravity") then
+			Gui.text(`Gravity Direction: {gravity.upDirection}`)
+			Gui.text(`Gravity Rotation: {gravity.upRotation:euler()}`)
+			Gui.text(`Gravity Strenght: {gravity.strength}`)
+			Gui.treePop()
+		end
+		if Gui.treeNode("Freecam") then
+			if Gui.button("Follow Freecam") then
+				debugFreecam = true
+				ui:setCamera("anotheraxiom.freecam")
+				camera:followCamera(getCameraById("anotheraxiom.freecam"))
 			end
-			Gui.unindent()
+			Gui.treePop()
+		end
+		if Gui.treeNode("Debug Settings") then
+			speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
+			camera.nearClippingPlane = Gui.dragFloat("Near Clipping Plane", camera.nearClippingPlane, 1, 0, 999999)
+			boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
+			Gui.treePop()
+		end
 
-			Gui.text("All Players: ")
-			Gui.indent()
-			for i, player in selectedArena.players do
-				Gui.text(i .. " " .. player.playerName)
-			end
-			Gui.unindent()
-		end
 		Gui.treePop()
 	end
 end
