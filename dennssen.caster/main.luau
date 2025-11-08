@@ -3244,7 +3244,7 @@ function DoGoalExplosion(team: ArenaTeam)
 		goalExplosionColor = homeTeamPrimaryColor
 	end
 
-	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation, goalExplosionColor)
+	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
 end
 
 function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
