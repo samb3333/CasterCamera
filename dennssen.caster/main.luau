@@ -7,8 +7,9 @@ local version: string = "2.1.1"
 -- Ball outline does not show in POV mode
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
--- Goal explosion in Driftblitz does not match the goal size and shape
--- Goal explosions trigger at the start of each match (need to figure out why)
+
+-- TODO:
+-- PLEASE FOR THE LOVE OF GOD AND ALL THAT'S MIGHTY SORT THE GOD DAMN DEBUG MENU!!!!
 
 -- Dependencies
 local Util = require("util")
@@ -2479,19 +2480,6 @@ function getPlayer()
 	followPlayer()
 end
 
-function stopFollow()
-	toggleSmoothing(true, true)
-	ui:setCamera("")
-	playerFollow = false
-	camera:followCamera(nil)
-	cameraPosition = followPlussCamera:getSmoothedPosition()
-	rotEuler = followPlussCamera:getSmoothedRotation():euler()
-	rotEuler.x = 0
-	currentPlayer = nil
-	camera.fieldOfView = cameraFOV
-	camera.hideNearestHead = false
-end
-
 -- particle start
 function createParticle(
 	position: Vec3,
@@ -2753,6 +2741,19 @@ function setGlobalCameraRotation(globalRotation)
 	perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
 	local localRotation = getGravityUp():inverse() * globalRotation
 	rotEuler = localRotation:euler()
+end
+
+function stopFollow()
+	toggleSmoothing(true, true)
+	ui:setCamera("")
+	playerFollow = false
+	camera:followCamera(nil)
+	cameraPosition = followPlussCamera:getSmoothedPosition()
+	setGlobalCameraRotation(followPlussCamera:getSmoothedRotation())
+	rotEuler.x = 0
+	currentPlayer = nil
+	camera.fieldOfView = cameraFOV
+	camera.hideNearestHead = false
 end
 
 function readInput()
