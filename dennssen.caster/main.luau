@@ -2230,7 +2230,7 @@ function onGui()
 			if selectedArena and Gui.button("Print Team Colors Array") then
 				for i, value in selectedArena.gamemode:getTeamColorsArray() do
 					print(i)
-					print(getmetatable(value))
+					print(tostring(value))
 				end
 			end
 
@@ -3239,9 +3239,9 @@ function DoGoalExplosion(team: ArenaTeam)
 	end
 
 	if team.teamIndex == Util.TeamIndex.HomeTeam then
-		goalExplosionColor = awayTeamPrimaryColor
-	else
 		goalExplosionColor = homeTeamPrimaryColor
+	else
+		goalExplosionColor = awayTeamPrimaryColor
 	end
 
 	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
@@ -3537,7 +3537,7 @@ function goalScoreCheck()
 
 	-- the ball has newely scored
 	if selectedArena.away.scoreIncrease then
-		DoGoalExplosion(selectedArena.home)
+		DoGoalExplosion(selectedArena.away)
 
 		local shooterName = ""
 		local assistName = ""
@@ -3598,7 +3598,7 @@ function goalScoreCheck()
 	end
 
 	if selectedArena.home.scoreIncrease then
-		DoGoalExplosion(selectedArena.away)
+		DoGoalExplosion(selectedArena.home)
 
 		local shooterName = ""
 		local assistName = ""
