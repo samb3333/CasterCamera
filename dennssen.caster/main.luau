@@ -606,7 +606,7 @@ function Arena3v3.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number):
 end
 
 function Arena3v3:isPointOnHomeSide(point: Vec3): boolean
-	local homeDirection = (self.transform.rotation * Arena3v3.homeRotationOffset):getForwardVector()
+	local homeDirection = self:getTeamRotation(Util.TeamIndex.HomeTeam):getForwardVector()
 	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
@@ -629,18 +629,18 @@ function Arena3v3:setupDimensions()
 	)
 
 	self.home.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * Arena3v3.homeRotationOffset):rotateVector(Arena3v3.goalPositionOffset),
-		rotation = self.transform.rotation * Arena3v3.homeRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+			:rotateVector(Arena3v3.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
 		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, Arena3v3.goalBoxSize, self.home.goal.rotation)
 
 	self.away.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * Arena3v3.awayRotationOffset):rotateVector(Arena3v3.goalPositionOffset),
-		rotation = self.transform.rotation * Arena3v3.awayRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+			:rotateVector(Arena3v3.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Arena3v3.goalBoxSize, self.away.goal.rotation)
@@ -652,14 +652,14 @@ function Arena3v3:setupOverviews()
 
 	for _, overview in overviewOffsets._3v3 do
 		local homeOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * Arena3v3.homeRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * Arena3v3.homeRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam) * overview.rotation,
 		}
 		local awayOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * Arena3v3.awayRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * Arena3v3.awayRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam) * overview.rotation,
 		}
 
 		table.insert(self.home.data.overview, homeOverview)
@@ -702,6 +702,7 @@ type Arena4v4 = CasterArena & {
 	__index: Arena4v4,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena4v4,
+	isOld4v4: (self: Arena4v4) -> boolean,
 
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
@@ -746,8 +747,12 @@ function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number):
 	return self :: Arena4v4
 end
 
+function Arena4v4:isOld4v4(): boolean
+	return self.slotId:find("Jakeball") ~= nil or self.slotId:find("Driftball") ~= nil
+end
+
 function Arena4v4:isPointOnHomeSide(point: Vec3): boolean
-	local homeDirection = (self.transform.rotation * Arena4v4.homeRotationOffset):getForwardVector()
+	local homeDirection = self:getTeamRotation(Util.TeamIndex.HomeTeam):getForwardVector()
 	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
@@ -770,18 +775,18 @@ function Arena4v4:setupDimensions()
 	)
 
 	self.home.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * Arena4v4.homeRotationOffset):rotateVector(Arena4v4.goalPositionOffset),
-		rotation = self.transform.rotation * Arena4v4.homeRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+			:rotateVector(Arena4v4.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
 		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, Arena4v4.goalBoxSize, self.home.goal.rotation)
 
 	self.away.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * Arena4v4.awayRotationOffset):rotateVector(Arena4v4.goalPositionOffset),
-		rotation = self.transform.rotation * Arena4v4.awayRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+			:rotateVector(Arena4v4.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Arena4v4.goalBoxSize, self.away.goal.rotation)
@@ -793,14 +798,14 @@ function Arena4v4:setupOverviews()
 
 	for _, overview in overviewOffsets._4v4 do
 		local homeOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * Arena4v4.homeRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * Arena4v4.homeRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam) * overview.rotation,
 		}
 		local awayOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * Arena4v4.awayRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * Arena4v4.awayRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam) * overview.rotation,
 		}
 
 		table.insert(self.home.data.overview, homeOverview)
@@ -814,6 +819,10 @@ function Arena4v4:getTeamRotation(teamIndex: number?): Quat
 		rotation = self.transform.rotation * Arena4v4.homeRotationOffset
 	elseif teamIndex == Util.TeamIndex.AwayTeam then
 		rotation = self.transform.rotation * Arena4v4.awayRotationOffset
+	end
+
+	if (self :: Arena4v4):isOld4v4() then
+		rotation *= Quat.fromEuler(0, 0, 180) -- Comp build has Home and Away side flipped
 	end
 
 	return rotation
@@ -878,7 +887,7 @@ function Driftblitz.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number
 end
 
 function Driftblitz:isPointOnHomeSide(point: Vec3): boolean
-	local homeDirection = (self.transform.rotation * Driftblitz.homeRotationOffset):getForwardVector()
+	local homeDirection = self:getTeamRotation(Util.TeamIndex.HomeTeam):getForwardVector()
 	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
@@ -901,18 +910,18 @@ function Driftblitz:setupDimensions()
 	)
 
 	self.home.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * Driftblitz.homeRotationOffset):rotateVector(Driftblitz.goalPositionOffset),
-		rotation = self.transform.rotation * Driftblitz.homeRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+			:rotateVector(Driftblitz.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
 		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, Driftblitz.goalBoxSize, self.home.goal.rotation)
 
 	self.away.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * Driftblitz.awayRotationOffset):rotateVector(Driftblitz.goalPositionOffset),
-		rotation = self.transform.rotation * Driftblitz.awayRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+			:rotateVector(Driftblitz.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Driftblitz.goalBoxSize, self.away.goal.rotation)
@@ -924,14 +933,14 @@ function Driftblitz:setupOverviews()
 
 	for _, overview in overviewOffsets._driftblitz do
 		local homeOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * Driftblitz.homeRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * Driftblitz.homeRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam) * overview.rotation,
 		}
 		local awayOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * Driftblitz.awayRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * Driftblitz.awayRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam) * overview.rotation,
 		}
 
 		table.insert(self.home.data.overview, homeOverview)
@@ -1018,7 +1027,7 @@ function ZDrift.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Z
 end
 
 function ZDrift:isPointOnHomeSide(point: Vec3): boolean
-	local homeDirection = (self.transform.rotation * ZDrift.homeRotationOffset):getForwardVector()
+	local homeDirection = self:getTeamRotation(Util.TeamIndex.HomeTeam):getForwardVector()
 	local ballDirection = Util.getForward(self.transform.position, point)
 	if homeDirection:dot(ballDirection) >= 0 then
 		return true
@@ -1041,18 +1050,18 @@ function ZDrift:setupDimensions()
 	)
 
 	self.home.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * ZDrift.homeRotationOffset):rotateVector(ZDrift.goalPositionOffset),
-		rotation = self.transform.rotation * ZDrift.homeRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+			:rotateVector(ZDrift.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
 		box = Box.empty,
 	}
 
 	self.home.goal.box = Box.new(self.home.goal.position, ZDrift.goalBoxSize, self.home.goal.rotation)
 
 	self.away.goal = {
-		position = self.transform.position
-			+ (self.transform.rotation * ZDrift.awayRotationOffset):rotateVector(ZDrift.goalPositionOffset),
-		rotation = self.transform.rotation * ZDrift.awayRotationOffset:inverse(),
+		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+			:rotateVector(ZDrift.goalPositionOffset),
+		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, ZDrift.goalBoxSize, self.away.goal.rotation)
@@ -1064,14 +1073,14 @@ function ZDrift:setupOverviews()
 
 	for _, overview in overviewOffsets._zdrift do
 		local homeOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * ZDrift.homeRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * ZDrift.homeRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam) * overview.rotation,
 		}
 		local awayOverview = {
-			position = self.transform.position
-				+ (self.transform.rotation * ZDrift.awayRotationOffset):rotateVector(overview.position),
-			rotation = (self.transform.rotation * ZDrift.awayRotationOffset * overview.rotation),
+			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
+				:rotateVector(overview.position),
+			rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam) * overview.rotation,
 		}
 
 		table.insert(self.home.data.overview, homeOverview)
