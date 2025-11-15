@@ -625,7 +625,7 @@ function Arena3v3:setupDimensions()
 	self.home.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
 			:rotateVector(Arena3v3.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
+		rotation = self.transform.rotation * Arena3v3.homeRotationOffset:inverse(),
 		box = Box.empty,
 	}
 
@@ -634,7 +634,7 @@ function Arena3v3:setupDimensions()
 	self.away.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
 			:rotateVector(Arena3v3.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
+		rotation = self.transform.rotation * Arena3v3.awayRotationOffset:inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Arena3v3.goalBoxSize, self.away.goal.rotation)
@@ -771,7 +771,7 @@ function Arena4v4:setupDimensions()
 	self.home.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
 			:rotateVector(Arena4v4.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
+		rotation = self.transform.rotation * Arena4v4.homeRotationOffset:inverse(),
 		box = Box.empty,
 	}
 
@@ -780,7 +780,7 @@ function Arena4v4:setupDimensions()
 	self.away.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
 			:rotateVector(Arena4v4.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
+		rotation = self.transform.rotation * Arena4v4.awayRotationOffset:inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Arena4v4.goalBoxSize, self.away.goal.rotation)
@@ -906,7 +906,7 @@ function Driftblitz:setupDimensions()
 	self.home.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
 			:rotateVector(Driftblitz.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
+		rotation = self.transform.rotation * Driftblitz.homeRotationOffset:inverse(),
 		box = Box.empty,
 	}
 
@@ -915,7 +915,7 @@ function Driftblitz:setupDimensions()
 	self.away.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
 			:rotateVector(Driftblitz.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
+		rotation = self.transform.rotation * Driftblitz.awayRotationOffset:inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, Driftblitz.goalBoxSize, self.away.goal.rotation)
@@ -1046,7 +1046,7 @@ function ZDrift:setupDimensions()
 	self.home.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
 			:rotateVector(ZDrift.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam):inverse(),
+		rotation = self.transform.rotation * ZDrift.homeRotationOffset:inverse(),
 		box = Box.empty,
 	}
 
@@ -1055,7 +1055,7 @@ function ZDrift:setupDimensions()
 	self.away.goal = {
 		position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
 			:rotateVector(ZDrift.goalPositionOffset),
-		rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam):inverse(),
+		rotation = self.transform.rotation * ZDrift.awayRotationOffset:inverse(),
 		box = Box.empty,
 	}
 	self.away.goal.box = Box.new(self.away.goal.position, ZDrift.goalBoxSize, self.away.goal.rotation)
