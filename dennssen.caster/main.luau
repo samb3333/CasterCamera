@@ -36,12 +36,6 @@ type HUD = HUD.HUD
 local readLocation = 0
 local gameData: ReplayFrame
 
-function debugPrint(s: any)
-	if Input.getKeyDown(Input.Key.N) then
-		print(s)
-	end
-end
-
 local defaultKeybinds = {
 	keyboard = {
 		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
@@ -1615,11 +1609,6 @@ local inputOrder = {
 	},
 }
 
---  Keyboard (debug)
-local one = Input.Key.One
-local two = Input.Key.Two
-local three = Input.Key.Three
-
 --  Mouse
 local invertMouseLookHorizontal: boolean = config.invertMouseLookHorizontal
 local invertMouseLookVertical: boolean = config.invertMouseLookVertical
@@ -1643,6 +1632,29 @@ local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
 }
+local tpGamemodeName: string = ""
+
+function getGamemodeByName(gamemodeName: string): ModuleStateSpectatorLuaApi?
+	for _, gamemode in SpectatorGamemodes.listGamemodes() do
+		if gamemode:getSlotId() == gamemodeName then
+			return gamemode
+		end
+	end
+
+	return nil
+end
+
+function setGlobalCameraRotation(globalRotation)
+	camera.rotation = globalRotation
+	perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
+	local localRotation = getGravityUp():inverse() * globalRotation
+	rotEuler = localRotation:euler()
+end
+
+function setGlobalCameraTransform(position: Vec3, rotation: Quat)
+	cameraPosition = position
+	setGlobalCameraRotation(rotation)
+end
 
 function main()
 	loadTime = os.clock()
@@ -2207,19 +2219,32 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Arena") then
-			if arenas and Gui.button("Print Arenas") then
-				for _, arena in arenas do
-					print(arena.slotId)
-				end
-			end
-			Gui.sameLine()
 			if Gui.button("Print Gamemode Ids") then
 				for _, gamemode in SpectatorGamemodes.listGamemodes() do
 					print(gamemode:getSlotId())
 				end
 			end
 
+			tpGamemodeName = Gui.inputText("##gamemodeName", tpGamemodeName)
+			Gui.sameLine()
+			if Gui.button("TP to Gamemode") then
+				local gamemode = getGamemodeByName(tpGamemodeName)
+				if gamemode then
+					local transform = gamemode.transform
+					setGlobalCameraTransform(transform.position, transform.rotation)
+				end
+			end
+
+			Gui.newLine()
+
+			if arenas and Gui.button("Print Arenas") then
+				for _, arena in arenas do
+					print(arena.slotId)
+				end
+			end
+
 			if selectedArena and Gui.button("Set Orientation to Arena") then
+				Gui.sameLine()
 				cameraPosition = selectedArena.transform.position
 				camera.rotation = selectedArena.transform.rotation
 				rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
@@ -2237,6 +2262,7 @@ function onGui()
 			end
 
 			if selectedArena and Gui.button("Print Team Colors Array") then
+				Gui.sameLine()
 				for i, value in selectedArena.gamemode:getTeamColorsArray() do
 					print(i)
 					print(tostring(value))
@@ -2790,13 +2816,6 @@ function GameStartEffect()
 	end
 end
 --effects end
-
-function setGlobalCameraRotation(globalRotation)
-	camera.rotation = globalRotation
-	perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
-	local localRotation = getGravityUp():inverse() * globalRotation
-	rotEuler = localRotation:euler()
-end
 
 function stopFollow()
 	toggleSmoothing(true, true)
