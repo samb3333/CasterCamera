@@ -7,6 +7,8 @@ local version: string = "2.1.4"
 -- Ball outline does not show in POV mode
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
+-- Update the HUD library
+-- Update Follow+ Framework implementation
 
 -- Dependencies
 local Util = require("util")
@@ -1737,8 +1739,8 @@ function setSelectedArena(arena: CasterArena)
 			info = "slotId",
 			value = arena.slotId,
 		})
-		arena.instantUpdate = true
 	end
+	arena.instantUpdate = true
 	selectedArena = arena
 end
 
