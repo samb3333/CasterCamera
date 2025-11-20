@@ -21,12 +21,14 @@ export type HUD = {
 	generateTransform: (self: HUD) -> (),
 
 	tick: (self: HUD) -> (),
-	drawPoint: (anchor: Vec3, color: Vec3, pointSize: number, lifetime: number) -> (),
-	drawLine: (startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number) -> (),
-	worldToHUD: (self: HUD, worldPosition: Vec3) -> Vec3,
+	drawPoint: (self: HUD, anchor: Vec2, color: Vec3, pointSize: number, lifetime: number) -> (),
+	drawLine: (self: HUD, startAnchor: Vec2, endAnchor: Vec2, color: Vec3, thickness: number, lifetime: number) -> (),
+	drawTriangle: (self: HUD, anchor1: Vec2, anchor2: Vec2, anchor3: Vec2, color: LinearColor, lifetime: number) -> (),
+	worldToHUD: (self: HUD, worldPosition: Vec3) -> Vec2,
 	convertOffsetToHUD: (self: HUD, offset: Vec2) -> Vec3,
 	convertHUDToOffset: (self: HUD, point: Vec3) -> Vec2,
-	getApparentLength: (self: HUD, length: number, point: Vec3, depth: number?) -> number,
+	getApparentLength: (self: HUD, length: number, point: Vec3) -> number,
+	getUniversalLength: (self: HUD, length: number) -> number,
 }
 
 local HUD: HUD = {} :: HUD
@@ -81,15 +83,25 @@ function HUD:tick()
 	self:generateTransform()
 end
 
-function HUD.drawPoint(anchor: Vec3, color: Vec3, pointSize: number, lifetime: number)
-	WorldDraw.drawPoint(anchor, color.x, color.y, color.z, pointSize, lifetime)
+function HUD:drawPoint(anchor: Vec2, color: Vec3, pointSize: number, lifetime: number)
+	local vec = self.transform.origin + self:convertOffsetToHUD(anchor)
+	WorldDraw.drawPoint(vec, color.x, color.y, color.z, pointSize, lifetime)
 end
 
-function HUD.drawLine(startAnchor: Vec3, endAnchor: Vec3, color: Vec3, thickness: number, lifetime: number)
-	WorldDraw.drawLine(startAnchor, endAnchor, color.x, color.y, color.z, thickness, lifetime)
+function HUD:drawLine(startAnchor: Vec2, endAnchor: Vec2, color: Vec3, thickness: number, lifetime: number)
+	local vec1 = self.transform.origin + self:convertOffsetToHUD(startAnchor)
+	local vec2 = self.transform.origin + self:convertOffsetToHUD(endAnchor)
+	WorldDraw.drawLine(vec1, vec2, color.x, color.y, color.z, thickness, lifetime)
 end
 
-function HUD:worldToHUD(worldPosition: Vec3): Vec3
+function HUD:drawTriangle(anchor1: Vec2, anchor2: Vec2, anchor3: Vec2, color: LinearColor, lifetime: number)
+	local vec1 = self.transform.origin + self:convertOffsetToHUD(anchor1)
+	local vec2 = self.transform.origin + self:convertOffsetToHUD(anchor2)
+	local vec3 = self.transform.origin + self:convertOffsetToHUD(anchor3)
+	WorldDraw.drawTriangle(vec1, vec2, vec3, color, lifetime)
+end
+
+function HUD:worldToHUD(worldPosition: Vec3): Vec2
 	local _camera
 
 	if self.cameraId ~= "" then
@@ -106,14 +118,15 @@ function HUD:worldToHUD(worldPosition: Vec3): Vec3
 	local denom = camForward:dot(rayDir)
 
 	if denom <= 1e-3 then
-		return Vec3.zeroVector
+		return Vec2.zeroVector
 	end
 
 	-- Ray-plane intersection:
 	local t = (hudOrigin - camPos):dot(camForward) / denom
 	local projected = camPos + rayDir * t
+	local converted = self:convertHUDToOffset(projected)
 
-	return projected
+	return converted
 end
 
 function HUD:convertOffsetToHUD(offset: Vec2): Vec3
@@ -158,13 +171,7 @@ function HUD:convertHUDToOffset(position: Vec3): Vec2
 	return Vec2.new(offsetX, offsetY)
 end
 
-function HUD:getApparentLength(length: number, point: Vec3, depth: number?): number
-	local _depth: number
-	if depth then
-		_depth = depth
-	else
-		_depth = self.depth
-	end
+function HUD:getApparentLength(length: number, point: Vec3): number
 	local _camera
 	if self.cameraId ~= "" then
 		_camera = getCameraById(self.cameraId)
@@ -172,9 +179,29 @@ function HUD:getApparentLength(length: number, point: Vec3, depth: number?): num
 		_camera = camera
 	end
 
+	local fovRad = math.rad(_camera.fieldOfView)
+	local halfWidth = math.tan(fovRad / 2) * self.depth
 	local distance = Util.getDist(_camera.position, point)
+	local apparentWorldLength = self.depth * (length / distance)
 
-	return _depth * (length / distance)
+	return (apparentWorldLength / halfWidth) * self.width
+end
+
+function HUD:getUniversalLength(length: number): number
+	local _camera
+
+	if self.cameraId ~= "" then
+		_camera = getCameraById(self.cameraId)
+	else
+		_camera = camera
+	end
+
+	local fovRad = math.rad(_camera.fieldOfView)
+	local aspectRatio = self.width / self.height
+	local halfWidth = math.tan(fovRad / 2) * self.depth
+	local halfHeight = halfWidth / aspectRatio
+
+	return (length / self.height) * halfHeight
 end
 
 return HUD

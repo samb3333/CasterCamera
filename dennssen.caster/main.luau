@@ -7,7 +7,6 @@ local version: string = "2.1.4"
 -- Ball outline does not show in POV mode
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
--- Update the HUD library
 -- Update Follow+ Framework implementation
 
 -- Dependencies
@@ -3721,18 +3720,16 @@ function drawBallOutline()
 
 	ui:tick()
 
-	local desmoothedBallPosition = ball.transform.position - (ball.velocity * (deltaTime / 2))
-	local ballUIPosition = ui:worldToHUD(desmoothedBallPosition)
+	local ballHUDPosition: Vec2 = ui:worldToHUD(ball.transform.position)
 
-	if ballUIPosition == Vec3.zeroVector then
-		return -- ball is behind viewport, don't render
+	if ballHUDPosition == Vec2.zeroVector then
+		return
 	end
 
 	local ballRadius = 17.5
 	local segments = 20
-	local radius =
-		ui:getApparentLength(ballRadius, ball.transform.position, Util.getDist(camera.position, ballUIPosition))
-	local thickness = radius / 4
+	local radius = ui:getApparentLength(ballRadius, ball.transform.position)
+	local thickness = math.min(ui.depth / 10, radius / 100)
 
 	local angleStep = (2 * math.pi) / segments
 	local prevPoint = nil
@@ -3743,10 +3740,10 @@ function drawBallOutline()
 		local x = radius * math.cos(angle)
 		local y = radius * math.sin(angle)
 
-		local point = ballUIPosition + (camera.rotation:getRightVector() * x) + (camera.rotation:getUpVector() * y)
+		local point: Vec2 = ballHUDPosition + Vec2.new(x, y)
 
 		if prevPoint then
-			ui.drawLine(prevPoint, point, Vec3.new(1, 1, 1), thickness, 0)
+			ui:drawLine(prevPoint, point, Vec3.oneVector, thickness, 0)
 		end
 
 		prevPoint = point
@@ -3809,12 +3806,12 @@ function tick(dt)
 
 		moveCamera()
 		rotateCamera()
+		drawBallOutline()
 	end
 
 	particleAffect()
 	ballInCenterCheck()
 	if ball then
-		drawBallOutline()
 		goalScoreCheck()
 	end
 
