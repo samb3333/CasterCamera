@@ -288,12 +288,8 @@ function capitalize(s: string): string
 	return `{firstLetter}{s}`
 end
 
-function getApparentRaidus(radius: number, distance: number, HUDDepth: number): number
-	return HUDDepth * (radius / distance)
-end
-
-function convertToHUD(vec: Vec2): Vec3
-	return camera.rotation:getRightVector() * vec.x + camera.rotation:getUpVector() * vec.y
+function setHideHead(hide: boolean)
+	camera.hideNearestHead = hide
 end
 
 local deltaTime: number = 0
@@ -370,9 +366,11 @@ end
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
-local requiredFollowPlussVersion: string = ">=1.11.0"
+local requiredFollowPlussVersion: string = ">=1.14.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
+local followPlussTick: (number, boolean) -> ()
+
 local playerFollow = false
 local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
@@ -390,9 +388,28 @@ function getFollowVersion(version: string)
 	followPlussVersion = version
 end
 
+function getFollowPlussTick(_followPlussTick: (number, boolean) -> ())
+	followPlussTick = _followPlussTick
+end
+
 type MessageValues = {
 	versionCallback: (string) -> ()?,
-	callback: (() -> ()) -> ()?,
+	getMainProcessCallback: ((number, boolean) -> ()) -> ()?,
+	guiCallback: (() -> ()) -> ()?,
+	topSettingsCallback: (() -> ()) -> ()?,
+	checkboxSettingsCallback: (() -> ()) -> ()?,
+	playerSettingsCallback: (() -> ()) -> ()?,
+	cameraSettingsCallback: (() -> ()) -> ()?,
+	followSettingsCallback: (() -> ()) -> ()?,
+	mainSettingsCallback: (() -> ()) -> ()?,
+	autoCameraSettingsCallback: (() -> ()) -> ()?,
+	savingSettingsCallback: (() -> ()) -> ()?,
+	debugSettingsCallback: (() -> ()) -> ()?,
+	gestureSettingsCallback: (() -> ()) -> ()?,
+	autoShootingSettingsCallback: (() -> ()) -> ()?,
+	goalCamSettingsCallback: (() -> ()) -> ()?,
+	getTargetPlayerCallback: (() -> ReplayPlayer?) -> ()?,
+	setHideHeadCallback: (boolean) -> ()?,
 	readLocation: number?,
 	showNameTags: boolean?,
 	isLeftHanded: boolean?,
@@ -405,19 +422,21 @@ type MessageValues = {
 	cameraMode: number?,
 	radius: number?,
 	threshold: number?,
-	cameraPositionOffset: string?,
-	cameraEulerOffset: string?,
+	cameraPositionOffset: Vec3?,
+	cameraRotationOffset: Quat?,
 	gestureControls: boolean?,
 	forwardGestureMode: number?,
 	upGestureMode: number?,
 	backwardsGestureMode: number?,
 	autoBall: boolean?,
-	autoBallThreshold: number?,
+	simResolutionScale: number?,
+	simTimeLength: number?,
 	autoGoalCam: boolean?,
 	ballGoalMode: number?,
 	goalMode: number?,
 	hideNearestHead: boolean?,
 	showQuests: boolean?,
+	autoRecordReplays: boolean?,
 }
 
 type Color = {
@@ -1666,8 +1685,13 @@ function main()
 	rotEuler = defaultRotation:euler()
 	followPlussCamera = getCameraById(followPlussId)
 	if followPlussCamera then
-		local versionMessage: MessageValues = { versionCallback = getFollowVersion }
-		sendMessage(followPlussCamera, versionMessage)
+		local followSetupMessage: MessageValues = {
+			getMainProcessCallback = getFollowPlussTick,
+			versionCallback = getFollowVersion,
+			setHideHeadCallback = setHideHead,
+		}
+
+		sendMessage(followPlussCamera, followSetupMessage)
 		local result = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
 		if not result.success then
 			followPlussWarning =
@@ -2217,6 +2241,7 @@ function onGui()
 			Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
 			Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
 			Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
+			Gui.text(`Hide nearest head: {camera.hideNearestHead}`)
 			Gui.treePop()
 		end
 		if Gui.treeNode("Arena") then
@@ -2453,7 +2478,7 @@ function onTransitionBegin(transitionInfo: Transition)
 
 	alwaysTick = true
 	camera.rotationSmoothing = 0
-	camera.hideNearestHead = false
+	setHideHead(false)
 	camera.showNameTags = true
 end
 
@@ -2822,13 +2847,12 @@ function stopFollow()
 	toggleSmoothing(true, true)
 	ui:setCamera("")
 	playerFollow = false
-	camera:followCamera(nil)
 	cameraPosition = followPlussCamera:getSmoothedPosition()
 	setGlobalCameraRotation(followPlussCamera:getSmoothedRotation())
 	rotEuler.x = 0
 	currentPlayer = nil
 	camera.fieldOfView = cameraFOV
-	camera.hideNearestHead = false
+	setHideHead(false)
 end
 
 function readInput()
@@ -3242,8 +3266,8 @@ function followPlayer()
 		radius = followRadius,
 		threshold = 5,
 		positionSmoothing = followPosititonSmoothing,
-		cameraPositionOffset = tostring(Vec3.zeroVector),
-		cameraEulerOffset = tostring(Vec3.zeroVector),
+		cameraPositionOffset = Vec3.zeroVector,
+		cameraRotationOffset = Quat.identity,
 		gestureControls = false,
 		autoBall = false,
 		autoGoalCam = false,
@@ -3252,7 +3276,6 @@ function followPlayer()
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
 	ui:setCamera(followPlussId)
-	camera:followCamera(followPlussCamera)
 end
 
 function DoGoalExplosion(team: ArenaTeam)
@@ -3799,6 +3822,8 @@ function tick(dt)
 	end
 
 	if playerFollow then
+		followPlussTick(dt, true)
+		Util.followCamera(followPlussId)
 		readOtherInputs()
 	else
 		toggleSmoothing(true, true)

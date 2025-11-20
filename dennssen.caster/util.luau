@@ -1,5 +1,20 @@
 --!strict
 
+--[=[
+- `ThumbDown` True if thumb on face of controller (Touch sensor)
+- `TriggerDown` True if Trigger is pressed down
+- `TriggerPoint` True if finger is not on trigger (Touch sensor)
+- `GripDown` True if Grip is pressed down
+- `FullHandPoseOverride` see `Util.HandPose`
+]=]
+type HandPoses = {
+	ThumbDown: boolean,
+	TriggerDown: boolean,
+	TriggerPoint: boolean,
+	GripDown: boolean,
+	FullHandPoseOverride: number,
+}
+
 local Util = {}
 
 --- TeamIndex constants
@@ -12,13 +27,43 @@ Util.TeamIndex = {
 	AwayTeam = 1,
 }
 
---- Toggle debug printing
+--- HandPose constants
+--[=[
+- `Neutral` Doesn't work
+- `Flat` Hand on ground and not grabbing
+- `GrabBall` Hold a ball with grip
+- `HoldBackItem` Hold a back cosmetic
+- `Horns` Doesn't work
+- `OK` Doesn't work
+- `Peace` Doesn't work
+- `Point` Doesn't work
+- `Shaka` Doesn't work
+- `ThumbsUp` Doesn't work
+- `FingerGun` Doesn't work
+- `MAX` When not Flat or Holding ball
+]=]
+Util.HandPose = {
+	Neutral = 0,
+	Flat = 1,
+	GrabBall = 2,
+	HoldBackItem = 3,
+	Horns = 4,
+	OK = 5,
+	Peace = 6,
+	Point = 7,
+	Shaka = 8,
+	ThumbsUp = 9,
+	FingerGun = 10,
+	MAX = 11,
+}
+
+--- Toggle debug printing.
 --- Avoid calling the property directly. Instead let `Util.debugPrintToggle()` handle the logic.
 Util.printToggle = false
 
 --- Sends the `message` if the `camera` exists
---- @param camera -- the SpectatorCamera to message
---- @param message -- the message to send to the camera
+--- @param camera the SpectatorCamera to message
+--- @param message the message to send to the camera
 function Util.safeSendMessage(camera: SpectatorCamera, message: any)
 	if camera then
 		sendMessage(camera, message)
@@ -26,8 +71,8 @@ function Util.safeSendMessage(camera: SpectatorCamera, message: any)
 end
 
 --- Get the distance between 2 points
---- @param a -- the first point
---- @param b -- then second point
+--- @param a the first point
+--- @param b the second point
 --- @return the distance between `a` and `b` in centimeters
 function Util.getDist(a: Vec3, b: Vec3): number
 	local x: number = math.abs(a.x - b.x) ^ 2
@@ -174,18 +219,21 @@ end
 --- @return true if the `normalTable` was modified to fit the structure of `structureTable`
 function Util.deepStructureCopy(structureTable, normalTable): boolean
 	local adjusted = false
-	if typeof(structureTable) == "table" then
-		for structureKey, structureValue in structureTable do
-			if normalTable[structureKey] == nil then
+
+	if typeof(structureTable) ~= "table" then
+		return adjusted
+	end
+
+	for structureKey, structureValue in structureTable do
+		if normalTable[structureKey] == nil then
+			adjusted = true
+			normalTable[structureKey] = structureValue
+		elseif typeof(normalTable[structureKey]) ~= typeof(structureValue) then
+			adjusted = true
+			normalTable[structureKey] = structureValue
+		elseif typeof(structureValue) == "table" then
+			if Util.deepStructureCopy(structureValue, normalTable[structureKey]) then
 				adjusted = true
-				normalTable[structureKey] = structureValue
-			elseif typeof(normalTable[structureKey]) ~= typeof(structureValue) then
-				adjusted = true
-				normalTable[structureKey] = structureValue
-			elseif typeof(structureValue) == "table" then
-				if Util.deepStructureCopy(structureValue, normalTable[structureKey]) then
-					adjusted = true
-				end
 			end
 		end
 	end
@@ -199,15 +247,18 @@ end
 --- @return true if the `normalTable` was modified to fit the structure of `structureTable`
 function Util.deepStructureClean(structureTable, normalTable): boolean
 	local adjusted = false
-	if typeof(normalTable) == "table" then
-		for normalKey, normalValue in normalTable do
-			if structureTable[normalKey] == nil then
+
+	if typeof(normalTable) ~= "table" then
+		return adjusted
+	end
+
+	for normalKey, normalValue in normalTable do
+		if structureTable[normalKey] == nil then
+			adjusted = true
+			normalTable[normalKey] = nil
+		elseif typeof(normalValue) == "table" then
+			if Util.deepStructureClean(structureTable[normalKey], normalValue) then
 				adjusted = true
-				normalTable[normalKey] = nil
-			elseif typeof(normalValue) == "table" then
-				if Util.deepStructureClean(structureTable[normalKey], normalValue) then
-					adjusted = true
-				end
 			end
 		end
 	end
@@ -288,15 +339,64 @@ function Util.getClosestBall(targetPosition: Vec3, frameData: ReplayFrame): Repl
 	return clostestBall
 end
 
+--- Converts the handPoseBits number into a HandPoses table
+function Util.decodePoseBits(handPoseBits: number): HandPoses
+	return {
+		ThumbDown = bit32.band(handPoseBits, 1) ~= 0,
+		TriggerDown = bit32.band(handPoseBits, bit32.lshift(1, 1)) ~= 0,
+		TriggerPoint = bit32.band(handPoseBits, bit32.lshift(1, 2)) ~= 0,
+		GripDown = bit32.band(handPoseBits, bit32.lshift(1, 3)) ~= 0,
+		FullHandPoseOverride = bit32.rshift(handPoseBits, 4) % 16,
+	}
+end
+
+--- @return The name of the active FullHandPoseOverride
+function Util.fullHandPoseToString(fullHandPoseOverride: number): string
+	local name: string = ""
+	for poseName: string, poseValue: number in Util.HandPose :: { [string]: number } do
+		if fullHandPoseOverride == poseValue then
+			name = poseName
+			break
+		end
+	end
+
+	if name == "" then
+		name = "Bad Hand Pose"
+	end
+
+	return name
+end
+
+function Util.getRightPlayerHand(player: ReplayPlayer): Transform
+	local transform: Transform = Transform.identity
+
+	transform.position = player.root.position + player.root.rotation:rotateVector(player.rightHand.position)
+	transform.rotation = player.root.rotation * player.rightHand.rotation
+
+	return transform
+end
+
+function Util.getLeftPlayerHand(player: ReplayPlayer): Transform
+	local transform: Transform = Transform.identity
+
+	transform.position = player.root.position + player.root.rotation:rotateVector(player.leftHand.position)
+	transform.rotation = player.root.rotation * player.leftHand.rotation
+
+	return transform
+end
+
 --[=[
 Checks if a player is withing a reasonable distance of the ball with their hands or head
+
+**IMPORTANT:** This is meant for driftball and other gamemodes that use physical contact with the ball.
+For checking if a player is actually holding a ball like a Z-Drift ball use `isZDriftballHeld()`.
 
 *Note: the radius of a normal driftball is 17*
 
 @return the player holding the ball
 @return `nil` if no player is holding the ball
 ]=]
-function Util.isBallHeld(ball: ReplayBall, ballRadius: number, players: { ReplayPlayer }): ReplayPlayer?
+function Util.isDriftballHeld(ball: ReplayBall, ballRadius: number, players: { ReplayPlayer }): ReplayPlayer?
 	local closestPlayerDistance = math.huge
 	local closestPlayer: ReplayPlayer = nil
 
@@ -539,7 +639,7 @@ function Util.lookAt(from: Vec3, to: Vec3, up: Vec3): Quat
 	return Quat.fromXZ(forward, up)
 end
 
---- getUpRotation will return a Quat similar to `gravity.upRotation` that corresponds with the `upDirection`
+--- getUpRotation will return a Quat similar to `gravity.upRotation` that corresponds with the given `upDirection`
 --- @param upDirection the up direction you want to get the upRotation to
 --- @return a Quat which up vector points in the same direction as `upDirection`
 function Util.getUpRotation(upDirection: Vec3): Quat
@@ -596,6 +696,18 @@ function Util.clampAround(n: number, min: number, max: number): number
 	else
 		return n
 	end
+end
+
+function Util.followCamera(_cameraId: string)
+	local _camera: SpectatorCamera? = getCameraById(_cameraId)
+
+	if not _camera then
+		return
+	end
+
+	camera.fieldOfView = _camera.fieldOfView
+	camera.position = _camera.position
+	camera.rotation = _camera.rotation
 end
 
 return Util
