@@ -366,7 +366,7 @@ end
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
-local requiredFollowPlussVersion: string = ">=1.14.0"
+local requiredFollowPlussVersion: string = ">=1.13.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
 local followPlussTick: (dt: number, isFollowing: boolean) -> ()
