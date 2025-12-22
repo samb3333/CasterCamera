@@ -2660,14 +2660,10 @@ function particleAffect()
 			end
 
 			--collision
-			local function dot(v1: Vec3, v2: Vec3): number
-				return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
-			end
-
 			if particle.variant == ParticleVariant.Embers then
 				local hit = camera:castRay(particle.position, particle.velocity + particle.position)
 				if hit.successful then
-					local dotProduct = dot(particle.velocity, hit.normal)
+					local dotProduct = particle.velocity:dot(hit.normal)
 					local reflection = particle.velocity - (hit.normal * (2 * dotProduct))
 
 					particle.velocity = reflection --bounce embers
