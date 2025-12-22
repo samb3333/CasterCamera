@@ -3303,18 +3303,6 @@ function DoGoalExplosion(team: ArenaTeam)
 	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
 end
 
-function playersAreOnSameTeam(player1: ReplayPlayer, player2: ReplayPlayer): boolean
-	if player1.teamIndex == Util.TeamIndex.NoTeam or player2.teamIndex == Util.TeamIndex.NoTeam then
-		return false
-	end
-
-	if player1.teamIndex == player2.teamIndex then
-		return true
-	end
-
-	return false
-end
-
 function checkBallContact()
 	local contactPlayer: ReplayPlayer? = getClosestPlayerToBall(30)
 	if contactPlayer == nil then
