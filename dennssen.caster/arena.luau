@@ -149,7 +149,7 @@ end
 function Arena:getArenaBall()
 	local balls = self.frame.balls
 	local closestBallDistance = math.huge
-	local clostestBall: ReplayBall = nil
+	local closestBall: ReplayBall = nil
 	for i in balls do
 		local ball = balls[i]
 
@@ -163,7 +163,7 @@ function Arena:getArenaBall()
 		local distance = Util.getDist(self.transform.position, ball.transform.position)
 		if distance < closestBallDistance then
 			closestBallDistance = distance
-			clostestBall = ball
+			closestBall = ball
 		end
 	end
 	return clostestBall
