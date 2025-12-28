@@ -5,6 +5,40 @@ type BoxType = typeof(Box)
 
 local Util = require("util")
 
+local debugTable = {}
+
+function debugBalls(error: string, frame: ReplayFrame): any
+	if debugTable["ballIndex"] == nil then
+		debugTable["ballIndex"] = 1
+	end
+
+	Gui.text(`Ball Index: {debugTable.ballIndex} / {#frame.balls}`)
+	if Gui.button(Icon.ArrowLeft) then
+		debugTable.ballIndex = math.max(1, debugTable.ballIndex - 1)
+	end
+	Gui.sameLine()
+	if Gui.button(Icon.ArrowRight) then
+		debugTable.ballIndex = math.min(debugTable.ballIndex + 1, #frame.balls)
+	end
+
+	for i, ball in frame.balls do
+		local color = {
+			r = 1,
+			g = 0,
+			b = 0,
+		}
+
+		if i == debugTable.ballIndex then
+			color.r = 0
+			color.g = 1
+		end
+
+		WorldDraw.drawPoint(ball.transform.position, color.r, color.g, color.b, 50, 0)
+	end
+
+	return error
+end
+
 export type ArenaTeam<T = {}> = {
 	teamIndex: number,
 	previousScore: number,
@@ -166,7 +200,17 @@ function Arena:getArenaBall()
 			closestBall = ball
 		end
 	end
-	return clostestBall
+
+	if nil == closestBall then
+		warn(
+			debugBalls(
+				`Warning: Ball not found in arena\nnumber of balls in frame. Index: {self.frameIndex}`,
+				self.frame
+			)
+		)
+	end
+
+	return closestBall
 end
 
 function Arena:tick()
