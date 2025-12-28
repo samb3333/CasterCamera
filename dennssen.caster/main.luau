@@ -1831,7 +1831,7 @@ function onGui()
 		for i = 1, #Replay.listLoaded() do
 			if Gui.selectable("Replay " .. i, i == readLocation) then
 				if i ~= readLocation then
-					arenas = nil
+					cachedGamemodesAmount = 0
 					selectedArena.instantUpdate = true
 				end
 				readLocation = i
@@ -2249,8 +2249,10 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Arena") then
+			local gamemodes = SpectatorGamemodes.listGamemodes()
+			Gui.text(`Number of Gamemodes: {#gamemodes}`)
 			if Gui.button("Print Gamemode Ids") then
-				for _, gamemode in SpectatorGamemodes.listGamemodes() do
+				for _, gamemode in gamemodes do
 					print(gamemode:getSlotId())
 				end
 			end
@@ -2313,7 +2315,7 @@ function onGui()
 					)
 				end
 				if Gui.button("Print Selected Arena") then
-					print(selectedArena)
+					print(`Selected Arena: {Util.tableToString(selectedArena)}`)
 				end
 				if Gui.treeNode("Selected Arena Dimensions") then
 					selectedArena:GUIChangeDimensions()
