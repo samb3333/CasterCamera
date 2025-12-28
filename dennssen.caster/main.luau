@@ -12,85 +12,6 @@ local version: string = "2.1.5"
 -- Dependencies
 local Util = require("util")
 
-local InputSystem = require("inputsystem")
-type Keybind = InputSystem.Keybind
-type CustomInput = InputSystem.CustomInput
-type InputSystem = InputSystem.InputSystem
-
-local Box = require("box")
-type BoxType = typeof(Box)
-
-type OverviewData = {
-	overview: { { position: Vec3, rotation: Quat } },
-}
-local Arena = require("arena")
-type ArenaTeam = Arena.ArenaTeam<OverviewData>
-type CasterArena = Arena.Arena<{}, OverviewData, OverviewData> & {
-	sendInfoMessage: (self: CasterArena) -> (),
-	setupOverviews: (self: CasterArena) -> (),
-}
-
-local HUD = require("hud")
-type HUD = HUD.HUD
-
--- GameData
-local readLocation = 0
-local gameData: ReplayFrame
-
-local defaultKeybinds = {
-	keyboard = {
-		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
-		previousPlayer = { primary = Input.Key.A, modifiers = {} },
-		right = { primary = Input.Key.D, modifiers = {} },
-		left = { primary = Input.Key.A, modifiers = {} },
-		resetFOV = { primary = Input.Key.MiddleMouseButton, modifiers = {} },
-		getClosestArena = { primary = Input.Key.Enter, modifiers = {} },
-		thirdPerson = { primary = Input.Key.V, modifiers = {} },
-		speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
-		lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
-		up = { primary = Input.Key.E, modifiers = {} },
-		clearOverlayInfo = { primary = Input.Key.BackSpace, modifiers = {} },
-		forwards = { primary = Input.Key.W, modifiers = {} },
-		overview3 = { primary = Input.Key.Seven, modifiers = {} },
-		freeCam = { primary = Input.Key.Z, modifiers = {} },
-		overview1 = { primary = Input.Key.Five, modifiers = {} },
-		backwards = { primary = Input.Key.S, modifiers = {} },
-		playerBallDistance = { primary = Input.Key.E, modifiers = { Input.Key.LeftAlt } },
-		speedUp = { primary = Input.Key.LeftShift, modifiers = {} },
-		overview2 = { primary = Input.Key.Six, modifiers = {} },
-		nextPlayer = { primary = Input.Key.D, modifiers = {} },
-		down = { primary = Input.Key.Q, modifiers = {} },
-		firstPerson = { primary = Input.Key.C, modifiers = {} },
-	},
-	gamepad = {
-		moveY = { primary = Input.Gamepad.LeftY, modifiers = {} },
-		previousPlayer = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
-		moveX = { primary = Input.Gamepad.LeftX, modifiers = {} },
-		nextPlayer = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
-		clearOverlayInfo = { primary = Input.Gamepad.Special_Left, modifiers = {} },
-		lookY = { primary = Input.Gamepad.RightY, modifiers = {} },
-		resetFOV = { primary = Input.Gamepad.DPad_Right, modifiers = {} },
-		getClosestArena = { primary = Input.Gamepad.Special_Right, modifiers = {} },
-		thirdPerson = { primary = Input.Gamepad.FaceButton_Top, modifiers = {} },
-		speedDown = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
-		up = { primary = Input.Gamepad.RightTrigger, modifiers = {} },
-		overview3 = { primary = Input.Gamepad.FaceButton_Right, modifiers = { Input.Gamepad.DPad_Left } },
-		overview1 = { primary = Input.Gamepad.FaceButton_Left, modifiers = { Input.Gamepad.DPad_Left } },
-		zoomOut = { primary = Input.Gamepad.DPad_Down, modifiers = {} },
-		zoomIn = { primary = Input.Gamepad.DPad_Up, modifiers = {} },
-		firstPerson = { primary = Input.Gamepad.FaceButton_Right, modifiers = {} },
-		freeCam = { primary = Input.Gamepad.FaceButton_Left, modifiers = {} },
-		playerBallDistance = { primary = Input.Gamepad.RightThumbstick, modifiers = {} },
-		speedUp = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
-		overview2 = { primary = Input.Gamepad.FaceButton_Top, modifiers = { Input.Gamepad.DPad_Left } },
-		lineOfSight = { primary = Input.Gamepad.LeftThumbstick, modifiers = {} },
-		down = { primary = Input.Gamepad.LeftTrigger, modifiers = {} },
-		lookX = { primary = Input.Gamepad.RightX, modifiers = {} },
-	},
-}
-
-InputSystem.setDefaultKeybinds(defaultKeybinds.keyboard, defaultKeybinds.gamepad)
-
 Util.initializeConfig({
 	cameraFOV = 90,
 	deadzone = 0,
@@ -193,6 +114,85 @@ Util.initializeConfig({
 		exposureBias = 1,
 	},
 })
+
+local InputSystem = require("inputsystem")
+type Keybind = InputSystem.Keybind
+type CustomInput = InputSystem.CustomInput
+type InputSystem = InputSystem.InputSystem
+
+local Box = require("box")
+type BoxType = typeof(Box)
+
+local Arena = require("arena")
+type OverviewData = {
+	overview: { { position: Vec3, rotation: Quat } },
+}
+type ArenaTeam = Arena.ArenaTeam<OverviewData>
+type CasterArena = Arena.Arena<{}, OverviewData, OverviewData> & {
+	sendInfoMessage: (self: CasterArena) -> (),
+	setupOverviews: (self: CasterArena) -> (),
+}
+
+local HUD = require("hud")
+type HUD = HUD.HUD
+
+-- GameData
+local readLocation = 0
+local gameData: ReplayFrame
+
+local defaultKeybinds = {
+	keyboard = {
+		lineOfSight = { primary = Input.Key.Q, modifiers = { Input.Key.LeftAlt } },
+		previousPlayer = { primary = Input.Key.A, modifiers = {} },
+		right = { primary = Input.Key.D, modifiers = {} },
+		left = { primary = Input.Key.A, modifiers = {} },
+		resetFOV = { primary = Input.Key.MiddleMouseButton, modifiers = {} },
+		getClosestArena = { primary = Input.Key.Enter, modifiers = {} },
+		thirdPerson = { primary = Input.Key.V, modifiers = {} },
+		speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
+		lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
+		up = { primary = Input.Key.E, modifiers = {} },
+		clearOverlayInfo = { primary = Input.Key.BackSpace, modifiers = {} },
+		forwards = { primary = Input.Key.W, modifiers = {} },
+		overview3 = { primary = Input.Key.Seven, modifiers = {} },
+		freeCam = { primary = Input.Key.Z, modifiers = {} },
+		overview1 = { primary = Input.Key.Five, modifiers = {} },
+		backwards = { primary = Input.Key.S, modifiers = {} },
+		playerBallDistance = { primary = Input.Key.E, modifiers = { Input.Key.LeftAlt } },
+		speedUp = { primary = Input.Key.LeftShift, modifiers = {} },
+		overview2 = { primary = Input.Key.Six, modifiers = {} },
+		nextPlayer = { primary = Input.Key.D, modifiers = {} },
+		down = { primary = Input.Key.Q, modifiers = {} },
+		firstPerson = { primary = Input.Key.C, modifiers = {} },
+	},
+	gamepad = {
+		moveY = { primary = Input.Gamepad.LeftY, modifiers = {} },
+		previousPlayer = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
+		moveX = { primary = Input.Gamepad.LeftX, modifiers = {} },
+		nextPlayer = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
+		clearOverlayInfo = { primary = Input.Gamepad.Special_Left, modifiers = {} },
+		lookY = { primary = Input.Gamepad.RightY, modifiers = {} },
+		resetFOV = { primary = Input.Gamepad.DPad_Right, modifiers = {} },
+		getClosestArena = { primary = Input.Gamepad.Special_Right, modifiers = {} },
+		thirdPerson = { primary = Input.Gamepad.FaceButton_Top, modifiers = {} },
+		speedDown = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
+		up = { primary = Input.Gamepad.RightTrigger, modifiers = {} },
+		overview3 = { primary = Input.Gamepad.FaceButton_Right, modifiers = { Input.Gamepad.DPad_Left } },
+		overview1 = { primary = Input.Gamepad.FaceButton_Left, modifiers = { Input.Gamepad.DPad_Left } },
+		zoomOut = { primary = Input.Gamepad.DPad_Down, modifiers = {} },
+		zoomIn = { primary = Input.Gamepad.DPad_Up, modifiers = {} },
+		firstPerson = { primary = Input.Gamepad.FaceButton_Right, modifiers = {} },
+		freeCam = { primary = Input.Gamepad.FaceButton_Left, modifiers = {} },
+		playerBallDistance = { primary = Input.Gamepad.RightThumbstick, modifiers = {} },
+		speedUp = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
+		overview2 = { primary = Input.Gamepad.FaceButton_Top, modifiers = { Input.Gamepad.DPad_Left } },
+		lineOfSight = { primary = Input.Gamepad.LeftThumbstick, modifiers = {} },
+		down = { primary = Input.Gamepad.LeftTrigger, modifiers = {} },
+		lookX = { primary = Input.Gamepad.RightX, modifiers = {} },
+	},
+}
+
+InputSystem.setDefaultKeybinds(defaultKeybinds.keyboard, defaultKeybinds.gamepad)
 
 function compareVersion(
 	actualRelease: number,
