@@ -369,7 +369,7 @@ local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = ">=1.13.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
-local followPlussTick: (dt: number, isFollowing: boolean) -> ()
+local followPlussTick: (dt: number, followedBy: SpectatorCamera) -> ()
 
 local playerFollow = false
 local currentPlayer: ReplayPlayer? = nil
@@ -388,14 +388,14 @@ function getFollowVersion(version: string)
 	followPlussVersion = version
 end
 
-function getFollowPlussTick(_followPlussTick: (number, boolean) -> ())
+function getFollowPlussTick(_followPlussTick: (number, SpectatorCamera) -> ())
 	followPlussTick = _followPlussTick
 end
 
 type FollowPlusData = {
 	-- Callbacks
 	versionCallback: (string) -> ()?,
-	getMainProcessCallback: ((number, boolean) -> ()) -> ()?,
+	getMainProcessCallback: ((number, SpectatorCamera) -> ()) -> ()?,
 	guiCallback: (() -> ()) -> ()?,
 	topSettingsCallback: (() -> ()) -> ()?,
 	checkboxSettingsCallback: (() -> ()) -> ()?,
@@ -411,7 +411,6 @@ type FollowPlusData = {
 	goalCamSettingsCallback: (() -> ()) -> ()?,
 	getTargetPlayerCallback: (() -> ReplayPlayer?) -> ()?,
 	getFollowDataCallback: (() -> FollowPlusData) -> ()?,
-	setHideHeadCallback: (boolean) -> ()?,
 
 	-- Data
 	readLocation: number?,
@@ -1692,7 +1691,6 @@ function main()
 		local followSetupMessage: FollowPlusData = {
 			getMainProcessCallback = getFollowPlussTick,
 			versionCallback = getFollowVersion,
-			setHideHeadCallback = setHideHead,
 		}
 
 		sendMessage(followPlussCamera, followSetupMessage)
@@ -3843,7 +3841,7 @@ function tick(dt)
 	end
 
 	if playerFollow then
-		followPlussTick(dt, true)
+		followPlussTick(dt, camera)
 		Util.followCamera(followPlussId)
 		readOtherInputs()
 	else
