@@ -213,6 +213,24 @@ function Util.getDictKey(value, table): string
 	return key
 end
 
+--- Truns any table into a human readable json formatted string.
+function Util.tableToString(table): string
+	local tableString = "{\n "
+
+	if Util.getDictSize(table) > 0 then
+		for key, item in table do
+			if typeof(item) == "table" then
+				tableString ..= `{key}: {Util.tableToString(item)},\n `
+			else
+				tableString ..= `{key}: {tostring(item)},\n `
+			end
+		end
+	end
+
+	tableString ..= `\n}`
+	return tableString
+end
+
 --- Finds and adds missing keys from `structureTable` in `normalTable`
 --- @param structureTable the table that contains all wanted keys and their default values
 --- @param normalTable the table that should mimic the structure of `structureTable`
@@ -423,6 +441,61 @@ function Util.isDriftballHeld(ball: ReplayBall, ballRadius: number, players: { R
 	else
 		return nil
 	end
+end
+
+--[=[
+@param ball the ball that could be held
+@param player the player we are checking is holding the ball
+@return true if the player is holding the ball
+]=]
+function Util.isHoldingZDriftball(ball: ReplayBall, player: ReplayPlayer): boolean
+	local leftHandPoses = Util.decodePoseBits(player.leftHandPosebits)
+	local rightHandPoses = Util.decodePoseBits(player.rightHandPosebits)
+
+	local grabBallHandPos: { left: Vec3?, right: Vec3? } = {
+		left = nil,
+		right = nil,
+	}
+
+	if leftHandPoses.FullHandPoseOverride == Util.HandPose.GrabBall then
+		grabBallHandPos.left = Util.getLeftPlayerHand(player).position
+	end
+
+	if rightHandPoses.FullHandPoseOverride == Util.HandPose.GrabBall then
+		grabBallHandPos.right = Util.getRightPlayerHand(player).position
+	end
+
+	if grabBallHandPos.right == nil and grabBallHandPos.left == nil then
+		return false -- Not grabbing a ball
+	end
+
+	if
+		(grabBallHandPos.right and grabBallHandPos.right:distance(ball.transform.position) <= 10)
+		or (grabBallHandPos.left and grabBallHandPos.left:distance(ball.transform.position) <= 10)
+	then
+		return true
+	else
+		return false
+	end
+end
+
+--[=[
+Checks if a player is holding the zdrift ball
+
+**IMPORTANT:** This is meant for ZDrift and other gamemodes where you hold the ball with grip.
+For checking if a player is holding a ball with physical contact use `isDriftballHeld()`.
+
+@return the player holding the ball
+@return `nil` if no player is holding the ball
+]=]
+function Util.isZDriftballHeld(ball: ReplayBall, players: { ReplayPlayer }): ReplayPlayer?
+	for _, player in players do
+		if Util.isHoldingZDriftball(ball, player) then
+			return player
+		end
+	end
+
+	return nil
 end
 
 --- @return the closest player in the table `players` to the `ball`
