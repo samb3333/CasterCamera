@@ -1,17 +1,17 @@
 {
-    "author": "Dennssen",
-    "defaultKeybind": "",
-    "description": "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
-    "displayName": "Caster Camera",
-    "keywords": [
-        "casting",
-        "keyboard",
-        "gamepad",
-        "freecam",
-        "driftball",
-        "driftblitz"
-    ],
-    "main": "main.luau",
-    "name": "dennssen.caster",
-    "version": "2.1.5"
+  "author": "Dennssen",
+  "displayName": "Caster Camera",
+  "name": "dennssen.caster",
+  "version": "2.2.0",
+  "description": "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
+  "keywords": [
+    "casting",
+    "keyboard",
+    "gamepad",
+    "freecam",
+    "driftball",
+    "driftblitz"
+  ],
+  "defaultKeybind": "",
+  "main": "main.luau"
 }
