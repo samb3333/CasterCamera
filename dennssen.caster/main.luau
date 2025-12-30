@@ -225,7 +225,7 @@ function checkVersion(version: string, versionExpression: string, cameraName: st
 	if not release or not major or not minor then
 		return {
 			success = false,
-			msg = `Your version of {cameraName} is outdated, the recommended version is {exRelease}.{exMajor}.{exMinor}`,
+			msg = `Your version of {cameraName} is outdated, the Suggested version is {exRelease}.{exMajor}.{exMinor}`,
 		}
 	end
 
@@ -247,30 +247,30 @@ function checkVersion(version: string, versionExpression: string, cameraName: st
 
 	msg = `Your {cameraName} version is {release}.{major}.{minor}`
 	if exLogic == "=" then
-		msg ..= `\nRecommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor}`
+		msg ..= `\nSuggested version of {cameraName} is {exRelease}.{exMajor}.{exMinor}`
 		if comparison ~= 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == ">=" then
-		msg ..= `\nRecommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or higher`
+		msg ..= `\nSuggested version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or higher`
 
 		if comparison < 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == "<=" then
-		msg ..= `\nRecommended version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or lower`
+		msg ..= `\nSuggested version of {cameraName} is {exRelease}.{exMajor}.{exMinor} or lower`
 
 		if comparison > 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == ">" then
-		msg ..= `\nRecommended version of {cameraName} is higher than {exRelease}.{exMajor}.{exMinor}`
+		msg ..= `\nSuggested version of {cameraName} is higher than {exRelease}.{exMajor}.{exMinor}`
 
 		if comparison <= 0 then
 			return { success = false, msg = msg }
 		end
 	elseif exLogic == "<" then
-		msg ..= `\nRecommended version of {cameraName} is lower than {exRelease}.{exMajor}.{exMinor}`
+		msg ..= `\nSuggested version of {cameraName} is lower than {exRelease}.{exMajor}.{exMinor}`
 
 		if comparison >= 0 then
 			return { success = false, msg = msg }
@@ -367,6 +367,7 @@ end
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = ">=1.13.0"
+local recommendedFollowPlussVersion: string = ">=1.13.2"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
 local followPlussTick: (dt: number, followedBy: SpectatorCamera) -> ()
@@ -1697,14 +1698,20 @@ function main()
 		}
 
 		sendMessage(followPlussCamera, followSetupMessage)
-		local result = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
-		if not result.success then
+		local recommendedResult = checkVersion(followPlussVersion, recommendedFollowPlussVersion, "Follow Pluss")
+		if not recommendedResult.success then
 			followPlussWarning =
-				`WARNING:\n{result.msg}.\nIf you are experiencing issues please install the recommended version.`
+				`WARNING:\nThis Caster Camera Version is designed for a newer Follow+ version.\nIf you are experiencing issues please install the Follow+ version suggested below.\n{recommendedResult.msg}`
+		end
+
+		local requiredResult = checkVersion(followPlussVersion, requiredFollowPlussVersion, "Follow Pluss")
+		if not requiredResult.success then
+			followPlussWarning =
+				`WARNING:\nYour version of Follow+ is outdated.\nPlease install the minimum required version suggested below\n{requiredResult.msg}.`
 		end
 	else
 		followPlussWarning =
-			"WARNING:\nFollow Pluss is not installed. POV mode will not work. \nPlease install Follow Pluss for POV to work."
+			"WARNING:\nFollow+ is not installed. POV mode will not work. \nPlease install Follow+ for POV to work."
 	end
 	overlayCamera = getCameraById(overlayId)
 	if overlayCamera then
@@ -1716,7 +1723,7 @@ function main()
 		local result = checkVersion(overlayVersion, requiredOverlayVersion, "Overlay Info")
 		if not result.success then
 			overlayWarning =
-				`WARNING:\n{result.msg}.\nIf you are experiencing issues please install the recommended version.`
+				`WARNING:\n{result.msg}.\nIf you are experiencing issues please install the suggested version.`
 		end
 	end
 end
