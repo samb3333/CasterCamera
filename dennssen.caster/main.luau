@@ -440,6 +440,9 @@ type FollowPlusData = {
 	hideNearestHead: boolean?,
 	showQuests: boolean?,
 	autoRecordReplays: boolean?,
+	mouseSensitivity: number?,
+	controllerSensitivity: number?,
+	controllerDeadzone: number?,
 }
 
 type Color = {
@@ -3273,6 +3276,9 @@ function followPlayer()
 		autoGoalCam = false,
 		showQuests = false,
 		autoRecordReplays = false,
+		mouseSensitivity = mouseSensitivity,
+		controllerSensitivity = controllerSensitivity,
+		controllerDeadzone = deadzone,
 	}
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
