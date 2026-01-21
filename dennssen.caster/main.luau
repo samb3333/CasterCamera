@@ -2,6 +2,9 @@
 
 local version: string = "2.2.0"
 
+-- TODO:
+-- Implement `sendOverlayInfo` into the new overlay system
+
 -- Known Issues:
 -- No replay compatibility
 -- Ball outline does not show in POV mode
@@ -133,6 +136,8 @@ type CasterArena = Arena.Arena<{}, OverviewData, OverviewData> & {
 	setupOverviews: (self: CasterArena) -> (),
 }
 
+local Overlay = require("overlay")
+
 local HUD = require("hud")
 type HUD = HUD.HUD
 
@@ -152,7 +157,6 @@ local defaultKeybinds = {
 		speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
 		lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
 		up = { primary = Input.Key.E, modifiers = {} },
-		clearOverlayInfo = { primary = Input.Key.BackSpace, modifiers = {} },
 		forwards = { primary = Input.Key.W, modifiers = {} },
 		overview3 = { primary = Input.Key.Seven, modifiers = {} },
 		freeCam = { primary = Input.Key.Z, modifiers = {} },
@@ -170,7 +174,6 @@ local defaultKeybinds = {
 		previousPlayer = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
 		moveX = { primary = Input.Gamepad.LeftX, modifiers = {} },
 		nextPlayer = { primary = Input.Gamepad.RightShoulder, modifiers = {} },
-		clearOverlayInfo = { primary = Input.Gamepad.Special_Left, modifiers = {} },
 		lookY = { primary = Input.Gamepad.RightY, modifiers = {} },
 		resetFOV = { primary = Input.Gamepad.DPad_Right, modifiers = {} },
 		getClosestArena = { primary = Input.Gamepad.Special_Right, modifiers = {} },
@@ -338,30 +341,8 @@ local GetBallVariant = {
 }
 local getBallVariant = config.getBallVariant
 
--- Overlay Camera
-local overlayCamera: SpectatorCamera = nil
-local overlayId: string = "dennssen.overlayInfo"
-local requiredOverlayVersion: string = "=1.0.0"
-local overlayWarning: string = ""
-local overlayVersion: string = ""
-local usingOverlay: boolean = false
+-- Overlay
 local sendOverlayInfo: boolean = config.sendOverlayInfo
-local homeTeam: string = ""
-local awayTeam: string = ""
-local homePreviousRoundScore: number = 0
-local awayPreviousRoundScore: number = 0
-
-function sendSafeMessage(camera: SpectatorCamera, message)
-	if not usingOverlay or not sendOverlayInfo then
-		return
-	end
-
-	sendMessage(camera, message)
-end
-
-function getOverlayVersion(version: string)
-	overlayVersion = version
-end
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
@@ -498,38 +479,12 @@ CasterArena.__index = CasterArena
 setmetatable(CasterArena, { __index = Arena })
 
 function CasterArena:onGameStartHook()
-	sendSafeMessage(overlayCamera, {
-		info = "stats",
-		value = "clear",
-	})
-
-	sendSafeMessage(overlayCamera, {
-		info = "rounds",
-		value = "clear",
-	})
+	Overlay.clearStats()
 end
 
 function CasterArena:onRoundStartHook() end
 
-function CasterArena:onRoundEndHook(isRestart: boolean, homeScore: number, awayScore: number)
-	if isRestart then
-		return
-	end
-
-	local round: Round = {
-		home = {
-			score = homeScore,
-		},
-		away = {
-			score = awayScore,
-		},
-	}
-
-	sendSafeMessage(overlayCamera, {
-		info = "rounds",
-		value = round,
-	})
-end
+function CasterArena:onRoundEndHook(isRestart: boolean, homeScore: number, awayScore: number) end
 
 function CasterArena:postTickHook()
 	(self :: CasterArena):sendInfoMessage()
@@ -545,48 +500,19 @@ function CasterArena:sendInfoMessage()
 		table.insert(awayPlayerNames, player.playerName)
 	end
 
-	sendSafeMessage(overlayCamera, {
-		info = "players",
-		value = {
-			team = "home",
-			players = homePlayerNames,
-		},
-	})
-	sendSafeMessage(overlayCamera, {
-		info = "players",
-		value = {
-			team = "away",
-			players = awayPlayerNames,
-		},
-	})
+	Overlay.setPlayers(self.home.teamIndex, homePlayerNames)
+	Overlay.setPlayers(self.away.teamIndex, awayPlayerNames)
 
 	local followedPlayerName = ""
 	if currentPlayer then
 		followedPlayerName = currentPlayer.playerName
 	end
 
-	sendSafeMessage(overlayCamera, {
-		info = "followedPlayer",
-		value = followedPlayerName,
-	})
-
-	sendSafeMessage(overlayCamera, {
-		info = "overtime",
-		value = self.isOvertime,
-	})
-	sendSafeMessage(overlayCamera, {
-		info = "grace",
-		value = self.isGracePeriod,
-	})
-	sendSafeMessage(overlayCamera, {
-		info = "bestOf",
-		value = self.bestOfAmount,
-	})
-
-	sendSafeMessage(overlayCamera, {
-		info = "matchLength",
-		value = self.matchLengthSeconds,
-	})
+	Overlay.setFollowedPlayer(followedPlayerName)
+	Overlay.setIsOvertime(self.isOvertime)
+	Overlay.setIsGracePeriod(self.isGracePeriod)
+	Overlay.setBestOf(self.bestOfAmount)
+	Overlay.setMatchLengthSeconds(self.matchLengthSeconds)
 end
 
 type Arena3v3 = CasterArena & {
@@ -1419,12 +1345,6 @@ InputSystem.inputs = {
 			keyboardKeybindsDeserialized["getClosestArena"].primary,
 			keyboardKeybindsDeserialized["getClosestArena"].modifiers
 		),
-		clearOverlayInfo = InputSystem.createCustomInput(
-			"Clear Overlay Data",
-			"Remove overlay data",
-			keyboardKeybindsDeserialized["clearOverlayInfo"].primary,
-			keyboardKeybindsDeserialized["clearOverlayInfo"].modifiers
-		),
 		lookAround = InputSystem.createCustomInput(
 			"Look Around",
 			"Hold to rotate camera",
@@ -1575,12 +1495,6 @@ InputSystem.inputs = {
 			gamepadKeybindsDeserialized["getClosestArena"].primary,
 			gamepadKeybindsDeserialized["getClosestArena"].modifiers
 		),
-		clearOverlayInfo = InputSystem.createCustomInput(
-			"Clear Overlay Data",
-			"Remove Overlay Data",
-			gamepadKeybindsDeserialized["clearOverlayInfo"].primary,
-			gamepadKeybindsDeserialized["clearOverlayInfo"].modifiers
-		),
 	},
 }
 
@@ -1607,7 +1521,6 @@ local inputOrder = {
 		"overview2",
 		"overview3",
 		"getClosestArena",
-		"clearOverlayInfo",
 	},
 	gamepad = {
 		"moveY",
@@ -1632,7 +1545,6 @@ local inputOrder = {
 		"overview2",
 		"overview3",
 		"getClosestArena",
-		"clearOverlayInfo",
 	},
 }
 
@@ -1653,8 +1565,6 @@ local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
-local addRound: boolean = false
-local overlayResponse: string = ""
 local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
@@ -1713,19 +1623,6 @@ function main()
 		followPlussWarning =
 			"WARNING:\nFollow+ is not installed. POV mode will not work. \nPlease install Follow+ for POV to work."
 	end
-	overlayCamera = getCameraById(overlayId)
-	if overlayCamera then
-		usingOverlay = true
-		sendMessage(overlayCamera, {
-			info = "version",
-			value = getOverlayVersion,
-		})
-		local result = checkVersion(overlayVersion, requiredOverlayVersion, "Overlay Info")
-		if not result.success then
-			overlayWarning =
-				`WARNING:\n{result.msg}.\nIf you are experiencing issues please install the suggested version.`
-		end
-	end
 end
 
 function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globalOverviewRotation: Quat): string
@@ -1766,14 +1663,7 @@ end
 function setSelectedArena(arena: CasterArena)
 	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
-		sendSafeMessage(overlayCamera, {
-			info = "rounds",
-			value = "clear",
-		})
-		sendSafeMessage(overlayCamera, {
-			info = "slotId",
-			value = arena.slotId,
-		})
+		Overlay.setGamemodeId(arena.slotId)
 	end
 	arena.instantUpdate = true
 	selectedArena = arena
@@ -2103,95 +1993,11 @@ function onGui()
 		Gui.newLine()
 	end
 
-	if usingOverlay then
-		if Gui.collapsingHeader("Overlay") then
-			Gui.indent()
-			Gui.text(`Overlay version: {overlayVersion}`)
-			if overlayWarning ~= "" then
-				Gui.text(overlayWarning)
-			end
-			if overlayResponse ~= "" then
-				Gui.text(overlayResponse)
-			end
-			sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
-			Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
-
-			Gui.newLine()
-
-			homeTeam = Gui.inputText("Home Team Name", homeTeam)
-			Gui.setItemTooltip(
-				"The team name for the home side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
-			)
-			awayTeam = Gui.inputText("Away Team Name", awayTeam)
-			Gui.setItemTooltip(
-				"The team name for the away side to be sendt to the overlay for it to display.\nFor correctly setting the team logo please refer to the overlays instructions."
-			)
-			if Gui.button(`{Icon.Retweet} Swap team names`) then
-				local temp = homeTeam
-				homeTeam = awayTeam
-				awayTeam = temp
-				sendMessage(overlayCamera, {
-					info = "teamNames",
-					value = {
-						home = homeTeam,
-						away = awayTeam,
-					},
-				})
-				overlayResponse = "Team names are swapped"
-			end
-
-			if Gui.button(Icon.Upload .. " Send Teams to Overlay") then
-				sendMessage(overlayCamera, {
-					info = "teamNames",
-					value = {
-						home = homeTeam,
-						away = awayTeam,
-					},
-				})
-				overlayResponse = "Team names are sendt"
-			end
-
-			Gui.newLine()
-
-			if not addRound then
-				if Gui.button(Icon.Plus .. "Add Previous Round") then
-					addRound = true
-				end
-				Gui.setItemTooltip("Add info about a round that ended before you started casting")
-				if Gui.button(Icon.Trash .. "Remove Previous Round") then
-					sendMessage(overlayCamera, {
-						info = "rounds",
-						value = "remove",
-					})
-				end
-				Gui.setItemTooltip("Remove info about the previous round like it never happened")
-			else
-				Gui.text("Previous Round Info")
-				homePreviousRoundScore = Gui.dragInt("Home Score", homePreviousRoundScore, 1, 0, 100)
-				homePreviousRoundScore = math.max(0, homePreviousRoundScore)
-				Gui.setItemTooltip("The score for the home team in the pervious round")
-				awayPreviousRoundScore = Gui.dragInt("Away Score", awayPreviousRoundScore, 1, 0, 100)
-				awayPreviousRoundScore = math.max(0, awayPreviousRoundScore)
-				Gui.setItemTooltip("The score for the away team in the pervious round")
-
-				if Gui.button(Icon.Plus .. " Add Round") then
-					local round: Round = {
-						home = {
-							score = homePreviousRoundScore,
-						},
-						away = {
-							score = awayPreviousRoundScore,
-						},
-					}
-					sendMessage(overlayCamera, {
-						info = "rounds",
-						value = round,
-					})
-					addRound = false
-				end
-			end
-			Gui.unindent()
-		end
+	if Gui.collapsingHeader("Overlay") then
+		Gui.indent()
+		sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
+		Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
+		Gui.unindent()
 	end
 	Gui.unindent()
 
@@ -2416,15 +2222,6 @@ function onGui()
 
 			if Gui.button("Round Starts") then
 				GameStartEffect()
-			end
-			Gui.treePop()
-		end
-		if Gui.treeNode("Overlay") then
-			if Gui.button("Reset All Stats") then
-				sendMessage(overlayCamera, {
-					info = "stats",
-					value = "clear",
-				})
 			end
 			Gui.treePop()
 		end
@@ -2951,16 +2748,6 @@ function readOtherInputs()
 	end
 
 	if
-		InputSystem.getCustomKey(InputSystem.inputs.keyboard.clearOverlayInfo).down
-		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.clearOverlayInfo).down
-	then
-		sendMessage(overlayCamera, {
-			info = "stats",
-			value = "clear",
-		})
-	end
-
-	if
 		ball
 		and (
 			InputSystem.getCustomKey(InputSystem.inputs.keyboard.overview1).down
@@ -3352,24 +3139,24 @@ function checkBallContact()
 	end
 end
 
-function getLastPlayerWithBall(): ReplayPlayer?
-	local homeTouchTime: number = 0
-	local homePlayer: ReplayPlayer
-	local awayTouchTime: number = 0
-	local awayPlayer: ReplayPlayer
+function getLastPlayerWithBall(): { contactTime: number, player: ReplayPlayer }?
+	local homePlayer: { contactTime: number, player: ReplayPlayer }
+	local awayPlayer: { contactTime: number, player: ReplayPlayer }
 	if ballCollisionInfo.home.current then
-		homeTouchTime = ballCollisionInfo.home.current.contactTime
-		homePlayer = ballCollisionInfo.home.current.player
+		homePlayer = ballCollisionInfo.home.current
+	else
+		return
 	end
 
 	if ballCollisionInfo.away.current then
-		awayTouchTime = ballCollisionInfo.away.current.contactTime
-		awayPlayer = ballCollisionInfo.away.current.player
+		awayPlayer = ballCollisionInfo.away.current
+	else
+		return
 	end
 
-	if homeTouchTime > awayTouchTime then
+	if homePlayer.contactTime > awayPlayer.contactTime then
 		return homePlayer
-	elseif awayTouchTime > homeTouchTime then
+	elseif awayPlayer.contactTime > homePlayer.contactTime then
 		return awayPlayer
 	else
 		return nil
@@ -3447,49 +3234,45 @@ function checkForSave(goal: { team: string, dist: number }): boolean
 
 	local successfulSave = false
 
-	if goal.team == "home" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == Util.TeamIndex.AwayTeam then
-		if
-			not homeGoalPotentialEnter
-			and previousHomeGoalPotentialEnter
-			and goal.dist <= 600
-			and goalie
-			and goalie.teamIndex == Util.TeamIndex.HomeTeam
-		then
-			successfulSave = true
+	if not lastPlayerWithBall then
+		return false
+	end
 
-			resetPlayersWithBall()
+	local isHomeGoal = goal.team == "home"
+	local isAwayGoal = goal.team == "away"
 
-			sendSafeMessage(overlayCamera, {
-				info = "stats",
-				value = {
-					team = "home",
-					stat = "saves",
-					player = goalie.playerName,
-				},
-			})
-		end
-	elseif goal.team == "away" and lastPlayerWithBall and lastPlayerWithBall.teamIndex == Util.TeamIndex.HomeTeam then
-		if
-			not awayGoalPotentialEnter
-			and previousAwayGoalPotentialEnter
-			and goal.dist <= 600
-			and goalie
-			and goalie.teamIndex == Util.TeamIndex.AwayTeam
-		then
-			successfulSave = true
+	if not isHomeGoal and not isAwayGoal then
+		return false
+	end
 
-			resetPlayersWithBall()
+	local goalPotentialEnter = isHomeGoal and homeGoalPotentialEnter or awayGoalPotentialEnter
+	local previousGoalPotentialEnter = isHomeGoal and previousHomeGoalPotentialEnter or previousAwayGoalPotentialEnter
+	local teamIndex = isHomeGoal and Util.TeamIndex.HomeTeam or Util.TeamIndex.AwayTeam
 
-			sendSafeMessage(overlayCamera, {
-				info = "stats",
-				value = {
-					team = "away",
-					stat = "saves",
-					player = goalie.playerName,
-				},
-			})
+	if goalPotentialEnter then
+		return false
+	end
+	if not previousGoalPotentialEnter then
+		return false
+	end
+	if goal.dist > 600 then
+		return false
+	end
+	if not goalie or goalie.teamIndex ~= teamIndex then
+		return false
+	end
+
+	if lastPlayerWithBall.player.teamIndex == teamIndex then
+		-- The player who last touched the ball could be the goalie saving it
+		if os.clock() - lastPlayerWithBall.contactTime > 0.25 then
+			-- The player touched the ball way too long ago for it to be the goalie
+			return false
 		end
 	end
+
+	successfulSave = true
+	resetPlayersWithBall()
+	Overlay.increaseStat(teamIndex, goalie.playerName, "saves")
 
 	return successfulSave
 end
@@ -3613,38 +3396,21 @@ function goalScoreCheck()
 			assistName = assistPlayer.playerName
 		end
 
-		sendSafeMessage(overlayCamera, {
-			info = "shot",
-			value = {
-				shooter = shooterName,
-				assister = assistName,
-				team = "away",
-				shotSpeed = ball.velocity:length() / 100,
-				shotDistanceMeters = shotDistance,
-			},
+		Overlay.setShotInfo({
+			shooter = shooterName,
+			assister = assistName,
+			team = Util.TeamIndex.AwayTeam,
+			shotSpeed = ball.velocity:length() / 100,
+			shotDistanceMeters = shotDistance,
 		})
 
 		if goalPlayer then
 			resetPlayersWithBall()
 
-			sendSafeMessage(overlayCamera, {
-				info = "stats",
-				value = {
-					team = "away",
-					stat = "goals",
-					player = goalPlayer.playerName,
-				},
-			})
+			Overlay.increaseStat(Util.TeamIndex.AwayTeam, goalPlayer.playerName, "goals")
 
 			if assistPlayer then
-				sendSafeMessage(overlayCamera, {
-					info = "stats",
-					value = {
-						team = "away",
-						stat = "assists",
-						player = assistPlayer.playerName,
-					},
-				})
+				Overlay.increaseStat(Util.TeamIndex.AwayTeam, assistPlayer.playerName, "assists")
 
 				assistPlayer = nil
 			end
@@ -3674,37 +3440,21 @@ function goalScoreCheck()
 			assistName = assistPlayer.playerName
 		end
 
-		sendSafeMessage(overlayCamera, {
-			info = "shot",
-			value = {
-				shooter = shooterName, -- use lastPlayerWithBall instead of goalPlayer incase it is a self goal
-				assister = assistName,
-				team = "home",
-				shotSpeed = ball.velocity:length() / 100,
-				shotDistanceMeters = shotDistance,
-			},
+		Overlay.setShotInfo({
+			shooter = shooterName,
+			assister = assistName,
+			team = Util.TeamIndex.HomeTeam,
+			shotSpeed = ball.velocity:length() / 100,
+			shotDistanceMeters = shotDistance,
 		})
 
 		if goalPlayer then
 			resetPlayersWithBall()
 
-			sendSafeMessage(overlayCamera, {
-				info = "stats",
-				value = {
-					team = "home",
-					stat = "goals",
-					player = goalPlayer.playerName,
-				},
-			})
+			Overlay.increaseStat(Util.TeamIndex.HomeTeam, goalPlayer.playerName, "goals")
 			if assistPlayer then
-				sendSafeMessage(overlayCamera, {
-					info = "stats",
-					value = {
-						team = "home",
-						stat = "assists",
-						player = assistPlayer.playerName,
-					},
-				})
+				Overlay.increaseStat(Util.TeamIndex.HomeTeam, assistPlayer.playerName, "assists")
+
 				assistPlayer = nil
 			end
 		end
@@ -3872,6 +3622,8 @@ function tick(dt)
 	if ball then
 		goalScoreCheck()
 	end
+
+	Overlay.tick()
 
 	InputSystem.readInputEnd()
 
