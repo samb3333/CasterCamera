@@ -329,6 +329,64 @@ function Util.isBetween(n: number, min: number, max: number): boolean
 	end
 end
 
+--- @return a mutable mock of a `ReplayPlayer` with default values. e.g `player.playerName == ""`
+function Util.defaultReplayPlayer(): ReplayPlayer
+	return {
+		playerId = 0,
+		playerName = "",
+		isLocalPlayer = false,
+		root = {
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+		},
+		head = {
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+		},
+		leftHand = {
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+		},
+		rightHand = {
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+		},
+		velocity = Vec3.zeroVector,
+		leftThrusterActive = false,
+		rightThrusterActive = false,
+		isBraking = false,
+		isBigBoosting = false,
+		teamIndex = Util.TeamIndex.NoTeam,
+		playerColor = {
+			teamLogoIndex = 0,
+			teamName = "",
+			teamRowId = "",
+		},
+		leftClimbing = false,
+		rightClimbing = false,
+		leftColliding = false,
+		rightColliding = false,
+		leftSliding = false,
+		rightSliding = false,
+		leftHandPosebits = 0,
+		rightHandPosebits = 0,
+		localClimbOffset = Vec3.zeroVector,
+		grabbedByAnotherPlayerCounter = 0,
+	} :: any
+end
+
+--- @return a mutable mock of a `ReplayBall` with default values. e.g `ball.velocity == Vec3.zeroVector`
+function Util.defaultReplayBall(): ReplayBall
+	return {
+		transform = {
+			position = Vec3.zeroVector,
+			rotation = Quat.identity,
+		},
+		velocity = Vec3.zeroVector,
+		arena = 0,
+	} :: any
+end
+
 --- @return the index of the player within the table
 --- @return nil if the player is not in the table
 function Util.findPlayerInTable(table: { ReplayPlayer }, player: ReplayPlayer): number?
