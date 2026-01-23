@@ -35,15 +35,15 @@ type Round = {
 	},
 }
 
+type OverlayTeam = {
+	players: { [string]: Stats },
+}
+
 type APIStructure = {
 	gamemodeId: string,
 
-	home: {
-		players: { [string]: Stats },
-	},
-	away: {
-		players: { [string]: Stats },
-	},
+	home: OverlayTeam,
+	away: OverlayTeam,
 	rounds: { Round },
 	followedPlayer: string,
 	lastShotInfo: ShotInfo,
@@ -82,30 +82,30 @@ function Overlay.setGamemodeId(gamemodeId: string)
 end
 
 function Overlay.setPlayers(teamIndex: number, playerNames: { string })
-	local team: string = ""
+	local team: OverlayTeam = nil
 
 	if teamIndex == Utils.TeamIndex.HomeTeam then
-		team = "home"
+		team = api.home
 	elseif teamIndex == Utils.TeamIndex.AwayTeam then
-		team = "away"
+		team = api.away
 	end
 
-	if team == "" then
+	if team == nil then
 		-- Check for teamIndex NoTeam but also check for any number not in TeamIndex
 		return
 	end
 
 	-- Save current players
 	local currentPlayers: { [string]: boolean } = {}
-	for playerName: string, _ in api[team].players do
+	for playerName: string, _ in team.players do
 		currentPlayers[playerName] = true
 	end
 
 	-- Add new players
 	for _, playerName: string in playerNames do
-		if api[team].players[playerName] == nil then
+		if team.players[playerName] == nil then
 			print(`Created new player stats data for {playerName}`)
-			api[team].players[playerName] = newStats()
+			team.players[playerName] = newStats()
 		else
 			currentPlayers[playerName] = false
 		end
@@ -114,7 +114,7 @@ function Overlay.setPlayers(teamIndex: number, playerNames: { string })
 	-- Remove old players
 	for playerName: string, remove: boolean in currentPlayers do
 		if remove then
-			api[team].players[playerName] = nil
+			team.players[playerName] = nil
 		end
 	end
 end
@@ -130,30 +130,30 @@ function Overlay.clearStats()
 end
 
 function Overlay.increaseStat(teamIndex: number, playerName: string, stat: string)
-	local team: string = ""
+	local team: OverlayTeam = nil
 
 	if teamIndex == Utils.TeamIndex.HomeTeam then
-		team = "home"
+		team = api.home
 	elseif teamIndex == Utils.TeamIndex.AwayTeam then
-		team = "away"
+		team = api.away
 	end
 
-	if team == "" then
+	if team == nil then
 		-- Check for teamIndex NoTeam but also check for any number not in TeamIndex
 		return
 	end
 
-	if api[team].players[playerName] == nil then
+	if team.players[playerName] == nil then
 		return
 	end
 
-	if api[team].players[playerName][stat] == nil then
+	if team.players[playerName][stat] == nil then
 		return
 	end
 
 	print(`Increased stat {stat} for {playerName}`)
 
-	api[team].players[playerName][stat] += 1
+	team.players[playerName][stat] += 1
 end
 
 function Overlay.setFollowedPlayer(followedPlayer: string)
