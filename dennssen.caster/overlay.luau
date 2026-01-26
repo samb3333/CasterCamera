@@ -27,12 +27,8 @@ type ShotInfo = {
 }
 
 type Round = {
-	home: {
-		score: number,
-	},
-	away: {
-		score: number,
-	},
+	home: number,
+	away: number,
 }
 
 type OverlayTeam = {
@@ -117,6 +113,17 @@ function Overlay.setPlayers(teamIndex: number, playerNames: { string })
 			team.players[playerName] = nil
 		end
 	end
+end
+
+function Overlay.clearRounds()
+	api.rounds = {}
+end
+
+function Overlay.addRound(homeScore: number, awayScore: number)
+	table.insert(api.rounds, {
+		home = homeScore,
+		away = awayScore,
+	})
 end
 
 function Overlay.clearStats()
