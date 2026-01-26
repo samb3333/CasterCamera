@@ -343,6 +343,9 @@ local getBallVariant = config.getBallVariant
 
 -- Overlay
 local sendOverlayInfo: boolean = config.sendOverlayInfo
+local debugBestOfAmount: number = 0
+local debugHomeScore: number = 0
+local debugAwayScore: number = 0
 
 -- Follow Camera
 local followPlussCamera: SpectatorCamera = nil
@@ -512,7 +515,7 @@ function CasterArena:sendInfoMessage()
 	Overlay.setFollowedPlayer(followedPlayerName)
 	Overlay.setIsOvertime(self.isOvertime)
 	Overlay.setIsGracePeriod(self.isGracePeriod)
-	Overlay.setBestOf(self.bestOfAmount)
+	Overlay.setBestOf(self.bestOfAmount ~= 0 and self.bestOfAmount or debugBestOfAmount)
 	Overlay.setMatchLengthSeconds(self.matchLengthSeconds)
 end
 
@@ -2223,6 +2226,19 @@ function onGui()
 
 			if Gui.button("Round Starts") then
 				GameStartEffect()
+			end
+			Gui.treePop()
+		end
+		if Gui.treeNode("Overlay") then
+			debugBestOfAmount = Gui.dragInt("Best Of", debugBestOfAmount, 1, 0, 99)
+			debugHomeScore = Gui.dragInt("Home Score", debugHomeScore, 1, 0, 99)
+			debugAwayScore = Gui.dragInt("Away Score", debugAwayScore, 1, 0, 99)
+			if Gui.button("Add Round") then
+				Overlay.addRound(debugHomeScore, debugAwayScore)
+			end
+
+			if Gui.button("Clear Rounds") then
+				Overlay.clearRounds()
 			end
 			Gui.treePop()
 		end
