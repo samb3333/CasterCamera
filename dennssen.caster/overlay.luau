@@ -100,7 +100,6 @@ function Overlay.setPlayers(teamIndex: number, playerNames: { string })
 	-- Add new players
 	for _, playerName: string in playerNames do
 		if team.players[playerName] == nil then
-			print(`Created new player stats data for {playerName}`)
 			team.players[playerName] = newStats()
 		else
 			currentPlayers[playerName] = false
@@ -127,12 +126,12 @@ function Overlay.addRound(homeScore: number, awayScore: number)
 end
 
 function Overlay.clearStats()
-	for _, stats: Stats in api.home.players do
-		stats = newStats()
+	for playerName: string, _ in api.home.players do
+		api.home.players[playerName] = newStats()
 	end
 
-	for _, stats: Stats in api.away.players do
-		stats = newStats()
+	for playerName: string, _ in api.away.players do
+		api.away.players[playerName] = newStats()
 	end
 end
 
@@ -157,8 +156,6 @@ function Overlay.increaseStat(teamIndex: number, playerName: string, stat: strin
 	if team.players[playerName][stat] == nil then
 		return
 	end
-
-	print(`Increased stat {stat} for {playerName}`)
 
 	team.players[playerName][stat] += 1
 end
