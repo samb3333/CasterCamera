@@ -2130,6 +2130,10 @@ function onGui()
 					)
 				end
 				if Gui.button("Print Selected Arena") then
+					print(selectedArena)
+				end
+				Gui.sameLine()
+				if Gui.button("Print Selected String Arena") then
 					print(`Selected Arena: {Util.tableToString(selectedArena)}`)
 				end
 				if Gui.treeNode("Selected Arena Dimensions") then
