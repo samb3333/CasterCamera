@@ -2616,17 +2616,12 @@ end
 function GameStartEffect()
 	local particlePosition = selectedArena.centerBox.position
 
-	local colourAverage = {
-		r = (homeTeamPrimaryColor.r + awayTeamPrimaryColor.r) / 2,
-		g = (homeTeamPrimaryColor.g + awayTeamPrimaryColor.g) / 2,
-		b = (homeTeamPrimaryColor.b + awayTeamPrimaryColor.b) / 2,
-	}
 	createParticle(
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.9,
 		Vec3.zeroVector,
-		colourAverage,
+		awayTeamPrimaryColor,
 		ParticleVariant.Rings,
 		150
 	)
@@ -2635,7 +2630,7 @@ function GameStartEffect()
 		selectedArena.transform.rotation,
 		0.7,
 		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
-		colourAverage,
+		awayTeamPrimaryColor,
 		ParticleVariant.Rings,
 		600
 	)
@@ -2643,8 +2638,8 @@ function GameStartEffect()
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.7,
-		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
-		colourAverage,
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 5)),
+		homeTeamPrimaryColor,
 		ParticleVariant.Rings,
 		400
 	)
