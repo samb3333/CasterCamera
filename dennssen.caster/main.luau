@@ -2137,6 +2137,8 @@ function onGui()
 					Gui.treePop()
 				end
 
+				local isOld4v4 = (selectedArena :: Arena4v4).isOld4v4 ~= nil and (selectedArena :: Arena4v4):isOld4v4()
+				Gui.text(`Is Old 4v4: {isOld4v4}`)
 				Gui.text("Home Team: ")
 				Gui.indent()
 				for i, player in selectedArena.home.players do
@@ -2213,6 +2215,15 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Particles") then
+			Gui.text(`Home Color: {Util.tableToString(homeTeamPrimaryColor)}`)
+			Gui.text(`Away Color: {Util.tableToString(awayTeamPrimaryColor)}`)
+			local colourAverage = {
+				r = math.min(homeTeamPrimaryColor.r + awayTeamPrimaryColor.r, 1),
+				g = math.min(homeTeamPrimaryColor.g + awayTeamPrimaryColor.g, 1),
+				b = math.min(homeTeamPrimaryColor.b + awayTeamPrimaryColor.b, 1),
+			}
+			Gui.text(`Combined Color: {Util.tableToString(colourAverage)}`)
+
 			if Gui.button("Home Scores") then
 				DoGoalExplosion(selectedArena.home)
 			end
