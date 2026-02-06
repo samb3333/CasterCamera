@@ -56,16 +56,16 @@ Util.initializeConfig({
 		},
 		_4v4 = {
 			{
-				position = Vec3.new(1055, -2600, 540),
-				rotation = Quat.fromEuler(0, -7.5, 30),
+				position = Vec3.new(680, -2632, 1315),
+				rotation = Quat.fromEuler(0, -18, 40),
 			},
 			{
-				position = Vec3.new(2935, 0, 65),
+				position = Vec3.new(2925, 0, 165),
 				rotation = Quat.fromEuler(0, 5, 0),
 			},
 			{
-				position = Vec3.new(3390, 2595, 215),
-				rotation = Quat.fromEuler(0, -7.5, -105),
+				position = Vec3.new(3565, 2670, 1305),
+				rotation = Quat.fromEuler(0, -25, -122),
 			},
 		},
 		_driftblitz = {
@@ -664,11 +664,11 @@ setmetatable(Arena4v4, { __index = CasterArena })
 
 Arena4v4.homeRotationOffset = Quat.fromEuler(0, 0, 90)
 Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, -90)
-Arena4v4.boxSize = Vec3.new(6110, 8400, 1490)
-Arena4v4.boxOffset = Vec3.new(0, 0, 600)
-Arena4v4.centerBoxOffset = Vec3.new(0, 0, 250)
-Arena4v4.goalBoxSize = Vec3.new(220, 450, 225)
-Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
+Arena4v4.boxSize = Vec3.new(6715, 8400, 1490)
+Arena4v4.boxOffset = Vec3.new(0, 0, 685)
+Arena4v4.centerBoxOffset = Vec3.new(0, 0, 435)
+Arena4v4.goalBoxSize = Vec3.new(165, 450, 225)
+Arena4v4.goalPositionOffset = Vec3.new(4085, 0, 270)
 
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena4v4
 	local self: Arena4v4 = setmetatable(Arena.new(gamemode, frameIndex), Arena4v4) :: any
