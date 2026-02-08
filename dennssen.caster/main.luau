@@ -3098,12 +3098,14 @@ function DoGoalExplosion(team: ArenaTeam)
 	local goalExplosionPosition: Vec3
 	local goalExplosionColor: Color
 
+	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
+
 	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
 		goalExplosionPosition = ball.transform.position
 	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
-		goalExplosionPosition = selectedArena.away.goal.position + Vec3.new(0, 0, -60)
+		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
 	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
-		goalExplosionPosition = selectedArena.home.goal.position + Vec3.new(0, 0, -60)
+		goalExplosionPosition = selectedArena.home.goal.position + goalExplosionOffset
 	end
 
 	if team.teamIndex == Util.TeamIndex.HomeTeam then
