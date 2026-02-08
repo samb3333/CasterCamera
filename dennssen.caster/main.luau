@@ -676,11 +676,13 @@ function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number):
 
 	local name: string = ""
 
-	if self.slotId:find("TKB") then
+	if self.slotId:find("TKB_") then
 		name = self.slotId:gsub("TKB_", "")
-	else
+	elseif self.slotId:find("_") then
 		local nameEnd = self.slotId:find("_") :: number
 		name = `{self.slotId:sub(1, nameEnd - 1)} {self.slotId:sub(self.slotId:len() - 2)}`
+	else
+		name = self.slotId
 	end
 
 	self.name = name
@@ -1085,6 +1087,7 @@ function getArenas(): { [any]: CasterArena }
 		elseif
 			(slotId:find("Jakeball") or slotId:find("Driftball"))
 			or (slotId:find("TKB") and slotId:find("Driftplex") and not slotId:find("Full"))
+			or (slotId:find("Beta") or slotId:find("Gamma") or slotId:find("Alpha"))
 		then
 			local arena: CasterArena = Arena4v4.new(gamemode, readLocation) :: Arena4v4
 			arenas[arena.name] = arena
