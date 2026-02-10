@@ -429,13 +429,6 @@ type FollowPlusData = {
 	controllerDeadzone: number?,
 }
 
-local ParticleVariant = {
-	Embers = "embers",
-	Rings = "rings",
-	GoalRing = "goalring",
-	Rocket = "rocket",
-}
-
 type Overview = {
 	position: Vec3,
 	rotation: Quat,
@@ -2405,7 +2398,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 			0.3,
 			velocityVector,
 			particleColor,
-			ParticleVariant.Embers,
+			ParticleSystem.Variant.Embers,
 			math.random(800, 1300)
 		)
 	end
@@ -2415,7 +2408,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 		0.9,
 		Vec3.zeroVector,
 		particleColor,
-		ParticleVariant.Rings,
+		ParticleSystem.Variant.Rings,
 		150
 	)
 
@@ -2426,7 +2419,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 		1,
 		Vec3.zeroVector,
 		particleColor,
-		ParticleVariant.Rings,
+		ParticleSystem.Variant.Rings,
 		200
 	)
 	ParticleSystem:createParticle(
@@ -2435,7 +2428,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 		1,
 		Vec3.zeroVector,
 		particleColor,
-		ParticleVariant.Rings,
+		ParticleSystem.Variant.Rings,
 		400
 	)
 
@@ -2452,7 +2445,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 			1,
 			goalRotation:getForwardVector() * goalSpeed,
 			particleColor,
-			ParticleVariant.GoalRing,
+			ParticleSystem.Variant.GoalRing,
 			400
 		)
 		goalSpeed /= 2
@@ -2474,7 +2467,7 @@ function GameStartEffect()
 		0.9,
 		Vec3.zeroVector,
 		colourAverage,
-		ParticleVariant.Rings,
+		ParticleSystem.Variant.Rings,
 		150
 	)
 	ParticleSystem:createParticle(
@@ -2483,7 +2476,7 @@ function GameStartEffect()
 		0.7,
 		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
 		colourAverage,
-		ParticleVariant.Rings,
+		ParticleSystem.Variant.Rings,
 		600
 	)
 	ParticleSystem:createParticle(
@@ -2492,7 +2485,7 @@ function GameStartEffect()
 		0.7,
 		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
 		colourAverage,
-		ParticleVariant.Rings,
+		ParticleSystem.Variant.Rings,
 		400
 	)
 	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
@@ -2504,7 +2497,7 @@ function GameStartEffect()
 			0.5,
 			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
 			colourPallette[math.random(1, 2)],
-			ParticleVariant.Embers,
+			ParticleSystem.Variant.Embers,
 			math.random(800, 1300)
 		)
 	end

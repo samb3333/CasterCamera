@@ -1,10 +1,3 @@
-local ParticleVariant = {
-	Embers = "embers",
-	Rings = "rings",
-	GoalRing = "goalring",
-	Rocket = "rocket",
-}
-
 type Particle = {
 	position: Vec3,
 	rotation: Quat,
@@ -21,6 +14,13 @@ type ParticelSystem = {
 	particles: { Particle },
 	replay: Replay?,
 	speed: number,
+
+	Variant: {
+		Embers: string,
+		Rings: string,
+		GoalRing: string,
+		Rocket: string,
+	},
 
 	createParticle: (
 		self: ParticelSystem,
@@ -42,6 +42,12 @@ ParticleSystem.vibrance = 1
 ParticleSystem.particles = {}
 ParticleSystem.replay = nil
 ParticleSystem.speed = 1
+ParticleSystem.Variant = {
+	Embers = "embers",
+	Rings = "rings",
+	GoalRing = "goalring",
+	Rocket = "rocket",
+}
 
 function ParticleSystem:createParticle(
 	position: Vec3,
@@ -53,7 +59,7 @@ function ParticleSystem:createParticle(
 	lifespan: number
 )
 	local variantExists = false
-	for _, value in pairs(ParticleVariant) do
+	for _, value in pairs(self.Variant) do
 		if value == variant then
 			variantExists = true
 		end
@@ -99,17 +105,17 @@ function ParticleSystem:particleAffect()
 			--affect position
 			local emberDrag = 0.95
 			local gravityMultiplier = 0.8
-			if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
+			if particle.variant == self.Variant.Embers or particle.variant == self.Variant.Rocket then
 				particle.velocity -= (gravity.upDirection * gravityMultiplier * self.speed)
 
 				--ember drag
-				if particle.variant ~= ParticleVariant.Rocket then
+				if particle.variant ~= self.Variant.Rocket then
 					particle.velocity = particle.velocity * (emberDrag ^ self.speed)
 				end
 			end
 
 			--collision
-			if particle.variant == ParticleVariant.Embers then
+			if particle.variant == self.Variant.Embers then
 				local hit = camera:castRay(particle.position, particle.velocity + particle.position)
 				if hit.successful then
 					local dotProduct = particle.velocity:dot(hit.normal)
@@ -124,9 +130,9 @@ function ParticleSystem:particleAffect()
 
 			--affect scale
 			if
-				particle.variant == ParticleVariant.Embers
-				or particle.variant == ParticleVariant.Rings
-				or particle.variant == ParticleVariant.GoalRing
+				particle.variant == self.Variant.Embers
+				or particle.variant == self.Variant.Rings
+				or particle.variant == self.Variant.GoalRing
 			then
 				particle.scale *= ((particle.aliveTime / particle.lifespan) ^ self.speed)
 			end
@@ -138,7 +144,7 @@ function ParticleSystem:particleAffect()
 		end
 
 		--draw parts
-		if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
+		if particle.variant == self.Variant.Embers or particle.variant == self.Variant.Rocket then
 			WorldDraw.drawLine(
 				particle.position,
 				particle.position - particle.velocity,
@@ -151,7 +157,7 @@ function ParticleSystem:particleAffect()
 		end
 
 		--generate rings
-		if particle.variant == ParticleVariant.Rings then
+		if particle.variant == self.Variant.Rings then
 			local r = (1 - particle.aliveTime / particle.lifespan) * 6000
 			local resolution = 90
 			local theta = 2 * math.pi / resolution
@@ -176,7 +182,7 @@ function ParticleSystem:particleAffect()
 
 			--generate goal ring
 		end
-		if particle.variant == ParticleVariant.GoalRing then
+		if particle.variant == self.Variant.GoalRing then
 			local goalOutline = {
 				Vec3.new(0, -248.905, -52.404),
 				Vec3.new(0, -248.905, 109.223),
