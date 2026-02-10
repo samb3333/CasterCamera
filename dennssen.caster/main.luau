@@ -29,18 +29,6 @@ Util.initializeConfig({
 	getBallVariant = "PlayerBallDistance",
 	sendOverlayInfo = true,
 	thirdPersonMode = 2,
-	homeTeamDefaultColor = {
-		R = 0,
-		G = 0.5,
-		B = 0.5,
-		A = 1,
-	},
-	awayTeamDefaultColor = {
-		R = 1,
-		G = 0.1,
-		B = 0.1,
-		A = 1,
-	},
 	overviewOffsets = {
 		_3v3 = {
 			{
@@ -1098,10 +1086,6 @@ end
 local selectedArena: CasterArena = nil
 
 -- Particles
-local homeTeamDefaultColor: LinearColor = config.homeTeamDefaultColor
-local awayTeamDefaultColor: LinearColor = config.awayTeamDefaultColor
-local homeTeamPrimaryColor: LinearColor = homeTeamDefaultColor
-local awayTeamPrimaryColor: LinearColor = awayTeamDefaultColor
 ParticleSystem.vibrance = config.vibrance
 ParticleSystem.speed = config.particleSimSpeed
 
@@ -1843,21 +1827,6 @@ function onGui()
 		Gui.newLine()
 		ParticleSystem.vibrance = Gui.sliderInt("Color Vibrance", ParticleSystem.vibrance, 1, 20)
 		ParticleSystem.vibrance = math.clamp(ParticleSystem.vibrance, 1, 20)
-		local homeDefault: Vec3 = Vec3.new(homeTeamDefaultColor.R, homeTeamDefaultColor.G, homeTeamDefaultColor.B)
-		homeDefault = Gui.sliderFloat3("Home Default Color", homeDefault, 0, 1)
-		homeDefault = Util.vec3ClampAxis(homeDefault, 0, 1)
-		homeTeamDefaultColor = LinearColor.new(homeDefault.x, homeDefault.y, homeDefault.z, 1)
-
-		Gui.setItemTooltip(
-			"The default color for team Home, this gets overwritten by the actual color when a player joins the team"
-		)
-		local awayDefault: Vec3 = Vec3.new(awayTeamDefaultColor.R, awayTeamDefaultColor.G, awayTeamDefaultColor.B)
-		awayDefault = Gui.sliderFloat3("Away Default Color", awayDefault, 0, 1)
-		awayDefault = Util.vec3ClampAxis(awayDefault, 0, 1)
-		awayTeamDefaultColor = LinearColor.new(awayDefault.x, awayDefault.y, awayDefault.z, 1)
-		Gui.setItemTooltip(
-			"The default color for team Away, this gets overwritten by the actual color when a player joins the team"
-		)
 		Gui.unindent()
 		Gui.newLine()
 	end
@@ -1998,18 +1967,6 @@ function onGui()
 		config.getBallVariant = getBallVariant
 		config.sendOverlayInfo = sendOverlayInfo
 		config.thirdPersonMode = thirdPersonMode
-		config.homeTeamDefaultColor = {
-			R = homeTeamDefaultColor.R,
-			G = homeTeamDefaultColor.G,
-			B = homeTeamDefaultColor.B,
-			A = 1,
-		}
-		config.awayTeamDefaultColor = {
-			R = awayTeamDefaultColor.R,
-			G = awayTeamDefaultColor.G,
-			B = awayTeamDefaultColor.B,
-			A = 1,
-		}
 		config.postProcessing = {
 			bloomIntensity = bloomIntensity,
 			bloomThreshold = bloomThreshold,
@@ -2455,10 +2412,13 @@ end
 function GameStartEffect()
 	local particlePosition = selectedArena.centerBox.position
 
+	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
+	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
+
 	local colourAverage = LinearColor.new(
-		(homeTeamPrimaryColor.R + awayTeamPrimaryColor.R) / 2,
-		(homeTeamPrimaryColor.G + awayTeamPrimaryColor.G) / 2,
-		(homeTeamPrimaryColor.B + awayTeamPrimaryColor.B) / 2,
+		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
+		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
+		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,
 		1
 	)
 	ParticleSystem:createParticle(
@@ -2488,7 +2448,7 @@ function GameStartEffect()
 		ParticleSystem.Variant.Rings,
 		400
 	)
-	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
+	local colourPallette = { normalizedHomeColor, normalizedAwayColor }
 	for i = 1, 300 do
 		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
 		ParticleSystem:createParticle(
@@ -2936,7 +2896,7 @@ end
 
 function DoGoalExplosion(team: ArenaTeam)
 	local goalExplosionPosition: Vec3
-	local goalExplosionColor: LinearColor
+	local goalExplosionColor: LinearColor = Util.linearColorNormalized(team.color)
 
 	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
 
@@ -2946,12 +2906,6 @@ function DoGoalExplosion(team: ArenaTeam)
 		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
 	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
 		goalExplosionPosition = selectedArena.home.goal.position + goalExplosionOffset
-	end
-
-	if team.teamIndex == Util.TeamIndex.HomeTeam then
-		goalExplosionColor = homeTeamPrimaryColor
-	else
-		goalExplosionColor = awayTeamPrimaryColor
 	end
 
 	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
@@ -3327,24 +3281,6 @@ function ballInCenterCheck()
 	end
 end
 
-function getTeamColors()
-	if #selectedArena.home.players > 0 then
-		local firstPlayer = selectedArena.home.players[1]
-		local playerJson = firstPlayer:toJson()
-		homeTeamPrimaryColor = Util.extractPrimaryPlayerColor(playerJson)
-	else
-		homeTeamPrimaryColor = homeTeamDefaultColor
-	end
-
-	if #selectedArena.away.players > 0 then
-		local firstPlayer = selectedArena.away.players[1]
-		local playerJson = firstPlayer:toJson()
-		awayTeamPrimaryColor = Util.extractPrimaryPlayerColor(playerJson)
-	else
-		awayTeamPrimaryColor = awayTeamDefaultColor
-	end
-end
-
 function drawBallOutline()
 	if not ballOutline then
 		return
@@ -3449,8 +3385,6 @@ function tick(dt)
 
 	selectedArena:tick()
 	ball = selectedArena.ball
-
-	getTeamColors()
 
 	if #gameData.players < 1 and playerFollow then
 		stopFollow()
