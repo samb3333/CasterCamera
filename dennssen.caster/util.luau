@@ -153,16 +153,16 @@ end
 --- Gets a players primary color using it's JSON data
 --- @param playerJson the `ReplayPlayer`'s json data
 --- @return a table with r, g and b properties
-function Util.extractPrimaryPlayerColor(playerJson: string): { r: number, g: number, b: number }
+function Util.extractPrimaryPlayerColor(playerJson: string): LinearColor
 	local r: number? = tonumber(playerJson:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)'))
 	local g: number? = tonumber(playerJson:match('"primary"%s*:%s*{.-"g"%s*:%s*(%d+)'))
 	local b: number? = tonumber(playerJson:match('"primary"%s*:%s*{.-"b"%s*:%s*(%d+)'))
 
 	if r == nil or g == nil or b == nil then
-		return { r = 0, b = 0, g = 0 }
+		return LinearColor.White
 	end
 
-	return { r = r / 255, g = g / 255, b = b / 255 }
+	return LinearColor.new(r / 255, g / 255, b / 255, 1)
 end
 
 --- @return the size of the dict
