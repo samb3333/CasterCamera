@@ -30,14 +30,16 @@ Util.initializeConfig({
 	sendOverlayInfo = true,
 	thirdPersonMode = 2,
 	homeTeamDefaultColor = {
-		r = 0,
-		g = 0.5,
-		b = 0.5,
+		R = 0,
+		G = 0.5,
+		B = 0.5,
+		A = 1,
 	},
 	awayTeamDefaultColor = {
-		r = 1,
-		g = 0.1,
-		b = 0.1,
+		R = 1,
+		G = 0.1,
+		B = 0.1,
+		A = 1,
 	},
 	overviewOffsets = {
 		_3v3 = {
@@ -111,6 +113,8 @@ Util.initializeConfig({
 		exposureBias = 1,
 	},
 })
+
+local ParticleSystem = require("particlesystem")
 
 local InputSystem = require("inputsystem")
 type Keybind = InputSystem.Keybind
@@ -423,23 +427,6 @@ type FollowPlusData = {
 	mouseSensitivity: number?,
 	controllerSensitivity: number?,
 	controllerDeadzone: number?,
-}
-
-type Color = {
-	r: number,
-	g: number,
-	b: number,
-}
-
-type Particle = {
-	position: Vec3,
-	rotation: Quat,
-	scale: number,
-	velocity: Vec3,
-	Color: Color,
-	variant: string,
-	lifespan: number,
-	aliveTime: number,
 }
 
 local ParticleVariant = {
@@ -1118,13 +1105,12 @@ end
 local selectedArena: CasterArena = nil
 
 -- Particles
-local homeTeamDefaultColor: Color = config.homeTeamDefaultColor
-local awayTeamDefaultColor: Color = config.awayTeamDefaultColor
-local homeTeamPrimaryColor: Color = homeTeamDefaultColor
-local awayTeamPrimaryColor: Color = awayTeamDefaultColor
-local vibrance = config.vibrance
-local particlesTable = {}
-local particleSimSpeed = config.particleSimSpeed
+local homeTeamDefaultColor: LinearColor = config.homeTeamDefaultColor
+local awayTeamDefaultColor: LinearColor = config.awayTeamDefaultColor
+local homeTeamPrimaryColor: LinearColor = homeTeamDefaultColor
+local awayTeamPrimaryColor: LinearColor = awayTeamDefaultColor
+ParticleSystem.vibrance = config.vibrance
+ParticleSystem.speed = config.particleSimSpeed
 
 -- Post Processing
 
@@ -1859,28 +1845,23 @@ function onGui()
 
 	if Gui.collapsingHeader("Particles") then
 		Gui.indent()
-		particleSimSpeed = Gui.sliderFloat("Particle Speed", particleSimSpeed, 0.001, 1)
-		particleSimSpeed = math.clamp(particleSimSpeed, 0.001, 1)
+		ParticleSystem.speed = Gui.sliderFloat("Particle Speed", ParticleSystem.speed, 0.001, 1)
+		ParticleSystem.speed = math.clamp(ParticleSystem.speed, 0.001, 1)
 		Gui.newLine()
-		vibrance = Gui.sliderInt("Color Vibrance", vibrance, 1, 20)
-		vibrance = math.clamp(vibrance, 1, 20)
-		local homeDefault: Vec3 = Vec3.new(homeTeamDefaultColor.r, homeTeamDefaultColor.g, homeTeamDefaultColor.b)
+		ParticleSystem.vibrance = Gui.sliderInt("Color Vibrance", ParticleSystem.vibrance, 1, 20)
+		ParticleSystem.vibrance = math.clamp(ParticleSystem.vibrance, 1, 20)
+		local homeDefault: Vec3 = Vec3.new(homeTeamDefaultColor.R, homeTeamDefaultColor.G, homeTeamDefaultColor.B)
 		homeDefault = Gui.sliderFloat3("Home Default Color", homeDefault, 0, 1)
-		homeTeamDefaultColor = {
-			r = math.clamp(homeDefault.x, 0, 1),
-			g = math.clamp(homeDefault.y, 0, 1),
-			b = math.clamp(homeDefault.z, 0, 1),
-		}
+		homeDefault = Util.vec3ClampAxis(homeDefault, 0, 1)
+		homeTeamDefaultColor = LinearColor.new(homeDefault.x, homeDefault.y, homeDefault.z, 1)
+
 		Gui.setItemTooltip(
 			"The default color for team Home, this gets overwritten by the actual color when a player joins the team"
 		)
-		local awayDefault: Vec3 = Vec3.new(awayTeamDefaultColor.r, awayTeamDefaultColor.g, awayTeamDefaultColor.b)
+		local awayDefault: Vec3 = Vec3.new(awayTeamDefaultColor.R, awayTeamDefaultColor.G, awayTeamDefaultColor.B)
 		awayDefault = Gui.sliderFloat3("Away Default Color", awayDefault, 0, 1)
-		awayTeamDefaultColor = {
-			r = math.clamp(awayDefault.x, 0, 1),
-			g = math.clamp(awayDefault.y, 0, 1),
-			b = math.clamp(awayDefault.z, 0, 1),
-		}
+		awayDefault = Util.vec3ClampAxis(awayDefault, 0, 1)
+		awayTeamDefaultColor = LinearColor.new(awayDefault.x, awayDefault.y, awayDefault.z, 1)
 		Gui.setItemTooltip(
 			"The default color for team Away, this gets overwritten by the actual color when a player joins the team"
 		)
@@ -2018,21 +1999,23 @@ function onGui()
 		config.controllerSensitivity = controllerSensitivity
 		config.positionSmoothing = positionSmoothing
 		config.lookSmoothness = lookSmoothness
-		config.particleSimSpeed = particleSimSpeed
+		config.particleSimSpeed = ParticleSystem.speed
 		config.ballOutline = ballOutline
-		config.vibrance = vibrance
+		config.vibrance = ParticleSystem.vibrance
 		config.getBallVariant = getBallVariant
 		config.sendOverlayInfo = sendOverlayInfo
 		config.thirdPersonMode = thirdPersonMode
 		config.homeTeamDefaultColor = {
-			r = homeTeamDefaultColor.r,
-			g = homeTeamDefaultColor.g,
-			b = homeTeamDefaultColor.b,
+			R = homeTeamDefaultColor.R,
+			G = homeTeamDefaultColor.G,
+			B = homeTeamDefaultColor.B,
+			A = 1,
 		}
 		config.awayTeamDefaultColor = {
-			r = awayTeamDefaultColor.r,
-			g = awayTeamDefaultColor.g,
-			b = awayTeamDefaultColor.b,
+			R = awayTeamDefaultColor.R,
+			G = awayTeamDefaultColor.G,
+			B = awayTeamDefaultColor.B,
+			A = 1,
 		}
 		config.postProcessing = {
 			bloomIntensity = bloomIntensity,
@@ -2412,172 +2395,11 @@ function getPlayer()
 	followPlayer()
 end
 
--- particle start
-function createParticle(
-	position: Vec3,
-	rotation: Quat,
-	scale: number,
-	velocity: Vec3,
-	Color: Color,
-	variant: string,
-	lifespan: number
-)
-	local variantExists = false
-	for _, value in pairs(ParticleVariant) do
-		if value == variant then
-			variantExists = true
-		end
-	end
-
-	if not variantExists then
-		warn(`Bad Variant: {variant}`)
-		return
-	end
-
-	-- change vibrancy of the color
-	Color = { r = Color.r * vibrance, g = Color.g * vibrance, b = Color.b * vibrance }
-
-	local newParticle: Particle = {
-		position = position,
-		rotation = rotation,
-		scale = scale,
-		velocity = velocity,
-		Color = Color,
-		variant = variant,
-		lifespan = lifespan,
-		aliveTime = lifespan,
-	}
-	table.insert(particlesTable, newParticle)
-end
-
-function particleAffect()
-	if #particlesTable < 1 then
-		return
-	end
-
-	local replay = Replay.getByIndex(readLocation)
-
-	for i, particle: Particle in ipairs(particlesTable) do
-		--LIFE DURATION
-		if not replay or replay.isPlaying then
-			particle.aliveTime -= 1 * particleSimSpeed
-		end
-
-		if particle.aliveTime < 0 then
-			table.remove(particlesTable, i)
-		end
-
-		if not replay or replay.isPlaying then
-			--affect position
-			local emberDrag = 0.95
-			local gravityMultiplier = 0.8
-			if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
-				particle.velocity -= (gravity.upDirection * gravityMultiplier * particleSimSpeed)
-
-				--ember drag
-				if particle.variant ~= ParticleVariant.Rocket then
-					particle.velocity = particle.velocity * (emberDrag ^ particleSimSpeed)
-				end
-			end
-
-			--collision
-			if particle.variant == ParticleVariant.Embers then
-				local hit = camera:castRay(particle.position, particle.velocity + particle.position)
-				if hit.successful then
-					local dotProduct = particle.velocity:dot(hit.normal)
-					local reflection = particle.velocity - (hit.normal * (2 * dotProduct))
-
-					particle.velocity = reflection --bounce embers
-				end
-			end
-
-			--update position
-			particle.position += (particle.velocity * particleSimSpeed)
-
-			--affect scale
-			if
-				particle.variant == ParticleVariant.Embers
-				or particle.variant == ParticleVariant.Rings
-				or particle.variant == ParticleVariant.GoalRing
-			then
-				particle.scale *= ((particle.aliveTime / particle.lifespan) ^ particleSimSpeed)
-			end
-		end
-
-		--remove tiny particles
-		if particle.scale < 0.01 then
-			table.remove(particlesTable, i)
-		end
-
-		--draw parts
-		if particle.variant == ParticleVariant.Embers or particle.variant == ParticleVariant.Rocket then
-			WorldDraw.drawLine(
-				particle.position,
-				particle.position - particle.velocity,
-				particle.Color.r,
-				particle.Color.g,
-				particle.Color.b,
-				particle.scale * 20,
-				0
-			)
-		end
-
-		--generate rings
-		if particle.variant == ParticleVariant.Rings then
-			local r = (1 - particle.aliveTime / particle.lifespan) * 6000
-			local resolution = 90
-			local theta = 2 * math.pi / resolution
-
-			local previousRingOffset = Vec3.new(r * math.cos(0), r * math.sin(0), -40)
-
-			for i = 1, resolution do
-				local currentRingOffset = Vec3.new(r * math.cos(i * theta), r * math.sin(i * theta), -40)
-
-				WorldDraw.drawLine(
-					particle.rotation:rotateVector(previousRingOffset) + particle.position,
-					particle.rotation:rotateVector(currentRingOffset) + particle.position,
-					particle.Color.r,
-					particle.Color.g,
-					particle.Color.b,
-					particle.scale * 90,
-					0
-				)
-
-				previousRingOffset = currentRingOffset
-			end
-
-			--generate goal ring
-		end
-		if particle.variant == ParticleVariant.GoalRing then
-			local goalOutline = {
-				Vec3.new(0, -248.905, -52.404),
-				Vec3.new(0, -248.905, 109.223),
-				Vec3.new(0, -188.979, 172.762),
-				Vec3.new(0, 188.979, 172.762),
-				Vec3.new(0, 248.905, 109.223),
-				Vec3.new(0, 248.905, -52.404),
-			}
-			for i = 1, 5 do
-				WorldDraw.drawLine(
-					particle.rotation:rotateVector(goalOutline[i]) + particle.position,
-					particle.rotation:rotateVector(goalOutline[i + 1]) + particle.position,
-					particle.Color.r,
-					particle.Color.g,
-					particle.Color.b,
-					particle.scale * 15,
-					0
-				)
-			end
-		end
-	end
-end
--- particle end
-
 --effects start
-function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: Color)
+function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: LinearColor)
 	for i = 1, 300 do
 		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
-		createParticle(
+		ParticleSystem:createParticle(
 			goalPosition,
 			Quat.identity,
 			0.3,
@@ -2587,11 +2409,35 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 			math.random(800, 1300)
 		)
 	end
-	createParticle(goalPosition, goalRotation, 0.9, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 150)
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		0.9,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleVariant.Rings,
+		150
+	)
 
 	--rings
-	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 200)
-	createParticle(goalPosition, goalRotation, 1, Vec3.zeroVector, particleColor, ParticleVariant.Rings, 400)
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		1,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleVariant.Rings,
+		200
+	)
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		1,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleVariant.Rings,
+		400
+	)
 
 	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
 		return
@@ -2600,7 +2446,7 @@ function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleCol
 	--goal outline
 	local goalSpeed = 20
 	for i = 1, 3 do
-		createParticle(
+		ParticleSystem:createParticle(
 			goalPosition,
 			goalRotation,
 			1,
@@ -2616,12 +2462,13 @@ end
 function GameStartEffect()
 	local particlePosition = selectedArena.centerBox.position
 
-	local colourAverage = {
-		r = (homeTeamPrimaryColor.r + awayTeamPrimaryColor.r) / 2,
-		g = (homeTeamPrimaryColor.g + awayTeamPrimaryColor.g) / 2,
-		b = (homeTeamPrimaryColor.b + awayTeamPrimaryColor.b) / 2,
-	}
-	createParticle(
+	local colourAverage = LinearColor.new(
+		(homeTeamPrimaryColor.R + awayTeamPrimaryColor.R) / 2,
+		(homeTeamPrimaryColor.G + awayTeamPrimaryColor.G) / 2,
+		(homeTeamPrimaryColor.B + awayTeamPrimaryColor.B) / 2,
+		1
+	)
+	ParticleSystem:createParticle(
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.9,
@@ -2630,7 +2477,7 @@ function GameStartEffect()
 		ParticleVariant.Rings,
 		150
 	)
-	createParticle(
+	ParticleSystem:createParticle(
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.7,
@@ -2639,7 +2486,7 @@ function GameStartEffect()
 		ParticleVariant.Rings,
 		600
 	)
-	createParticle(
+	ParticleSystem:createParticle(
 		particlePosition,
 		selectedArena.transform.rotation,
 		0.7,
@@ -2651,7 +2498,7 @@ function GameStartEffect()
 	local colourPallette = { homeTeamPrimaryColor, awayTeamPrimaryColor }
 	for i = 1, 300 do
 		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
-		createParticle(
+		ParticleSystem:createParticle(
 			particlePosition,
 			selectedArena.transform.rotation,
 			0.5,
@@ -3096,7 +2943,7 @@ end
 
 function DoGoalExplosion(team: ArenaTeam)
 	local goalExplosionPosition: Vec3
-	local goalExplosionColor: Color
+	local goalExplosionColor: LinearColor
 
 	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
 
@@ -3634,7 +3481,12 @@ function tick(dt)
 		drawBallOutline()
 	end
 
-	particleAffect()
+	if readLocation > 0 then
+		ParticleSystem.replay = Replay.getByIndex(readLocation)
+	else
+		ParticleSystem.replay = nil
+	end
+	ParticleSystem:particleAffect()
 	ballInCenterCheck()
 	if ball then
 		goalScoreCheck()
