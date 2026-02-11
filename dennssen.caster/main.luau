@@ -1524,6 +1524,8 @@ local invertControllerLookVertical: boolean = config.invertControllerLookVertica
 local controllerSensitivity: number = config.controllerSensitivity
 
 -- Gui
+local showDebugMenus: boolean = false
+
 local debugFreecam: boolean = false
 local controlsScreen: boolean = false
 local keyboardControls: boolean = true
@@ -1631,6 +1633,10 @@ function setSelectedArena(arena: CasterArena)
 	end
 	arena.instantUpdate = true
 	selectedArena = arena
+end
+
+function toggleDebugMenus(toggle: boolean)
+	Arena.showDebugMenus = toggle
 end
 
 function onGui()
@@ -2195,6 +2201,14 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Debug Settings") then
+			local newShowDebugMenus = Gui.checkbox("Show Debug Menus", showDebugMenus)
+			if newShowDebugMenus ~= showDebugMenus then
+				showDebugMenus = newShowDebugMenus
+				toggleDebugMenus(showDebugMenus)
+			end
+
+			Gui.newLine()
+
 			speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 			camera.nearClippingPlane = Gui.dragFloat("Near Clipping Plane", camera.nearClippingPlane, 1, 0, 999999)
 			boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
