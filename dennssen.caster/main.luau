@@ -10,6 +10,8 @@ local version: string = "2.3.2"
 local Util = require("util")
 local Profiler = require("profiler")
 
+--Util.getDist = Profiler:wrap(Util.getDist)
+
 Util.initializeConfig({
 	cameraFOV = 90,
 	deadzone = 0,
@@ -1664,6 +1666,7 @@ function setSelectedArena(arena: CasterArena)
 	arena.instantUpdate = true
 	selectedArena = arena
 	selectedArena.tick = Profiler:wrap(selectedArena.tick)
+	selectedArena.getTeamColors = Profiler:wrap(selectedArena.getTeamColors)
 end
 
 function DoGoalExplosion(team: ArenaTeam)
@@ -2164,8 +2167,10 @@ function onGui()
 			end
 
 			if Profiler.enabled and Gui.button("Toggle Freeze") then
-				Profiler.freeze = not Profiler.freeze
+				Profiler.freezed = not Profiler.freezed
 			end
+
+			Gui.text(`Wrappers: {Util.getDictSize(Profiler.wrappers)}`)
 			Gui.treePop()
 		end
 		if Gui.treeNode("Camera") then
@@ -2408,7 +2413,7 @@ function onGui()
 	end
 end
 
-onGui = Profiler:wrap(onGui)
+-- onGui = Profiler:wrap(onGui)
 
 function debugGamemodePositions()
 	if showGamemodePositions then
@@ -2450,6 +2455,8 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 		dynamicLookSmoothness = 0
 	end
 end
+
+--toggleSmoothing = Profiler:wrap(toggleSmoothing)
 
 function onTransitionBegin(transitionInfo: Transition)
 	transitionTime = os.clock()
@@ -3516,8 +3523,6 @@ function tick(dt)
 			arena.away.goal.box:render(0, 0, 1)
 		end
 	end
-
-	return
 end
 
 tick = Profiler:wrap(tick)
