@@ -10,7 +10,7 @@ local version: string = "2.3.2"
 local Util = require("util")
 local Profiler = require("profiler")
 
---Util.getDist = Profiler:wrap(Util.getDist)
+Util.getDist = Profiler:wrap(Util.getDist)
 
 Util.initializeConfig({
 	cameraFOV = 90,
@@ -2413,7 +2413,7 @@ function onGui()
 	end
 end
 
--- onGui = Profiler:wrap(onGui)
+onGui = Profiler:wrap(onGui)
 
 function debugGamemodePositions()
 	if showGamemodePositions then
@@ -2456,7 +2456,7 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 	end
 end
 
---toggleSmoothing = Profiler:wrap(toggleSmoothing)
+toggleSmoothing = Profiler:wrap(toggleSmoothing)
 
 function onTransitionBegin(transitionInfo: Transition)
 	transitionTime = os.clock()

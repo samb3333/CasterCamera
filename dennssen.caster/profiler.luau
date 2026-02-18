@@ -1,8 +1,9 @@
 --!strict
 
 type ProfiledData = {
-	deltaTime: number,
-	deltaMemory: number,
+	exclusiveTime: number,
+	inclusiveTime: number,
+	exclusiveMemory: number,
 }
 
 type ProfiledFunction = {
@@ -45,15 +46,26 @@ Profiler.frame = {}
 Profiler.wrappers = {}
 
 function Profiler.getFunctionId(level: number, f: (...any) -> any?): string
-	local source, line = _G.debug.info(level, "sl")
+	local callsiteSource, line = _G.debug.info(level, "sl")
+	local definitionSource = _G.debug.info(f, "s")
 
 	if line == -1 or line == nil then
-		source, line = _G.debug.info(f, "sl") -- get definition line for root functions
+		callsiteSource, line = _G.debug.info(f, "sl") -- get definition line for root functions
 	end
+
+	-- dennssen.caster/main.luau:3436 tick()
+	-- tick():3436[dennssen.caster/main.luau]
+	-- tick():3436 [main.luau]
+	-- arena:tick():3436 [main.luau]
+	local callsiteStripped = callsiteSource:match('^%[string "(.-)"%]$')
+	callsiteSource = (callsiteStripped and callsiteStripped:match("[^/]+$")) or callsiteSource
+
+	local definitionStripped = definitionSource:match('^%[string "(.-)"%]$')
+	definitionSource = (definitionStripped and definitionStripped:match("[^/]+$"):match("^[^.]+")) or definitionSource
 
 	local name = _G.debug.info(f, "n")
 
-	return `{source}:{line}_{name}()`
+	return `{definitionSource}:{name}():{line} [{callsiteSource}]`
 end
 
 function Profiler.isCFunction(f: (...any) -> any?): boolean
@@ -101,16 +113,15 @@ function Profiler:buildProfiledTree(
 			table.insert(tracebackIds, targetFuncId)
 		elseif passedTarget then
 			if not self.wrappers[func] and not self.isCFunction(func) then
-				-- this is supposed to skip the wrapper and the definition
-				local callsiteLevel = level + 2
-				local callsiteFunc = _G.debug.info(callsiteLevel, "f")
+				local callsiteLine = level + 3
+				-- callsiteFunc is apparently the child of the function with the callsite line, so we -1
+				local callsiteFunc = _G.debug.info(callsiteLine - 1, "f")
 
 				if not self.wrappers[callsiteFunc] then
-					-- i don't know why this +1 works, but it does.
-					table.insert(tracebackIds, self.getFunctionId(callsiteLevel + 1, func))
+					table.insert(tracebackIds, self.getFunctionId(callsiteLine, func))
 				else
-					-- If the called function is a
-					table.insert(tracebackIds, self.getFunctionId(level, func))
+					-- If the callsite function is a wrapper then that is the callsite line
+					table.insert(tracebackIds, self.getFunctionId(callsiteLine - 1, func))
 				end
 			end
 		end
@@ -119,6 +130,13 @@ function Profiler:buildProfiledTree(
 	end
 
 	local targetFuncProfile: ProfiledFunction = self:buildProfiledFunction(self.frame, tracebackIds, #tracebackIds)
+	for _, func: ProfiledFunction in targetFuncProfile.calls do
+		if func.data then
+			targetProfileData.exclusiveTime -= func.data.inclusiveTime
+			targetProfileData.exclusiveMemory -= func.data.exclusiveMemory
+		end
+	end
+
 	targetFuncProfile.data = targetProfileData
 end
 
@@ -135,9 +153,12 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 
 		local result = { f(...) }
 
+		local inclusiveTime: number = os.clock() - startTime
+
 		local profileData: ProfiledData = {
-			deltaTime = os.clock() - startTime,
-			deltaMemory = gcinfo() - startMem,
+			inclusiveTime = inclusiveTime,
+			exclusiveTime = inclusiveTime,
+			exclusiveMemory = gcinfo() - startMem,
 		}
 
 		self:buildProfiledTree(wrapper, self.getFunctionId(3, f), profileData)
@@ -170,12 +191,26 @@ function Profiler:viewFrame()
 end
 
 function Profiler.viewCalls(calls: { [string]: ProfiledFunction })
+	if not Profiler.enabled then
+		warn("this is not meant to be called directly")
+		return
+	end
+
 	for id: string, func: ProfiledFunction in calls do
 		if Gui.treeNode(id) then
 			local data: ProfiledData? = func.data
 			if data then
-				Gui.text(`{data.deltaTime * 1000}ms`)
-				Gui.text(`{data.deltaMemory > 0 and "+" or ""}{data.deltaMemory}MB`)
+				Gui.text(`Inclusive Time: {string.format("%.4f", data.inclusiveTime * 1000)}ms`)
+				Gui.text(`Exclusive Time: {string.format("%.4f", data.exclusiveTime * 1000)}ms`)
+
+				local share: number
+				if data.exclusiveTime ~= 0 then
+					share = data.exclusiveTime / data.inclusiveTime * 100
+				else
+					share = 0
+				end
+				Gui.text(`Self %{string.format("%.2f", share)}`)
+				Gui.text(`Exclusive Memory: {data.exclusiveMemory > 0 and "+" or ""}{data.exclusiveMemory}MB`)
 			end
 
 			Profiler.viewCalls(func.calls)
