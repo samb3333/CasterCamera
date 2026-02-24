@@ -2167,7 +2167,7 @@ function onGui()
 			end
 
 			if Profiler.enabled and Gui.button("Toggle Freeze") then
-				Profiler.freezed = not Profiler.freezed
+				Profiler.paused = not Profiler.paused
 			end
 
 			Gui.text(`Wrappers: {Util.getDictSize(Profiler.wrappers)}`)
@@ -3434,7 +3434,8 @@ function onExit()
 end
 
 function tick(dt)
-	Profiler:viewFrame()
+	Profiler:setDeltaTime(dt)
+	Profiler:graph()
 	Profiler:clearFrame()
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = nil
