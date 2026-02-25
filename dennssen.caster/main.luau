@@ -1665,8 +1665,6 @@ function setSelectedArena(arena: CasterArena)
 	end
 	arena.instantUpdate = true
 	selectedArena = arena
-	selectedArena.tick = Profiler:wrap(selectedArena.tick)
-	selectedArena.getTeamColors = Profiler:wrap(selectedArena.getTeamColors)
 end
 
 function DoGoalExplosion(team: ArenaTeam)
@@ -2162,15 +2160,8 @@ function onGui()
 
 	if Gui.treeNode("Debug") then
 		if Gui.treeNode("Profiler") then
-			if Gui.button("Toggle Profiler") then
-				Profiler.enabled = not Profiler.enabled
-			end
-
-			if Profiler.enabled and Gui.button("Toggle Freeze") then
-				Profiler.paused = not Profiler.paused
-			end
-
-			Gui.text(`Wrappers: {Util.getDictSize(Profiler.wrappers)}`)
+			Profiler:controls()
+			Gui.text(`Frames: {#Profiler.frames}`)
 			Gui.treePop()
 		end
 		if Gui.treeNode("Camera") then

@@ -17,10 +17,11 @@ type Profiler = {
 
 	enabled: boolean,
 	paused: boolean,
-	frame: { [string]: ProfiledFunction },
+	frames: { { [string]: ProfiledFunction } },
 	wrappers: { [(...any) -> any]: boolean },
 
 	freshFrame: boolean,
+	maxFrameAmount: number,
 
 	setDeltaTime: (self: Profiler, dt: number) -> (),
 
@@ -42,18 +43,20 @@ type Profiler = {
 	wrap: (self: Profiler, f: (...any) -> any) -> (...any) -> any,
 	clearFrame: (self: Profiler) -> (),
 
-	viewFrameData: (self: Profiler) -> (),
-	viewCallsData: (calls: { [string]: ProfiledFunction }) -> (),
+	controls: (self: Profiler) -> (),
 	graph: (self: Profiler) -> (),
 }
 
 local Profiler: Profiler = {} :: Profiler
 Profiler.enabled = false
 Profiler.paused = false
-Profiler.frame = {}
+Profiler.frames = {
+	{},
+}
 Profiler.wrappers = {}
 
 Profiler.freshFrame = true
+Profiler.maxFrameAmount = 1
 
 function Profiler:setDeltaTime(dt: number)
 	self.deltaTime = dt
@@ -139,7 +142,8 @@ function Profiler:buildProfiledTree(
 		level += 1
 	end
 
-	local targetFuncProfile: ProfiledFunction = self:buildProfiledFunction(self.frame, tracebackIds, #tracebackIds)
+	local targetFuncProfile: ProfiledFunction =
+		self:buildProfiledFunction(self.frames[#self.frames], tracebackIds, #tracebackIds)
 	for _, func: ProfiledFunction in targetFuncProfile.calls do
 		if func.data then
 			targetProfileData.exclusiveTime -= func.data.inclusiveTime
@@ -155,7 +159,9 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 
 	wrapper = function(...)
 		if not self.enabled or self.paused then
-			return f(...)
+			local result = { f(...) }
+
+			return table.unpack(result)
 		end
 
 		local startTime = os.clock()
@@ -187,8 +193,39 @@ function Profiler:clearFrame()
 		return
 	end
 
+	while #self.frames >= math.max(self.maxFrameAmount, 1) do
+		table.remove(self.frames, 1)
+	end
+
+	table.insert(self.frames, {})
 	self.freshFrame = true
-	self.frame = {}
+end
+
+function Profiler:controls()
+	if not self.enabled then
+		if Gui.button(Icon.Play) then
+			self.enabled = true
+		end
+	elseif self.enabled and not self.paused then
+		if Gui.button(Icon.Pause) then
+			self.paused = true
+		end
+		Gui.sameLine()
+		if Gui.button(Icon.Stop) then
+			self.enabled = false
+		end
+	elseif self.enabled and self.paused then
+		if Gui.button(Icon.Play) then
+			self.paused = false
+		end
+		Gui.sameLine()
+		if Gui.button(Icon.Stop) then
+			self.enabled = false
+			self.paused = false
+		end
+	end
+	self.maxFrameAmount = Gui.sliderInt("# Profiled Frames", self.maxFrameAmount, 1, 20)
+	self.maxFrameAmount = math.clamp(self.maxFrameAmount, 1, 20)
 end
 
 -- Profiler End
@@ -206,11 +243,12 @@ type GraphObject = {
 	render: string,
 }
 
-local graphObjects: { [string]: GraphObject } = {}
+local graphFrames: { { [string]: GraphObject } } = {}
 
 local graphPosition: number = 0
 local lastGraphPosition: number = graphPosition
 local buttonJumpShift: number = 5
+local graphLength: number = 0
 
 local hoverTime: { [string]: number } = {}
 local maxHoverTime: number = 0.15
@@ -235,7 +273,7 @@ function padToSize(line: string, totalSize: number): string
 	local gap = totalSize - line:len()
 	local left = math.floor(gap / 2)
 	local right = gap - left
-	return `{(" "):rep(left)}{line}{(" "):rep(right)}`
+	return `[{(" "):rep(left)}{line}{(" "):rep(right)}]`
 end
 
 function convertToGraphObject(funcID: string, profiledFunc: ProfiledFunction): GraphObject
@@ -283,28 +321,33 @@ function createTooltip(id: string, tooltip: () -> ())
 	end
 end
 
-function setTooltip(id: string, funcFile: string, funcLine: string, exclusiveTime: number?, memory: number?)
+function setTooltip(id: string, funcFile: string, funcLine: string, data: ProfiledData?, parentInclusiveTime: number?)
 	createTooltip(id, function()
 		Gui.separatorText("data")
 		Gui.text(`Location: {funcFile}:{funcLine}`)
-		if exclusiveTime then
-			Gui.text(`Self Time: {string.format("%.4f", exclusiveTime)}ms`)
-		end
-		if memory then
-			Gui.text(`Memory: {string.format("%.4f", memory)}MB`)
+		if data then
+			Gui.text(`Self Time: {string.format("%.4f", data.exclusiveTime)}ms`)
+			if parentInclusiveTime then
+				Gui.text(
+					`Percentage of parent: {string.format("%.2f", data.inclusiveTime / parentInclusiveTime * 100)}%`
+				)
+			end
+			Gui.text(`Memory: {data.exclusiveMemory}MB`)
 		end
 	end)
 end
 
-function getMaxDepth(profiledFuncs: { [string]: GraphObject }): number
-	local maxDepth = 0
-	for _, profiledFunc in profiledFuncs do
-		local childDepth = getMaxDepth(profiledFunc.calls)
-		if childDepth + 1 > maxDepth then
-			maxDepth = childDepth + 1
+function getGraphSize(graphObjects: { [string]: GraphObject }): Vec2
+	local graphSize = Vec2.zeroVector
+	for _, graphObject in graphObjects do
+		graphSize.x += graphObject.width
+
+		local childDepth = getGraphSize(graphObject.calls).y
+		if childDepth + 1 > graphSize.y then
+			graphSize.y = childDepth + 1
 		end
 	end
-	return maxDepth
+	return graphSize
 end
 
 function isGraphObjectVisible(position: number, cursor: number, profiledFuncs: { [string]: GraphObject }): boolean
@@ -319,24 +362,28 @@ function isGraphObjectVisible(position: number, cursor: number, profiledFuncs: {
 end
 
 function renderGraphObjects(
+	frameId: string,
 	position: number,
 	cursor: number,
-	parent: string,
+	parentInclusiveTime: number?,
 	graphObjects: { [string]: GraphObject }
-): number
+): Vec2
+	local graphSize: Vec2 = Vec2.unitX
 	if next(graphObjects) == nil then
-		return 0
+		return graphSize
 	end
 
 	if not isGraphObjectVisible(position, cursor, graphObjects) then
-		return getMaxDepth(graphObjects)
+		graphSize = getGraphSize(graphObjects)
+		return graphSize
 	end
 
-	Gui.beginHorizontal("horizontal" .. parent)
-	local deepestNest: number = 0
+	Gui.beginHorizontal("horizontal" .. frameId)
 	for funcID: string, graphObject: GraphObject in graphObjects do
 		local cursorStart: number = cursor
 		local renderText: string = graphObject.render
+
+		graphSize.x += graphObject.width
 
 		if cursor < position then
 			renderText = renderText:sub(position - cursor)
@@ -345,21 +392,21 @@ function renderGraphObjects(
 		-- If the function is visable
 		local isVisable: boolean = renderText:len() > 0
 		if isVisable then
-			Gui.beginVertical("vertical" .. funcID)
+			Gui.beginVertical("vertical" .. frameId .. funcID)
 			Gui.smallButton(renderText)
 			if graphObject.data then
-				setTooltip(
-					funcID,
-					graphObject.file,
-					graphObject.line,
-					graphObject.data.exclusiveTime,
-					graphObject.data.exclusiveMemory
-				)
+				setTooltip(frameId .. funcID, graphObject.file, graphObject.line, graphObject.data, parentInclusiveTime)
 			end
 		end
 
-		local currentNest = renderGraphObjects(position, cursorStart, funcID, graphObject.calls) + 1
-		deepestNest = currentNest > deepestNest and currentNest or deepestNest
+		local currentNest = renderGraphObjects(
+			frameId,
+			position,
+			cursorStart,
+			graphObject.data and graphObject.data.inclusiveTime or nil,
+			graphObject.calls
+		).y + 1
+		graphSize.y = currentNest > graphSize.y and currentNest or graphSize.y
 		cursor += graphObject.render:len()
 
 		if isVisable then
@@ -368,7 +415,7 @@ function renderGraphObjects(
 	end
 	Gui.endHorizontal()
 
-	return deepestNest
+	return graphSize
 end
 
 function getGraphObjects(profiledFuncs: { [string]: ProfiledFunction }): { [string]: GraphObject }
@@ -381,7 +428,7 @@ function getGraphObjects(profiledFuncs: { [string]: ProfiledFunction }): { [stri
 end
 
 function Profiler:graph()
-	if not self.enabled and not self.paused then
+	if not self.enabled or not self.paused then
 		return
 	end
 
@@ -391,27 +438,44 @@ function Profiler:graph()
 		graphPosition = graphPosition - buttonJumpShift
 	end
 	Gui.sameLine()
-	graphPosition = Gui.dragInt("##Slider", graphPosition, 1, 0, 9999999)
+	graphPosition = Gui.dragInt("##Slider", graphPosition, 1, 0, graphLength)
 	Gui.sameLine()
 	if Gui.button("->") then
 		graphPosition += buttonJumpShift
 	end
 	graphPosition = math.max(0, graphPosition)
+	graphPosition = math.min(graphPosition, graphLength)
 
 	Gui.separator()
 
 	if graphPosition ~= lastGraphPosition or self.freshFrame then
-		graphObjects = getGraphObjects(self.frame) -- cache graph objects
+		-- cache graph objects
+		graphFrames = {}
+		for i, frame in self.frames do
+			graphFrames[i] = getGraphObjects(frame)
+		end
 	end
 
 	Gui.beginHorizontal("hor")
 
-	local height = renderGraphObjects(graphPosition, 0, "root", graphObjects)
-	Gui.beginVertical("KeepHeight")
-	for i = 1, height + 1, 1 do
-		Gui.text(" ")
+	local totalGraphSize: Vec2 = Vec2.zeroVector
+	for i, graphFrame in graphFrames do
+		local graphSize = renderGraphObjects(`root{i}`, graphPosition, totalGraphSize.x, nil, graphFrame)
+		totalGraphSize.x += graphSize.x
+		totalGraphSize.y = graphSize.y > totalGraphSize.y and graphSize.y or totalGraphSize.y
+
+		totalGraphSize.x += 1
+		if totalGraphSize.x >= graphPosition then
+			Gui.beginVertical(`##{i}FrameSeperator`)
+			for j = 1, graphSize.y + 1, 1 do
+				Gui.text("|")
+			end
+			Gui.endVertical()
+		end
 	end
-	Gui.endVertical()
+
+	graphLength = totalGraphSize.x
+
 	Gui.endHorizontal()
 
 	Gui.separator()
