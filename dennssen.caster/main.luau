@@ -450,7 +450,11 @@ end
 
 function CasterArena:onRoundStartHook() end
 
-function CasterArena:onRoundEndHook(isRestart: boolean, homeScore: number, awayScore: number) end
+function CasterArena:onRoundEndHook(isRestart: boolean, homeScore: number, awayScore: number)
+	if not isRestart then
+		Overlay.addRound(homeScore, awayScore)
+	end
+end
 
 function CasterArena:postTickHook()
 	(self :: CasterArena):sendInfoMessage()
