@@ -5,42 +5,9 @@ type BoxType = typeof(Box)
 
 local Util = require("util")
 
-local debugTable = {}
-
-function debugBalls(error: string, frame: ReplayFrame): any
-	if debugTable["ballIndex"] == nil then
-		debugTable["ballIndex"] = 1
-	end
-
-	Gui.text(`Ball Index: {debugTable.ballIndex} / {#frame.balls}`)
-	if Gui.button(Icon.ArrowLeft) then
-		debugTable.ballIndex = math.max(1, debugTable.ballIndex - 1)
-	end
-	Gui.sameLine()
-	if Gui.button(Icon.ArrowRight) then
-		debugTable.ballIndex = math.min(debugTable.ballIndex + 1, #frame.balls)
-	end
-
-	for i, ball in frame.balls do
-		local color = {
-			r = 1,
-			g = 0,
-			b = 0,
-		}
-
-		if i == debugTable.ballIndex then
-			color.r = 0
-			color.g = 1
-		end
-
-		WorldDraw.drawPoint(ball.transform.position, color.r, color.g, color.b, 50, 0)
-	end
-
-	return error
-end
-
 export type ArenaTeam<T = {}> = {
 	teamIndex: number,
+	color: LinearColor,
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
@@ -59,6 +26,8 @@ export type ArenaTeam<T = {}> = {
 
 export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	__index: Arena<ArenaData, HomeData, AwayData>,
+	showDebugMenus: boolean,
+
 	type: string,
 
 	frameIndex: number,
@@ -94,6 +63,7 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 
 	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena<ArenaData, HomeData, AwayData>,
 	getArenaBall: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
+	getTeamColors: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	tick: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onGameStart: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onRoundStart: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
@@ -123,6 +93,7 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 
 local Arena: Arena = {} :: Arena
 Arena.__index = Arena
+Arena.showDebugMenus = false
 
 function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena
 	local self: Arena = setmetatable({}, Arena) :: any
@@ -136,6 +107,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 
 	self.home = {
 		teamIndex = Util.TeamIndex.HomeTeam,
+		color = LinearColor.White,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -154,6 +126,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 
 	self.away = {
 		teamIndex = Util.TeamIndex.AwayTeam,
+		color = LinearColor.White,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -202,19 +175,27 @@ function Arena:getArenaBall()
 	end
 
 	if nil == closestBall then
-		warn(
-			debugBalls(
-				`Warning: Ball not found in arena\nnumber of balls in frame. Index: {self.frameIndex}`,
-				self.frame
-			)
-		)
+		warn(debugBalls(`Warning: Ball not found in arena`, self.frame))
 	end
 
 	return closestBall
 end
 
+function Arena:getTeamColors()
+	local teamColors: { TeamColor } = self.gamemode:getTeamColorsArray()
+
+	if teamColors[1].primary then
+		self.home.color = teamColors[1].primary
+	end
+
+	if teamColors[2].primary then
+		self.away.color = teamColors[2].primary
+	end
+end
+
 function Arena:tick()
 	self.frame = Util.getReplayFrameFromIndex(self.frameIndex)
+	self:getTeamColors()
 	self.ball = self:getArenaBall()
 
 	if self.preTickHook then
@@ -404,6 +385,33 @@ function Arena:setTeams()
 		table.insert(allPlayers, player)
 	end
 	self.players = allPlayers
+end
+
+local debugTable = {}
+
+function debugBalls(error: string, frame: ReplayFrame): any
+	if not Arena.showDebugMenus then
+		return error
+	end
+
+	if debugTable["ballIndex"] == nil then
+		debugTable["ballIndex"] = 1
+	end
+
+	Gui.text(`Ball Index: {debugTable.ballIndex} / {#frame.balls}`)
+	if Gui.button(Icon.ArrowLeft) then
+		debugTable.ballIndex = math.max(1, debugTable.ballIndex - 1)
+	end
+	Gui.sameLine()
+	if Gui.button("TP To Ball") then
+		camera.position = frame.balls[debugTable.ballIndex].transform.position
+	end
+	Gui.sameLine()
+	if Gui.button(Icon.ArrowRight) then
+		debugTable.ballIndex = math.min(debugTable.ballIndex + 1, #frame.balls)
+	end
+
+	return error
 end
 
 return Arena

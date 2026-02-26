@@ -150,19 +150,24 @@ function Util.linearColorToVec3(color: LinearColor): Vec3
 	return Vec3.new(color.R, color.G, color.B)
 end
 
+--- Converts color ranges from `0-255` to `0-1`
+function Util.linearColorNormalized(color: LinearColor): LinearColor
+	return LinearColor.new(color.R / 255, color.G / 255, color.B / 255, 1)
+end
+
 --- Gets a players primary color using it's JSON data
 --- @param playerJson the `ReplayPlayer`'s json data
 --- @return a table with r, g and b properties
-function Util.extractPrimaryPlayerColor(playerJson: string): { r: number, g: number, b: number }
+function Util.extractPrimaryPlayerColor(playerJson: string): LinearColor
 	local r: number? = tonumber(playerJson:match('"primary"%s*:%s*{.-"r"%s*:%s*(%d+)'))
 	local g: number? = tonumber(playerJson:match('"primary"%s*:%s*{.-"g"%s*:%s*(%d+)'))
 	local b: number? = tonumber(playerJson:match('"primary"%s*:%s*{.-"b"%s*:%s*(%d+)'))
 
 	if r == nil or g == nil or b == nil then
-		return { r = 0, b = 0, g = 0 }
+		return LinearColor.White
 	end
 
-	return { r = r / 255, g = g / 255, b = b / 255 }
+	return LinearColor.new(r / 255, g / 255, b / 255, 1)
 end
 
 --- @return the size of the dict
