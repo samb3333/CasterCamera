@@ -1,6 +1,6 @@
 --!strict
 
-local version: string = "2.3.2"
+local version: string = "2.3.3"
 
 -- Known Issues:
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
@@ -446,6 +446,7 @@ setmetatable(CasterArena, { __index = Arena })
 
 function CasterArena:onGameStartHook()
 	Overlay.clearStats()
+	Overlay.clearRounds()
 end
 
 function CasterArena:onRoundStartHook() end
