@@ -1635,6 +1635,7 @@ function setSelectedArena(arena: CasterArena)
 	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
 		Overlay.setGamemodeId(arena.slotId)
+		Overlay.clearRounds()
 	end
 	arena.instantUpdate = true
 	selectedArena = arena
