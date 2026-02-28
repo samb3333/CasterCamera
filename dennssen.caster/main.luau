@@ -446,6 +446,7 @@ setmetatable(CasterArena, { __index = Arena })
 
 function CasterArena:onGameStartHook()
 	Overlay.clearStats()
+	Overlay.clearRounds()
 end
 
 function CasterArena:onRoundStartHook() end
