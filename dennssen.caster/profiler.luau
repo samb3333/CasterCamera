@@ -53,6 +53,8 @@ type Profiler = {
 
 	controls: (self: Profiler) -> (),
 	graph: (self: Profiler) -> (),
+
+	tick: (self: Profiler, dt: number) -> (),
 }
 
 local Profiler: Profiler = {} :: Profiler
@@ -588,5 +590,11 @@ function Profiler:graph()
 end
 
 -- Graph End
+
+function Profiler:tick(dt: number)
+	self:setDeltaTime(dt)
+	self:graph()
+	self:clearFrame()
+end
 
 return Profiler

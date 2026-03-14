@@ -3421,8 +3421,7 @@ function onExit()
 end
 
 function tick(dt)
-	Profiler:setDeltaTime(dt)
-	Profiler:graph()
+	Profiler:tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = nil
 		onExit()
