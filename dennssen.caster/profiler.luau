@@ -19,6 +19,7 @@ type Profiler = {
 	paused: boolean,
 	frames: { { [string]: ProfiledFunction } },
 	wrappers: { [(...any) -> any]: boolean },
+	overhead: number,
 
 	freshFrame: boolean,
 	maxFrameAmount: number,
@@ -41,6 +42,9 @@ type Profiler = {
 	) -> (),
 
 	wrap: (self: Profiler, f: (...any) -> any) -> (...any) -> any,
+	wrapScriptTick: (self: Profiler, f: (...any) -> any) -> (...any) -> any,
+	wrapModule: (self: Profiler, module: any) -> any,
+	wrapClass: (self: Profiler, class: any) -> any,
 	clearFrame: (self: Profiler) -> (),
 
 	controls: (self: Profiler) -> (),
@@ -54,6 +58,7 @@ Profiler.frames = {
 	{},
 }
 Profiler.wrappers = {}
+Profiler.overhead = 0
 
 Profiler.freshFrame = true
 Profiler.maxFrameAmount = 1
@@ -164,12 +169,17 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 			return table.unpack(result)
 		end
 
-		local startTime = os.clock()
 		local startMem = gcinfo()
-
+		local overheadBefore = self.overhead
+		local startTime = os.clock()
 		local result = { f(...) }
+		local endTime = os.clock()
 
-		local inclusiveTime: number = (os.clock() - startTime) * 1000 -- convert to milliseconds
+		local overheadStart = os.clock()
+		local functionId = self.getFunctionId(3, f)
+		local overheadGain = self.overhead - overheadBefore
+		local inclusiveTime: number = ((endTime - startTime) * 1000) -- convert to milliseconds
+		inclusiveTime -= overheadGain
 
 		local profileData: ProfiledData = {
 			inclusiveTime = inclusiveTime,
@@ -177,7 +187,10 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 			exclusiveMemory = gcinfo() - startMem,
 		}
 
-		self:buildProfiledTree(wrapper, self.getFunctionId(3, f), profileData)
+		self:buildProfiledTree(wrapper, functionId, profileData)
+		local overheadEnd = os.clock()
+
+		self.overhead += (overheadEnd - overheadStart) * 1000
 
 		return table.unpack(result)
 	end
@@ -187,12 +200,85 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 	return wrapper
 end
 
+-- is completely identical to wrap except it calls clearFrame before the wrapped function.
+function Profiler:wrapScriptTick(f: (...any) -> any?): (...any) -> any?
+	local wrapper: (...any) -> any?
+
+	wrapper = function(...)
+		if not self.enabled or self.paused then
+			local result = { f(...) }
+
+			return table.unpack(result)
+		end
+
+		self:clearFrame()
+
+		local startMem = gcinfo()
+		local overheadBefore = self.overhead
+		local startTime = os.clock()
+		local result = { f(...) }
+		local endTime = os.clock()
+
+		local overheadStart = os.clock()
+		local functionId = self.getFunctionId(3, f)
+		local overheadGain = self.overhead - overheadBefore
+		local inclusiveTime: number = ((endTime - startTime) * 1000) -- convert to milliseconds
+		inclusiveTime -= overheadGain
+
+		local profileData: ProfiledData = {
+			inclusiveTime = inclusiveTime,
+			exclusiveTime = inclusiveTime,
+			exclusiveMemory = gcinfo() - startMem,
+		}
+
+		self:buildProfiledTree(wrapper, functionId, profileData)
+		local overheadEnd = os.clock()
+
+		self.overhead += (overheadEnd - overheadStart) * 1000
+
+		return table.unpack(result)
+	end
+
+	self.wrappers[wrapper] = true
+
+	return wrapper
+end
+
+function Profiler:wrapModule(module: any): any
+	for k, v in pairs(module) do
+		if type(v) == "function" then
+			module[k] = self:wrap(v)
+		end
+	end
+
+	return module
+end
+
+function Profiler:wrapClass(class: any): any
+	local current = class
+	while current do
+		for k, v in pairs(current) do
+			if type(v) == "function" and k ~= "new" then
+				current[k] = self:wrap(v)
+			end
+		end
+		local mt = getmetatable(current)
+		current = mt and rawget(mt, "__index")
+		if type(current) ~= "table" then
+			break
+		end
+	end
+
+	return class
+end
+
 function Profiler:clearFrame()
 	if self.paused then
 		self.freshFrame = false
 		return
 	end
 
+	self.overhead = 0
 	while #self.frames >= math.max(self.maxFrameAmount, 1) do
 		table.remove(self.frames, 1)
 	end
