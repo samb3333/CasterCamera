@@ -10,8 +10,6 @@ local version: string = "2.3.2"
 local Util = require("util")
 local Profiler = require("profiler")
 
-Util.getDist = Profiler:wrap(Util.getDist)
-
 Util.initializeConfig({
 	cameraFOV = 90,
 	deadzone = 0,
@@ -113,9 +111,11 @@ type CustomInput = InputSystem.CustomInput
 type InputSystem = InputSystem.InputSystem
 
 local Box = require("box")
+Box = Profiler:wrapClass(Box)
 type BoxType = typeof(Box)
 
 local Arena = require("arena")
+Arena.profile(Profiler)
 type OverviewData = {
 	overview: { { position: Vec3, rotation: Quat } },
 }
@@ -2404,8 +2404,6 @@ function onGui()
 	end
 end
 
-onGui = Profiler:wrap(onGui)
-
 function debugGamemodePositions()
 	if showGamemodePositions then
 		local gamemodes = SpectatorGamemodes.listGamemodes()
@@ -2446,8 +2444,6 @@ function toggleSmoothing(position: boolean, rotation: boolean)
 		dynamicLookSmoothness = 0
 	end
 end
-
-toggleSmoothing = Profiler:wrap(toggleSmoothing)
 
 function onTransitionBegin(transitionInfo: Transition)
 	transitionTime = os.clock()
@@ -3427,7 +3423,6 @@ end
 function tick(dt)
 	Profiler:setDeltaTime(dt)
 	Profiler:graph()
-	Profiler:clearFrame()
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = nil
 		onExit()
@@ -3517,4 +3512,4 @@ function tick(dt)
 	end
 end
 
-tick = Profiler:wrap(tick)
+tick = Profiler:wrapScriptTick(tick)
