@@ -1,5 +1,9 @@
 --!strict
 
+-- Future Features:
+-- Include average frame length data in the graph
+-- Combine time when call is in a loop
+
 -- Profiler Begin
 type ProfiledData = {
 	exclusiveTime: number,
@@ -26,7 +30,7 @@ type Profiler = {
 
 	setDeltaTime: (self: Profiler, dt: number) -> (),
 
-	getFunctionId: (level: number, f: (...any) -> any) -> string,
+	getFunctionId: (levelIndicator: ((...any) -> any) | number, f: (...any) -> any) -> string,
 	isCFunction: (f: (...any) -> any) -> boolean,
 	buildProfiledFunction: (
 		self: Profiler,
@@ -67,8 +71,24 @@ function Profiler:setDeltaTime(dt: number)
 	self.deltaTime = dt
 end
 
-function Profiler.getFunctionId(level: number, f: (...any) -> any?): string
-	local callsiteSource, line = _G.debug.info(level, "sl")
+function Profiler.getFunctionId(levelIndicator: ((...any) -> any?) | number, f: (...any) -> any?): string
+	local callsiteLevel: number = typeof(levelIndicator) == "number" and levelIndicator or 1
+	if typeof(levelIndicator) ~= "number" then
+		while true do
+			local stackFunc = _G.debug.info(callsiteLevel, "f")
+			if stackFunc == nil then
+				break
+			end
+			if stackFunc == levelIndicator then
+				-- The frame above the wrapper is the callsite
+				callsiteLevel += 1
+				break
+			end
+			callsiteLevel += 1
+		end
+	end
+
+	local callsiteSource, line = _G.debug.info(callsiteLevel, "sl")
 	local definitionSource = _G.debug.info(f, "s")
 
 	if line == -1 or line == nil then
@@ -176,7 +196,7 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 		local endTime = os.clock()
 
 		local overheadStart = os.clock()
-		local functionId = self.getFunctionId(3, f)
+		local functionId = self.getFunctionId(wrapper, f)
 		local overheadGain = self.overhead - overheadBefore
 		local inclusiveTime: number = ((endTime - startTime) * 1000) -- convert to milliseconds
 		inclusiveTime -= overheadGain
