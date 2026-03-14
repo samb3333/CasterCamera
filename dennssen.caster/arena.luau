@@ -89,6 +89,8 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	getTeamRotation: (self: Arena<ArenaData, HomeData, AwayData>, teamIndex: number) -> Quat,
 
 	GUIChangeDimensions: (self: Arena<ArenaData, HomeData, AwayData>) -> (), -- Debuging
+
+	profile: (profiler: any) -> (),
 }
 
 local Arena: Arena = {} :: Arena
@@ -172,10 +174,6 @@ function Arena:getArenaBall()
 			closestBallDistance = distance
 			closestBall = ball
 		end
-	end
-
-	if nil == closestBall then
-		warn(debugBalls(`Warning: Ball not found in arena`, self.frame))
 	end
 
 	return closestBall
@@ -387,31 +385,10 @@ function Arena:setTeams()
 	self.players = allPlayers
 end
 
-local debugTable = {}
-
-function debugBalls(error: string, frame: ReplayFrame): any
-	if not Arena.showDebugMenus then
-		return error
-	end
-
-	if debugTable["ballIndex"] == nil then
-		debugTable["ballIndex"] = 1
-	end
-
-	Gui.text(`Ball Index: {debugTable.ballIndex} / {#frame.balls}`)
-	if Gui.button(Icon.ArrowLeft) then
-		debugTable.ballIndex = math.max(1, debugTable.ballIndex - 1)
-	end
-	Gui.sameLine()
-	if Gui.button("TP To Ball") then
-		camera.position = frame.balls[debugTable.ballIndex].transform.position
-	end
-	Gui.sameLine()
-	if Gui.button(Icon.ArrowRight) then
-		debugTable.ballIndex = math.min(debugTable.ballIndex + 1, #frame.balls)
-	end
-
-	return error
+function Arena.profile(profiler: any)
+	profiler:wrapClass(Arena)
+	profiler:wrapModule(Util)
+	profiler:wrapClass(Box)
 end
 
 return Arena
