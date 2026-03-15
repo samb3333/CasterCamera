@@ -49,6 +49,7 @@ type Profiler = {
 	wrapScriptTick: (self: Profiler, f: (...any) -> any) -> (...any) -> any,
 	wrapModule: (self: Profiler, module: any) -> any,
 	wrapClass: (self: Profiler, class: any) -> any,
+	clearOverhead: (self: Profiler) -> (),
 	clearFrame: (self: Profiler) -> (),
 
 	controls: (self: Profiler) -> (),
@@ -222,7 +223,7 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 	return wrapper
 end
 
--- is completely identical to wrap except it calls clearFrame before the wrapped function.
+-- is completely identical to wrap except it calls clearOverhead before the wrapped function.
 function Profiler:wrapScriptTick(f: (...any) -> any?): (...any) -> any?
 	local wrapper: (...any) -> any?
 
@@ -233,7 +234,7 @@ function Profiler:wrapScriptTick(f: (...any) -> any?): (...any) -> any?
 			return table.unpack(result)
 		end
 
-		self:clearFrame()
+		self:clearOverhead()
 
 		local startMem = gcinfo()
 		local overheadBefore = self.overhead
@@ -294,13 +295,17 @@ function Profiler:wrapClass(class: any): any
 	return class
 end
 
+function Profiler:clearOverhead()
+	self.overhead = 0
+end
+
 function Profiler:clearFrame()
 	if self.paused then
 		self.freshFrame = false
 		return
 	end
 
-	self.overhead = 0
+	self:clearOverhead()
 	while #self.frames >= math.max(self.maxFrameAmount, 1) do
 		table.remove(self.frames, 1)
 	end
