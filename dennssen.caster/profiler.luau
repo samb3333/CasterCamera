@@ -1,7 +1,6 @@
 --!strict
 
--- Future Features:
--- try and use rangeSlider for the 3rd time
+-- REMEMBER: Gui.rangeSlider doesn't work because its width spans the entire gui width (clips outside the window)
 
 -- Profiler Begin
 type ProfiledData = {
