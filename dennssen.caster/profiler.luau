@@ -1,7 +1,6 @@
 --!strict
 
 -- Future Features:
--- Combine time when call is in a loop
 -- try and use rangeSlider for the 3rd time
 
 -- Profiler Begin
@@ -9,6 +8,7 @@ type ProfiledData = {
 	exclusiveTime: number,
 	inclusiveTime: number,
 	exclusiveMemory: number,
+	calls: number,
 }
 
 type ProfiledFunction = {
@@ -179,7 +179,16 @@ function Profiler:buildProfiledTree(
 		end
 	end
 
-	targetFuncProfile.data = targetProfileData
+	if targetFuncProfile.data then
+		-- previously called in the same frame, so we combine data
+		targetFuncProfile.data.calls += 1
+		targetFuncProfile.data.inclusiveTime += targetProfileData.inclusiveTime
+		if targetProfileData.exclusiveTime > targetFuncProfile.data.exclusiveTime then
+			targetFuncProfile.data.exclusiveTime = targetProfileData.exclusiveTime
+		end
+	else
+		targetFuncProfile.data = targetProfileData
+	end
 end
 
 function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
@@ -208,6 +217,7 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 			inclusiveTime = inclusiveTime,
 			exclusiveTime = inclusiveTime,
 			exclusiveMemory = gcinfo() - startMem,
+			calls = 1,
 		}
 
 		self:buildProfiledTree(wrapper, functionId, profileData)
@@ -252,6 +262,7 @@ function Profiler:wrapScriptTick(f: (...any) -> any?): (...any) -> any?
 			inclusiveTime = inclusiveTime,
 			exclusiveTime = inclusiveTime,
 			exclusiveMemory = gcinfo() - startMem,
+			calls = 1,
 		}
 
 		self:buildProfiledTree(wrapper, functionId, profileData)
@@ -440,13 +451,24 @@ function setTooltip(id: string, funcFile: string, funcLine: string, data: Profil
 		Gui.separatorText("data")
 		Gui.text(`Location: {funcFile}:{funcLine}`)
 		if data then
-			Gui.text(`Self Time: {string.format("%.4f", data.exclusiveTime)}ms`)
+			local isLooped: boolean = data.calls > 1
+			local selfTimeFormated: string = string.format("%.4f", data.exclusiveTime)
+
+			if isLooped then
+				Gui.text(`Biggest Self Time: {selfTimeFormated}ms`)
+			else
+				Gui.text(`Self Time: {selfTimeFormated}ms`)
+			end
+
 			if parentInclusiveTime then
 				Gui.text(
 					`Percentage of parent: {string.format("%.2f", data.inclusiveTime / parentInclusiveTime * 100)}%`
 				)
 			end
 			Gui.text(`Memory: {data.exclusiveMemory}MB`)
+			if isLooped then
+				Gui.text(`Called Amount: {data.calls}`)
+			end
 		end
 	end)
 end
