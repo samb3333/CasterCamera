@@ -1,8 +1,8 @@
 --!strict
 
 -- Future Features:
--- Include average frame length data in the graph
 -- Combine time when call is in a loop
+-- try and use rangeSlider for the 3rd time
 
 -- Profiler Begin
 type ProfiledData = {
@@ -301,7 +301,6 @@ end
 
 function Profiler:clearFrame()
 	if self.paused then
-		self.freshFrame = false
 		return
 	end
 
@@ -362,6 +361,8 @@ local graphPosition: number = 0
 local lastGraphPosition: number = graphPosition
 local buttonJumpShift: number = 5
 local graphLength: number = 0
+
+local frameAverage: number = 0
 
 local hoverTime: { [string]: number } = {}
 local maxHoverTime: number = 0.15
@@ -545,6 +546,27 @@ function Profiler:graph()
 		return
 	end
 
+	local doUpdate: boolean = self.freshFrame
+	if doUpdate then
+		self.freshFrame = false
+	end
+
+	if doUpdate then
+		local framesAmount: number = 0
+		local framesTotal: number = 0
+		for _, frame in self.frames do
+			framesAmount += 1
+			for _, func in frame do
+				if func.data then
+					framesTotal += func.data.inclusiveTime
+				end
+			end
+		end
+		frameAverage = framesAmount ~= 0 and framesTotal / framesAmount or 0
+	end
+
+	Gui.text(`Frame Average: {string.format("%.4f", frameAverage)}ms`)
+
 	lastGraphPosition = graphPosition
 
 	if Gui.button("<-") then
@@ -559,15 +581,15 @@ function Profiler:graph()
 	graphPosition = math.max(0, graphPosition)
 	graphPosition = math.min(graphPosition, graphLength)
 
-	Gui.separator()
-
-	if graphPosition ~= lastGraphPosition or self.freshFrame then
+	if graphPosition ~= lastGraphPosition or doUpdate then
 		-- cache graph objects
 		graphFrames = {}
 		for i, frame in self.frames do
 			graphFrames[i] = getGraphObjects(frame)
 		end
 	end
+
+	Gui.separator()
 
 	Gui.beginHorizontal("hor")
 
