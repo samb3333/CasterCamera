@@ -7,8 +7,8 @@ local version: string = "2.3.2"
 -- Overtime goals don't have particle affects (think this is fixed)
 
 -- Dependencies
-local Util = require("util")
 local Profiler = require("profiler")
+local Util = require("util")
 
 Util.initializeConfig({
 	cameraFOV = 90,
