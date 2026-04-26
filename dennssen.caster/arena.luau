@@ -63,7 +63,7 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 
 	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena<ArenaData, HomeData, AwayData>,
 	getArenaBall: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
-	getTeamColors: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
+	getTeamColors: (self: Arena<ArenaData, HomeData, AwayData>, gamemodeData: SpectatorGamemodeData) -> (),
 	tick: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onGameStart: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onRoundStart: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
@@ -180,21 +180,24 @@ function Arena:getArenaBall()
 	return closestBall
 end
 
-function Arena:getTeamColors()
-	local teamColors: { TeamColor } = self.gamemode:getTeamColorsArray()
+function Arena:getTeamColors(gamemodeData: SpectatorGamemodeData)
+	local homeTeamColor = gamemodeData.teams[1].teamColor
+	local awayTeamColor = gamemodeData.teams[2].teamColor
 
-	if teamColors[1].primary then
-		self.home.color = teamColors[1].primary
+	if homeTeamColor then
+		self.home.color = homeTeamColor.primary
 	end
 
-	if teamColors[2].primary then
-		self.away.color = teamColors[2].primary
+	if awayTeamColor then
+		self.away.color = awayTeamColor.primary
 	end
 end
 
 function Arena:tick()
 	self.frame = Util.getReplayFrameFromIndex(self.frameIndex)
-	self:getTeamColors()
+
+	local gamemodeData: SpectatorGamemodeData = SpectatorGamemodes.getGamemodeData(self.slotId)
+	self:getTeamColors(gamemodeData)
 	self.ball = self:getArenaBall()
 
 	if self.preTickHook then
@@ -203,7 +206,7 @@ function Arena:tick()
 
 	local currentTime = os.clock()
 	self.lastIsGameActive = self.isGameActive
-	self.isGameActive = self.gamemode:getIsGameRunning()
+	self.isGameActive = gamemodeData.isGameRunning
 
 	if self.instantUpdate then
 		self.lastIsGameActive = self.isGameActive
@@ -221,25 +224,18 @@ function Arena:tick()
 		self:onRoundStart()
 	end
 
-	local gameTimeComponent = self.gamemode:getGameTimeComponent()
-
 	self.matchLengthSeconds = self.gamemode:getNumberConfigVariable("matchlengthseconds")
 	self.mercyScoreDifference = self.gamemode:getNumberConfigVariable("mercyscoredifference")
-	if gameTimeComponent then
-		if self.gameTimeSeconds and self.isGameActive then
-			self.lastGameTimeSeconds = self.gameTimeSeconds
-		elseif self.matchLengthSeconds then
-			self.lastGameTimeSeconds = self.matchLengthSeconds
-		else
-			self.lastGameTimeSeconds = 0
-		end
-		self.gameTimeSeconds = gameTimeComponent:getTimeSeconds()
-		self.actionTimerSeconds = gameTimeComponent:getSecondaryTimeSeconds()
+
+	if self.gameTimeSeconds and self.isGameActive then
+		self.lastGameTimeSeconds = self.gameTimeSeconds
+	elseif self.matchLengthSeconds then
+		self.lastGameTimeSeconds = self.matchLengthSeconds
 	else
-		self.gameTimeSeconds = 0
 		self.lastGameTimeSeconds = 0
-		self.actionTimerSeconds = 0
 	end
+	self.gameTimeSeconds = gamemodeData.timeSeconds
+	self.actionTimerSeconds = gamemodeData.secondaryTimeSeconds
 
 	if
 		self.isGracePeriod
@@ -253,9 +249,9 @@ function Arena:tick()
 	end
 
 	self.home.previousRoundsWon = self.home.roundsWon
-	self.home.roundsWon = self.gamemode:getTeamRoundsWon(Util.TeamIndex.HomeTeam)
+	self.home.roundsWon = gamemodeData.teams[1].roundsWon
 	self.away.previousRoundsWon = self.away.roundsWon
-	self.away.roundsWon = self.gamemode:getTeamRoundsWon(Util.TeamIndex.AwayTeam)
+	self.away.roundsWon = gamemodeData.teams[2].roundsWon
 
 	if self.instantUpdate then
 		self.home.previousRoundsWon = self.home.roundsWon
@@ -272,9 +268,9 @@ function Arena:tick()
 	end
 
 	self.home.previousScore = self.home.score
-	self.home.score = self.gamemode:getTeamScore(Util.TeamIndex.HomeTeam)
+	self.home.score = gamemodeData.teams[1].score
 	self.away.previousScore = self.away.score
-	self.away.score = self.gamemode:getTeamScore(Util.TeamIndex.AwayTeam)
+	self.away.score = gamemodeData.teams[2].score
 
 	if self.instantUpdate or isStarting then
 		self.home.previousScore = self.home.score
