@@ -1546,6 +1546,7 @@ local overviewMessage = {
 	message = "",
 }
 local tpGamemodeName: string = ""
+local dataGamemodeName: string = ""
 
 function getGamemodeByName(gamemodeName: string): ModuleStateSpectatorLuaApi?
 	for _, gamemode in SpectatorGamemodes.listGamemodes() do
@@ -2212,6 +2213,12 @@ function onGui()
 				for _, arena in arenas do
 					print(arena.slotId)
 				end
+			end
+
+			dataGamemodeName = Gui.inputText("##GamemodeData", dataGamemodeName)
+			Gui.sameLine()
+			if Gui.button("Print gamemode data") then
+				print(Util.tableToString(SpectatorGamemodes.getGamemodeData(dataGamemodeName).teams))
 			end
 
 			if selectedArena and Gui.button("Set Orientation to Arena") then
