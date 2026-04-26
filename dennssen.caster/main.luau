@@ -1819,8 +1819,6 @@ function toggleDebugMenus(toggle: boolean)
 end
 
 function onGui()
-	WorldDraw.clear()
-
 	if followPlussWarning ~= "" then
 		Gui.text(followPlussWarning)
 		Gui.newLine()
@@ -2308,11 +2306,6 @@ function onGui()
 			end
 
 			debugBallPrediction = Gui.checkbox("show ball prediction", debugBallPrediction)
-
-			if ball and debugBallPrediction then
-				BallSim:simBallPath(ball, overviewPredictionSteps, overviewPredictionTime / overviewPredictionSteps)
-				BallSim:renderBallPath()
-			end
 
 			if Gui.treeNode("Print ball collision info") then
 				if Gui.treeNode("Home") then
@@ -3428,6 +3421,26 @@ function drawBallOutline()
 	end
 end
 
+function debugCode()
+	if showGamemodePositions then
+		debugGamemodePositions()
+	end
+
+	if arenas and boundingBoxDebug then
+		for _, arena in arenas do
+			arena.box:renderFaces(LinearColor.new(1, 0, 1, 0.5))
+			arena.centerBox:render(0, 1, 0)
+			arena.home.goal.box:render(1, 0, 0)
+			arena.away.goal.box:render(0, 0, 1)
+		end
+	end
+
+	if ball and debugBallPrediction then
+		BallSim:simBallPath(ball, overviewPredictionSteps, overviewPredictionTime / overviewPredictionSteps)
+		BallSim:renderBallPath()
+	end
+end
+
 function onExit()
 	if playerFollow then
 		stopFollow()
@@ -3441,6 +3454,8 @@ function tick(dt)
 		onExit()
 		return
 	end
+
+	WorldDraw.clear()
 
 	if cachedGamemodesAmount ~= #SpectatorGamemodes.listGamemodeIds() then
 		arenas = getArenas()
@@ -3509,18 +3524,7 @@ function tick(dt)
 
 	InputSystem.readInputEnd()
 
-	if showGamemodePositions then
-		debugGamemodePositions()
-	end
-
-	if arenas and boundingBoxDebug then
-		for _, arena in arenas do
-			arena.box:renderFaces(LinearColor.new(1, 0, 1, 0.5))
-			arena.centerBox:render(0, 1, 0)
-			arena.home.goal.box:render(1, 0, 0)
-			arena.away.goal.box:render(0, 0, 1)
-		end
-	end
+	debugCode()
 end
 
 tick = Profiler:wrapScriptTick(tick)
