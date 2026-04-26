@@ -2546,6 +2546,35 @@ function getClosestPlayerToLineOfSight(): ReplayPlayer?
 	return closestPlayer
 end
 
+function followPlayer()
+	playerFollow = true
+	local message: FollowPlusData = {
+		readLocation = readLocation,
+		showNameTags = true,
+		muteSelf = false,
+		isBallOutlineEnabled = ballOutline,
+		targetPlayer = currentPlayer,
+		cameraFOV = followFOV,
+		cameraMode = cameraMode,
+		radius = followRadius,
+		threshold = 5,
+		positionSmoothing = followPosititonSmoothing,
+		cameraPositionOffset = Vec3.zeroVector,
+		cameraRotationOffset = Quat.identity,
+		gestureControls = false,
+		autoBall = false,
+		autoGoalCam = false,
+		showQuests = false,
+		autoRecordReplays = false,
+		mouseSensitivity = mouseSensitivity,
+		controllerSensitivity = controllerSensitivity,
+		controllerDeadzone = deadzone,
+	}
+	toggleSmoothing(false, false)
+	sendMessage(followPlussCamera, message)
+	ui:setCamera(followPlussId)
+end
+
 function getPlayer()
 	if not followPlussCamera then
 		return
@@ -2959,35 +2988,6 @@ function rotateCamera()
 
 	rotEuler.y = math.clamp(rotEuler.y, -89.99, 89.99)
 	camera.rotation = gravityChaser * Quat.fromEuler(rotEuler.x, rotEuler.y, rotEuler.z)
-end
-
-function followPlayer()
-	playerFollow = true
-	local message: FollowPlusData = {
-		readLocation = readLocation,
-		showNameTags = true,
-		muteSelf = false,
-		isBallOutlineEnabled = ballOutline,
-		targetPlayer = currentPlayer,
-		cameraFOV = followFOV,
-		cameraMode = cameraMode,
-		radius = followRadius,
-		threshold = 5,
-		positionSmoothing = followPosititonSmoothing,
-		cameraPositionOffset = Vec3.zeroVector,
-		cameraRotationOffset = Quat.identity,
-		gestureControls = false,
-		autoBall = false,
-		autoGoalCam = false,
-		showQuests = false,
-		autoRecordReplays = false,
-		mouseSensitivity = mouseSensitivity,
-		controllerSensitivity = controllerSensitivity,
-		controllerDeadzone = deadzone,
-	}
-	toggleSmoothing(false, false)
-	sendMessage(followPlussCamera, message)
-	ui:setCamera(followPlussId)
 end
 
 function checkBallContact()
