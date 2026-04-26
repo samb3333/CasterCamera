@@ -111,7 +111,6 @@ type CustomInput = InputSystem.CustomInput
 type InputSystem = InputSystem.InputSystem
 
 local Box = require("box")
-Box = Profiler:wrapClass(Box)
 type BoxType = typeof(Box)
 
 local Arena = require("arena")
