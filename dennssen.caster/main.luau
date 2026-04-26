@@ -2965,7 +2965,7 @@ function followPlayer()
 		readLocation = readLocation,
 		showNameTags = true,
 		muteSelf = false,
-		isBallOutlineEnabled = true,
+		isBallOutlineEnabled = ballOutline,
 		targetPlayer = currentPlayer,
 		cameraFOV = followFOV,
 		cameraMode = cameraMode,
