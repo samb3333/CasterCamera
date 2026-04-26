@@ -1200,12 +1200,14 @@ local rotEuler: Vec3 = Vec3.zeroVector
 local keyboardKeybindsDeserialized = InputSystem.decodeKeybinds(config.keyboardKeybinds)
 local gamepadKeybindsDeserialized = InputSystem.decodeKeybinds(config.gamepadKeybinds)
 
-if Util.getDictSize(keyboardKeybindsDeserialized) == 0 then
-	keyboardKeybindsDeserialized = InputSystem.defaultKeybinds.keyboard
+if Util.getDictSize(keyboardKeybindsDeserialized) ~= Util.getDictSize(InputSystem.defaultKeybinds.keyboard) then
+	Util.deepStructureCopy(InputSystem.defaultKeybinds.keyboard, keyboardKeybindsDeserialized)
+	Util.deepStructureClean(InputSystem.defaultKeybinds.keyboard, keyboardKeybindsDeserialized)
 end
 
-if Util.getDictSize(gamepadKeybindsDeserialized) == 0 then
-	gamepadKeybindsDeserialized = InputSystem.defaultKeybinds.gamepad
+if Util.getDictSize(gamepadKeybindsDeserialized) ~= Util.getDictSize(InputSystem.defaultKeybinds.gamepad) then
+	Util.deepStructureCopy(InputSystem.defaultKeybinds.gamepad, gamepadKeybindsDeserialized)
+	Util.deepStructureClean(InputSystem.defaultKeybinds.gamepad, gamepadKeybindsDeserialized)
 end
 
 InputSystem.inputs = {
