@@ -110,6 +110,8 @@ type Keybind = InputSystem.Keybind
 type CustomInput = InputSystem.CustomInput
 type InputSystem = InputSystem.InputSystem
 
+local BallSim = require("ballsim")
+
 local Box = require("box")
 type BoxType = typeof(Box)
 
@@ -441,6 +443,8 @@ local ARENA_TYPES = {
 }
 local centerBoxSize = Vec3.new(50, 50, 125)
 local overviewOffsets = config.overviewOffsets
+local overviewPredictionSteps: number = 2
+local overviewPredictionTime: number = 5
 
 local CasterArena = {} :: CasterArena
 CasterArena.__index = CasterArena
@@ -1540,6 +1544,7 @@ local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
 local showGamemodePositions: boolean = false
 local closestDebugGamemodeId: string = ""
+local debugBallPrediction: boolean = false
 
 local overviewMessage = {
 	overviewNumber = 0,
@@ -1814,6 +1819,8 @@ function toggleDebugMenus(toggle: boolean)
 end
 
 function onGui()
+	WorldDraw.clear()
+
 	if followPlussWarning ~= "" then
 		Gui.text(followPlussWarning)
 		Gui.newLine()
@@ -2291,13 +2298,20 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Ball") then
-			if Gui.button("Print arena ball json") then
+			if ball and Gui.button("Print arena ball json") then
 				print(ball:toJson())
 			end
 
 			if selectedArena and Gui.button("Print closest ball json") then
 				local closestBall = Util.getClosestBall(selectedArena.transform.position, gameData)
 				print(closestBall:toJson())
+			end
+
+			debugBallPrediction = Gui.checkbox("show ball prediction", debugBallPrediction)
+
+			if ball and debugBallPrediction then
+				BallSim:simBallPath(ball, overviewPredictionSteps, overviewPredictionTime / overviewPredictionSteps)
+				BallSim:renderBallPath()
 			end
 
 			if Gui.treeNode("Print ball collision info") then
@@ -2570,6 +2584,24 @@ function stopFollow()
 	setHideHead(false)
 end
 
+function setOverview(overviewNumber: number)
+	if playerFollow then
+		stopFollow()
+	end
+	toggleSmoothing(false, false)
+
+	BallSim:simBallPath(ball, overviewPredictionSteps, overviewPredictionTime / overviewPredictionSteps)
+	local futureBallPosition: Vec3 = BallSim.simPath[#BallSim.simPath].position
+
+	if selectedArena:isPointOnHomeSide(futureBallPosition) then
+		cameraPosition = selectedArena.home.data.overview[overviewNumber].position
+		setGlobalCameraRotation(selectedArena.home.data.overview[overviewNumber].rotation)
+	else
+		cameraPosition = selectedArena.away.data.overview[overviewNumber].position
+		setGlobalCameraRotation(selectedArena.away.data.overview[overviewNumber].rotation)
+	end
+end
+
 function readInput()
 	readOtherInputs()
 	readMoveInput()
@@ -2662,17 +2694,7 @@ function readOtherInputs()
 			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview1).down
 		)
 	then
-		if playerFollow then
-			stopFollow()
-		end
-		toggleSmoothing(false, false)
-		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.data.overview[1].position
-			setGlobalCameraRotation(selectedArena.home.data.overview[1].rotation)
-		else
-			cameraPosition = selectedArena.away.data.overview[1].position
-			setGlobalCameraRotation(selectedArena.away.data.overview[1].rotation)
-		end
+		setOverview(1)
 	end
 	if
 		ball
@@ -2681,17 +2703,7 @@ function readOtherInputs()
 			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview2).down
 		)
 	then
-		if playerFollow then
-			stopFollow()
-		end
-		toggleSmoothing(false, false)
-		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.data.overview[2].position
-			setGlobalCameraRotation(selectedArena.home.data.overview[2].rotation)
-		else
-			cameraPosition = selectedArena.away.data.overview[2].position
-			setGlobalCameraRotation(selectedArena.away.data.overview[2].rotation)
-		end
+		setOverview(2)
 	end
 	if
 		ball
@@ -2700,17 +2712,7 @@ function readOtherInputs()
 			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview3).down
 		)
 	then
-		if playerFollow then
-			stopFollow()
-		end
-		toggleSmoothing(false, false)
-		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.data.overview[3].position
-			setGlobalCameraRotation(selectedArena.home.data.overview[3].rotation)
-		else
-			cameraPosition = selectedArena.away.data.overview[3].position
-			setGlobalCameraRotation(selectedArena.away.data.overview[3].rotation)
-		end
+		setOverview(3)
 	end
 
 	if
@@ -3439,8 +3441,6 @@ function tick(dt)
 		onExit()
 		return
 	end
-
-	WorldDraw.clear()
 
 	if cachedGamemodesAmount ~= #SpectatorGamemodes.listGamemodeIds() then
 		arenas = getArenas()
