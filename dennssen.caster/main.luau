@@ -344,10 +344,10 @@ local debugAwayScore: number = 0
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = ">=1.13.0"
-local recommendedFollowPlussVersion: string = ">=1.13.2"
+local recommendedFollowPlussVersion: string = ">=1.14.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
-local followPlussTick: (dt: number, followedBy: SpectatorCamera) -> ()
+local followPlussTick: (dt: number, followedBy: SpectatorCamera?) -> ()
 
 local playerFollow = false
 local povFollow = false
@@ -367,14 +367,14 @@ function getFollowVersion(version: string)
 	followPlussVersion = version
 end
 
-function getFollowPlussTick(_followPlussTick: (number, SpectatorCamera) -> ())
+function getFollowPlussTick(_followPlussTick: (number, SpectatorCamera?) -> ())
 	followPlussTick = _followPlussTick
 end
 
 type FollowPlusData = {
 	-- Callbacks
 	versionCallback: (string) -> ()?,
-	getMainProcessCallback: ((number, SpectatorCamera) -> ()) -> ()?,
+	getMainProcessCallback: ((number, SpectatorCamera?) -> ()) -> ()?,
 	guiCallback: (() -> ()) -> ()?,
 	topSettingsCallback: (() -> ()) -> ()?,
 	checkboxSettingsCallback: (() -> ()) -> ()?,
@@ -2631,6 +2631,7 @@ function stopFollow()
 	currentPlayer = nil
 	camera.fieldOfView = cameraFOV
 	setHideHead(false)
+	followPlussTick(deltaTime, nil)
 end
 
 function setOverview(overviewNumber: number)
