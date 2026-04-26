@@ -144,6 +144,7 @@ local defaultKeybinds = {
 		resetFOV = { primary = Input.Key.MiddleMouseButton, modifiers = {} },
 		getClosestArena = { primary = Input.Key.Enter, modifiers = {} },
 		thirdPerson = { primary = Input.Key.V, modifiers = {} },
+		ballCam = { primary = Input.Key.B, modifiers = {} },
 		speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
 		lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
 		up = { primary = Input.Key.E, modifiers = {} },
@@ -168,6 +169,7 @@ local defaultKeybinds = {
 		resetFOV = { primary = Input.Gamepad.DPad_Right, modifiers = {} },
 		getClosestArena = { primary = Input.Gamepad.Special_Right, modifiers = {} },
 		thirdPerson = { primary = Input.Gamepad.FaceButton_Top, modifiers = {} },
+		ballCam = { primary = Input.Gamepad.FaceButton_Bottom, modifiers = {} },
 		speedDown = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
 		up = { primary = Input.Gamepad.RightTrigger, modifiers = {} },
 		overview3 = { primary = Input.Gamepad.FaceButton_Right, modifiers = { Input.Gamepad.DPad_Left } },
@@ -312,6 +314,7 @@ local CameraMode = {
 	HeadRotation = 2,
 	VelocityRotation = 3,
 	FaceTheBall = 4,
+	BallCam = 5,
 }
 local CAMERA_MODE_NAMES = {
 	[1] = "First Person",
@@ -347,6 +350,7 @@ local followPlussWarning: string = ""
 local followPlussTick: (dt: number, followedBy: SpectatorCamera) -> ()
 
 local playerFollow = false
+local povFollow = false
 local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
 local followFOV: number = config.followFOV
@@ -1278,6 +1282,12 @@ InputSystem.inputs = {
 			keyboardKeybindsDeserialized["speedDown"].primary,
 			keyboardKeybindsDeserialized["speedDown"].modifiers
 		),
+		ballCam = InputSystem.createCustomInput(
+			"Ball Cam",
+			"Toggle ball view",
+			keyboardKeybindsDeserialized["ballCam"].primary,
+			keyboardKeybindsDeserialized["ballCam"].modifiers
+		),
 		thirdPerson = InputSystem.createCustomInput(
 			"Third Person",
 			"Toggle third-person view",
@@ -1446,6 +1456,12 @@ InputSystem.inputs = {
 			gamepadKeybindsDeserialized["thirdPerson"].primary,
 			gamepadKeybindsDeserialized["thirdPerson"].modifiers
 		),
+		ballCam = InputSystem.createCustomInput(
+			"Ball Cam",
+			"Toggle ball view",
+			gamepadKeybindsDeserialized["ballCam"].primary,
+			gamepadKeybindsDeserialized["ballCam"].modifiers
+		),
 		overview1 = InputSystem.createCustomInput(
 			"Overview 1",
 			"Jump to first overview position",
@@ -1492,6 +1508,7 @@ local inputOrder = {
 		"freeCam",
 		"firstPerson",
 		"thirdPerson",
+		"ballCam",
 		"overview1",
 		"overview2",
 		"overview3",
@@ -1516,6 +1533,7 @@ local inputOrder = {
 		"freeCam",
 		"firstPerson",
 		"thirdPerson",
+		"ballCam",
 		"overview1",
 		"overview2",
 		"overview3",
@@ -2539,8 +2557,14 @@ function getClosestPlayerToLineOfSight(): ReplayPlayer?
 	return closestPlayer
 end
 
-function followPlayer()
-	playerFollow = true
+function followPov(type: "player" | "ball")
+	povFollow = true
+	if type == "player" then
+		playerFollow = true
+	elseif type == "ball" then
+		playerFollow = false
+	end
+
 	local message: FollowPlusData = {
 		readLocation = readLocation,
 		showNameTags = true,
@@ -2568,7 +2592,7 @@ function followPlayer()
 	ui:setCamera(followPlussId)
 end
 
-function getPlayer()
+function getPlayer(type: "player" | "ball")
 	if not followPlussCamera then
 		return
 	end
@@ -2591,12 +2615,13 @@ function getPlayer()
 		return
 	end
 	currentPlayerIndex = playerIndex
-	followPlayer()
+	followPov(type)
 end
 
 function stopFollow()
 	toggleSmoothing(true, true)
 	ui:setCamera("")
+	povFollow = false
 	playerFollow = false
 	cameraPosition = followPlussCamera:getSmoothedPosition()
 	setGlobalCameraRotation(followPlussCamera:getSmoothedRotation())
@@ -2607,7 +2632,7 @@ function stopFollow()
 end
 
 function setOverview(overviewNumber: number)
-	if playerFollow then
+	if povFollow then
 		stopFollow()
 	end
 	toggleSmoothing(false, false)
@@ -2755,12 +2780,14 @@ function readOtherInputs()
 		InputSystem.getCustomKey(InputSystem.inputs.keyboard.thirdPerson).down
 		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.thirdPerson).down
 	then
-		if currentPlayer == nil or cameraMode == thirdPersonMode then
+		-- Get player if already in third person or in ball cam
+		-- Otherwise just switch camera mode
+		if currentPlayer == nil or cameraMode == thirdPersonMode or cameraMode == CameraMode.BallCam then
 			cameraMode = thirdPersonMode
-			getPlayer()
+			getPlayer("player")
 		else
 			cameraMode = thirdPersonMode
-			followPlayer()
+			followPov("player")
 		end
 	end
 
@@ -2768,20 +2795,30 @@ function readOtherInputs()
 		InputSystem.getCustomKey(InputSystem.inputs.keyboard.firstPerson).down
 		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.firstPerson).down
 	then
-		if currentPlayer == nil or cameraMode == CameraMode.FirstPerson then
+		-- Get player if already in third person or in ball cam
+		-- Otherwise just switch camera mode
+		if currentPlayer == nil or cameraMode == CameraMode.FirstPerson or cameraMode == CameraMode.BallCam then
 			cameraMode = CameraMode.FirstPerson
-			getPlayer()
+			getPlayer("player")
 		else
 			cameraMode = CameraMode.FirstPerson
-			followPlayer()
+			followPov("player")
 		end
+	end
+
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.ballCam).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.ballCam).down
+	then
+		cameraMode = CameraMode.BallCam
+		getPlayer("ball")
 	end
 
 	if
 		InputSystem.getCustomKey(InputSystem.inputs.keyboard.freeCam).down
 		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.freeCam).down
 	then
-		if playerFollow then
+		if povFollow then
 			stopFollow()
 		end
 	end
@@ -2798,7 +2835,7 @@ function readOtherInputs()
 			currentPlayerIndex = #selectedArena.players
 		end
 		currentPlayer = selectedArena.players[currentPlayerIndex]
-		followPlayer()
+		followPov("player")
 	end
 	if
 		playerFollow
@@ -2812,7 +2849,7 @@ function readOtherInputs()
 			currentPlayerIndex = 1
 		end
 		currentPlayer = selectedArena.players[currentPlayerIndex]
-		followPlayer()
+		followPov("player")
 	end
 end
 
@@ -3442,7 +3479,7 @@ function debugCode()
 end
 
 function onExit()
-	if playerFollow then
+	if povFollow then
 		stopFollow()
 	end
 end
@@ -3485,7 +3522,7 @@ function tick(dt)
 	selectedArena:tick()
 	ball = selectedArena.ball
 
-	if #gameData.players < 1 and playerFollow then
+	if #gameData.players < 1 and povFollow then
 		stopFollow()
 	end
 
@@ -3494,7 +3531,7 @@ function tick(dt)
 		return
 	end
 
-	if playerFollow then
+	if povFollow then
 		followPlussTick(dt, camera)
 		Util.followCamera(followPlussId)
 		readOtherInputs()
