@@ -7,6 +7,7 @@ local version: string = "2.3.3"
 -- Overtime goals don't have particle affects (think this is fixed)
 
 -- Dependencies
+local Profiler = require("profiler")
 local Util = require("util")
 
 Util.initializeConfig({
@@ -113,6 +114,7 @@ local Box = require("box")
 type BoxType = typeof(Box)
 
 local Arena = require("arena")
+Arena.profile(Profiler)
 type OverviewData = {
 	overview: { { position: Vec3, rotation: Quat } },
 }
@@ -1536,6 +1538,9 @@ local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
+local showGamemodePositions: boolean = false
+local closestDebugGamemodeId: string = ""
+
 local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
@@ -1631,6 +1636,32 @@ function resetPlayersWithBall()
 	ballCollisionInfo.away.previous = nil
 end
 
+function getClosestArena(targetPosition: Vec3): CasterArena
+	local closestArenaDistance = math.huge
+	local closestArena = nil
+
+	if not arenas then
+		return closestArena
+	end
+
+	for _, arena: CasterArena in pairs(arenas) do
+		if arena.box:checkPointIntersect(targetPosition) then
+			return arena
+		end
+	end
+
+	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
+	for _, arena: CasterArena in pairs(arenas) do
+		local distance = Util.getDist(targetPosition, arena.transform.position)
+		if distance < closestArenaDistance then
+			closestArenaDistance = distance
+			closestArena = arena
+		end
+	end
+
+	return closestArena
+end
+
 function setSelectedArena(arena: CasterArena)
 	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
@@ -1640,6 +1671,142 @@ function setSelectedArena(arena: CasterArena)
 	arena.instantUpdate = true
 	selectedArena = arena
 end
+
+function DoGoalExplosion(team: ArenaTeam)
+	local goalExplosionPosition: Vec3
+	local goalExplosionColor: LinearColor = Util.linearColorNormalized(team.color)
+
+	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
+
+	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
+		goalExplosionPosition = ball.transform.position
+	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
+		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
+	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
+		goalExplosionPosition = selectedArena.home.goal.position + goalExplosionOffset
+	end
+
+	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
+end
+
+--effects start
+function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: LinearColor)
+	for i = 1, 300 do
+		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
+		ParticleSystem:createParticle(
+			goalPosition,
+			Quat.identity,
+			0.3,
+			velocityVector,
+			particleColor,
+			ParticleSystem.Variant.Embers,
+			math.random(800, 1300)
+		)
+	end
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		0.9,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleSystem.Variant.Rings,
+		150
+	)
+
+	--rings
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		1,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleSystem.Variant.Rings,
+		200
+	)
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		1,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleSystem.Variant.Rings,
+		400
+	)
+
+	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
+		return
+	end
+
+	--goal outline
+	local goalSpeed = 20
+	for i = 1, 3 do
+		ParticleSystem:createParticle(
+			goalPosition,
+			goalRotation,
+			1,
+			goalRotation:getForwardVector() * goalSpeed,
+			particleColor,
+			ParticleSystem.Variant.GoalRing,
+			400
+		)
+		goalSpeed /= 2
+	end
+end
+
+function GameStartEffect()
+	local particlePosition = selectedArena.centerBox.position
+
+	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
+	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
+
+	local colourAverage = LinearColor.new(
+		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
+		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
+		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,
+		1
+	)
+	ParticleSystem:createParticle(
+		particlePosition,
+		selectedArena.transform.rotation,
+		0.9,
+		Vec3.zeroVector,
+		colourAverage,
+		ParticleSystem.Variant.Rings,
+		150
+	)
+	ParticleSystem:createParticle(
+		particlePosition,
+		selectedArena.transform.rotation,
+		0.7,
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
+		colourAverage,
+		ParticleSystem.Variant.Rings,
+		600
+	)
+	ParticleSystem:createParticle(
+		particlePosition,
+		selectedArena.transform.rotation,
+		0.7,
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
+		colourAverage,
+		ParticleSystem.Variant.Rings,
+		400
+	)
+	local colourPallette = { normalizedHomeColor, normalizedAwayColor }
+	for i = 1, 300 do
+		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
+		ParticleSystem:createParticle(
+			particlePosition,
+			selectedArena.transform.rotation,
+			0.5,
+			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
+			colourPallette[math.random(1, 2)],
+			ParticleSystem.Variant.Embers,
+			math.random(800, 1300)
+		)
+	end
+end
+--effects end
 
 function toggleDebugMenus(toggle: boolean)
 	Arena.showDebugMenus = toggle
@@ -1997,6 +2164,11 @@ function onGui()
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
+		if Gui.treeNode("Profiler") then
+			Profiler:controls()
+			Gui.text(`Frames: {#Profiler.frames}`)
+			Gui.treePop()
+		end
 		if Gui.treeNode("Camera") then
 			Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
 			Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
@@ -2025,6 +2197,13 @@ function onGui()
 					local transform = gamemode.transform
 					setGlobalCameraTransform(transform.position, transform.rotation)
 				end
+			end
+
+			Gui.newLine()
+
+			showGamemodePositions = Gui.checkbox("Show gamemode positions", showGamemodePositions)
+			if showGamemodePositions and Gui.button("Print Closest Gamemode") then
+				print(closestDebugGamemodeId)
 			end
 
 			Gui.newLine()
@@ -2206,6 +2385,11 @@ function onGui()
 			end
 			Gui.treePop()
 		end
+		if Gui.treeNode("Other") then
+			Gui.text(`Luau Memory Usage: {gcinfo() / 1000}MB`)
+
+			Gui.treePop()
+		end
 		if Gui.treeNode("Debug Settings") then
 			local newShowDebugMenus = Gui.checkbox("Show Debug Menus", showDebugMenus)
 			if newShowDebugMenus ~= showDebugMenus then
@@ -2222,6 +2406,34 @@ function onGui()
 		end
 
 		Gui.treePop()
+	end
+end
+
+function debugGamemodePositions()
+	if showGamemodePositions then
+		local gamemodes = SpectatorGamemodes.listGamemodes()
+
+		local closestGamemode = {
+			distance = math.huge,
+		}
+
+		local cameraPos = camera.position
+		for _, gamemode: ModuleStateSpectatorLuaApi in gamemodes do
+			local position = gamemode.transform.position
+			local distance = cameraPos:distance(position)
+
+			WorldDraw.drawPoint(position, 1, 0, 0, 50, 0)
+
+			if distance < closestGamemode.distance then
+				closestGamemode.distance = distance
+				closestGamemode.gamemode = gamemode
+			end
+		end
+
+		closestDebugGamemodeId = closestGamemode.gamemode:getSlotId()
+		WorldDraw.drawPoint(closestGamemode.gamemode.transform.position, 0, 1, 0, 50, 0)
+	else
+		closestDebugGamemodeId = ""
 	end
 end
 
@@ -2258,32 +2470,6 @@ function onTransitionBegin(transitionInfo: Transition)
 	camera.rotationSmoothing = 0
 	setHideHead(false)
 	camera.showNameTags = true
-end
-
-function getClosestArena(targetPosition: Vec3): CasterArena
-	local closestArenaDistance = math.huge
-	local closestArena = nil
-
-	if not arenas then
-		return closestArena
-	end
-
-	for _, arena: CasterArena in pairs(arenas) do
-		if arena.box:checkPointIntersect(targetPosition) then
-			return arena
-		end
-	end
-
-	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
-	for _, arena: CasterArena in pairs(arenas) do
-		local distance = Util.getDist(targetPosition, arena.transform.position)
-		if distance < closestArenaDistance then
-			closestArenaDistance = distance
-			closestArena = arena
-		end
-	end
-
-	return closestArena
 end
 
 -- Remember: ball radius is 17.5, use an extra 10 for player contact
@@ -2364,125 +2550,6 @@ function getPlayer()
 	currentPlayerIndex = playerIndex
 	followPlayer()
 end
-
---effects start
-function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: LinearColor)
-	for i = 1, 300 do
-		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
-		ParticleSystem:createParticle(
-			goalPosition,
-			Quat.identity,
-			0.3,
-			velocityVector,
-			particleColor,
-			ParticleSystem.Variant.Embers,
-			math.random(800, 1300)
-		)
-	end
-	ParticleSystem:createParticle(
-		goalPosition,
-		goalRotation,
-		0.9,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleSystem.Variant.Rings,
-		150
-	)
-
-	--rings
-	ParticleSystem:createParticle(
-		goalPosition,
-		goalRotation,
-		1,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleSystem.Variant.Rings,
-		200
-	)
-	ParticleSystem:createParticle(
-		goalPosition,
-		goalRotation,
-		1,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleSystem.Variant.Rings,
-		400
-	)
-
-	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
-		return
-	end
-
-	--goal outline
-	local goalSpeed = 20
-	for i = 1, 3 do
-		ParticleSystem:createParticle(
-			goalPosition,
-			goalRotation,
-			1,
-			goalRotation:getForwardVector() * goalSpeed,
-			particleColor,
-			ParticleSystem.Variant.GoalRing,
-			400
-		)
-		goalSpeed /= 2
-	end
-end
-
-function GameStartEffect()
-	local particlePosition = selectedArena.centerBox.position
-
-	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
-	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
-
-	local colourAverage = LinearColor.new(
-		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
-		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
-		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,
-		1
-	)
-	ParticleSystem:createParticle(
-		particlePosition,
-		selectedArena.transform.rotation,
-		0.9,
-		Vec3.zeroVector,
-		colourAverage,
-		ParticleSystem.Variant.Rings,
-		150
-	)
-	ParticleSystem:createParticle(
-		particlePosition,
-		selectedArena.transform.rotation,
-		0.7,
-		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
-		colourAverage,
-		ParticleSystem.Variant.Rings,
-		600
-	)
-	ParticleSystem:createParticle(
-		particlePosition,
-		selectedArena.transform.rotation,
-		0.7,
-		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
-		colourAverage,
-		ParticleSystem.Variant.Rings,
-		400
-	)
-	local colourPallette = { normalizedHomeColor, normalizedAwayColor }
-	for i = 1, 300 do
-		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
-		ParticleSystem:createParticle(
-			particlePosition,
-			selectedArena.transform.rotation,
-			0.5,
-			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
-			colourPallette[math.random(1, 2)],
-			ParticleSystem.Variant.Embers,
-			math.random(800, 1300)
-		)
-	end
-end
---effects end
 
 function stopFollow()
 	toggleSmoothing(true, true)
@@ -2912,23 +2979,6 @@ function followPlayer()
 	toggleSmoothing(false, false)
 	sendMessage(followPlussCamera, message)
 	ui:setCamera(followPlussId)
-end
-
-function DoGoalExplosion(team: ArenaTeam)
-	local goalExplosionPosition: Vec3
-	local goalExplosionColor: LinearColor = Util.linearColorNormalized(team.color)
-
-	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
-
-	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
-		goalExplosionPosition = ball.transform.position
-	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
-		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
-	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
-		goalExplosionPosition = selectedArena.home.goal.position + goalExplosionOffset
-	end
-
-	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
 end
 
 function checkBallContact()
@@ -3369,7 +3419,14 @@ function drawBallOutline()
 	end
 end
 
+function onExit()
+	if playerFollow then
+		stopFollow()
+	end
+end
+
 function tick(dt)
+	Profiler:tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = nil
 		onExit()
@@ -3445,6 +3502,10 @@ function tick(dt)
 
 	InputSystem.readInputEnd()
 
+	if showGamemodePositions then
+		debugGamemodePositions()
+	end
+
 	if arenas and boundingBoxDebug then
 		for _, arena in arenas do
 			arena.box:renderFaces(LinearColor.new(1, 0, 1, 0.5))
@@ -3455,8 +3516,4 @@ function tick(dt)
 	end
 end
 
-function onExit()
-	if playerFollow then
-		stopFollow()
-	end
-end
+tick = Profiler:wrapScriptTick(tick)
