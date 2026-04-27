@@ -1,12 +1,13 @@
 --!strict
 
-local version: string = "2.3.3"
+local version: string = "2.4.0"
 
 -- Known Issues:
 -- Double clicking and hold right click while not moving the mouse makes you unable to rotate the camera. (This is a spectator issue, only happens with UI open)
 -- Overtime goals don't have particle affects (think this is fixed)
 
 -- Dependencies
+local Profiler = require("profiler")
 local Util = require("util")
 
 Util.initializeConfig({
@@ -109,10 +110,13 @@ type Keybind = InputSystem.Keybind
 type CustomInput = InputSystem.CustomInput
 type InputSystem = InputSystem.InputSystem
 
+local BallSim = require("ballsim")
+
 local Box = require("box")
 type BoxType = typeof(Box)
 
 local Arena = require("arena")
+Arena.profile(Profiler)
 type OverviewData = {
 	overview: { { position: Vec3, rotation: Quat } },
 }
@@ -140,6 +144,7 @@ local defaultKeybinds = {
 		resetFOV = { primary = Input.Key.MiddleMouseButton, modifiers = {} },
 		getClosestArena = { primary = Input.Key.Enter, modifiers = {} },
 		thirdPerson = { primary = Input.Key.V, modifiers = {} },
+		ballCam = { primary = Input.Key.B, modifiers = {} },
 		speedDown = { primary = Input.Key.LeftControl, modifiers = {} },
 		lookAround = { primary = Input.Key.RightMouseButton, modifiers = {} },
 		up = { primary = Input.Key.E, modifiers = {} },
@@ -164,6 +169,7 @@ local defaultKeybinds = {
 		resetFOV = { primary = Input.Gamepad.DPad_Right, modifiers = {} },
 		getClosestArena = { primary = Input.Gamepad.Special_Right, modifiers = {} },
 		thirdPerson = { primary = Input.Gamepad.FaceButton_Top, modifiers = {} },
+		ballCam = { primary = Input.Gamepad.FaceButton_Bottom, modifiers = {} },
 		speedDown = { primary = Input.Gamepad.LeftShoulder, modifiers = {} },
 		up = { primary = Input.Gamepad.RightTrigger, modifiers = {} },
 		overview3 = { primary = Input.Gamepad.FaceButton_Right, modifiers = { Input.Gamepad.DPad_Left } },
@@ -308,6 +314,7 @@ local CameraMode = {
 	HeadRotation = 2,
 	VelocityRotation = 3,
 	FaceTheBall = 4,
+	BallCam = 5,
 }
 local CAMERA_MODE_NAMES = {
 	[1] = "First Person",
@@ -337,12 +344,13 @@ local debugAwayScore: number = 0
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = ">=1.13.0"
-local recommendedFollowPlussVersion: string = ">=1.13.2"
+local recommendedFollowPlussVersion: string = ">=1.14.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
-local followPlussTick: (dt: number, followedBy: SpectatorCamera) -> ()
+local followPlussTick: (dt: number, followedBy: SpectatorCamera?) -> ()
 
 local playerFollow = false
+local povFollow = false
 local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
 local followFOV: number = config.followFOV
@@ -359,14 +367,14 @@ function getFollowVersion(version: string)
 	followPlussVersion = version
 end
 
-function getFollowPlussTick(_followPlussTick: (number, SpectatorCamera) -> ())
+function getFollowPlussTick(_followPlussTick: (number, SpectatorCamera?) -> ())
 	followPlussTick = _followPlussTick
 end
 
 type FollowPlusData = {
 	-- Callbacks
 	versionCallback: (string) -> ()?,
-	getMainProcessCallback: ((number, SpectatorCamera) -> ()) -> ()?,
+	getMainProcessCallback: ((number, SpectatorCamera?) -> ()) -> ()?,
 	guiCallback: (() -> ()) -> ()?,
 	topSettingsCallback: (() -> ()) -> ()?,
 	checkboxSettingsCallback: (() -> ()) -> ()?,
@@ -439,6 +447,8 @@ local ARENA_TYPES = {
 }
 local centerBoxSize = Vec3.new(50, 50, 125)
 local overviewOffsets = config.overviewOffsets
+local overviewPredictionSteps: number = 2
+local overviewPredictionTime: number = 5
 
 local CasterArena = {} :: CasterArena
 CasterArena.__index = CasterArena
@@ -1190,12 +1200,14 @@ local rotEuler: Vec3 = Vec3.zeroVector
 local keyboardKeybindsDeserialized = InputSystem.decodeKeybinds(config.keyboardKeybinds)
 local gamepadKeybindsDeserialized = InputSystem.decodeKeybinds(config.gamepadKeybinds)
 
-if Util.getDictSize(keyboardKeybindsDeserialized) == 0 then
-	keyboardKeybindsDeserialized = InputSystem.defaultKeybinds.keyboard
+if Util.getDictSize(keyboardKeybindsDeserialized) ~= Util.getDictSize(InputSystem.defaultKeybinds.keyboard) then
+	Util.deepStructureCopy(InputSystem.defaultKeybinds.keyboard, keyboardKeybindsDeserialized)
+	Util.deepStructureClean(InputSystem.defaultKeybinds.keyboard, keyboardKeybindsDeserialized)
 end
 
-if Util.getDictSize(gamepadKeybindsDeserialized) == 0 then
-	gamepadKeybindsDeserialized = InputSystem.defaultKeybinds.gamepad
+if Util.getDictSize(gamepadKeybindsDeserialized) ~= Util.getDictSize(InputSystem.defaultKeybinds.gamepad) then
+	Util.deepStructureCopy(InputSystem.defaultKeybinds.gamepad, gamepadKeybindsDeserialized)
+	Util.deepStructureClean(InputSystem.defaultKeybinds.gamepad, gamepadKeybindsDeserialized)
 end
 
 InputSystem.inputs = {
@@ -1271,6 +1283,12 @@ InputSystem.inputs = {
 			"Decrease camera speed",
 			keyboardKeybindsDeserialized["speedDown"].primary,
 			keyboardKeybindsDeserialized["speedDown"].modifiers
+		),
+		ballCam = InputSystem.createCustomInput(
+			"Ball Cam",
+			"Toggle ball view",
+			keyboardKeybindsDeserialized["ballCam"].primary,
+			keyboardKeybindsDeserialized["ballCam"].modifiers
 		),
 		thirdPerson = InputSystem.createCustomInput(
 			"Third Person",
@@ -1440,6 +1458,12 @@ InputSystem.inputs = {
 			gamepadKeybindsDeserialized["thirdPerson"].primary,
 			gamepadKeybindsDeserialized["thirdPerson"].modifiers
 		),
+		ballCam = InputSystem.createCustomInput(
+			"Ball Cam",
+			"Toggle ball view",
+			gamepadKeybindsDeserialized["ballCam"].primary,
+			gamepadKeybindsDeserialized["ballCam"].modifiers
+		),
 		overview1 = InputSystem.createCustomInput(
 			"Overview 1",
 			"Jump to first overview position",
@@ -1486,6 +1510,7 @@ local inputOrder = {
 		"freeCam",
 		"firstPerson",
 		"thirdPerson",
+		"ballCam",
 		"overview1",
 		"overview2",
 		"overview3",
@@ -1510,6 +1535,7 @@ local inputOrder = {
 		"freeCam",
 		"firstPerson",
 		"thirdPerson",
+		"ballCam",
 		"overview1",
 		"overview2",
 		"overview3",
@@ -1536,11 +1562,16 @@ local controlsScreen: boolean = false
 local keyboardControls: boolean = true
 local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
+local showGamemodePositions: boolean = false
+local closestDebugGamemodeId: string = ""
+local debugBallPrediction: boolean = false
+
 local overviewMessage = {
 	overviewNumber = 0,
 	message = "",
 }
 local tpGamemodeName: string = ""
+local dataGamemodeName: string = ""
 
 function getGamemodeByName(gamemodeName: string): ModuleStateSpectatorLuaApi?
 	for _, gamemode in SpectatorGamemodes.listGamemodes() do
@@ -1631,6 +1662,32 @@ function resetPlayersWithBall()
 	ballCollisionInfo.away.previous = nil
 end
 
+function getClosestArena(targetPosition: Vec3): CasterArena
+	local closestArenaDistance = math.huge
+	local closestArena = nil
+
+	if not arenas then
+		return closestArena
+	end
+
+	for _, arena: CasterArena in pairs(arenas) do
+		if arena.box:checkPointIntersect(targetPosition) then
+			return arena
+		end
+	end
+
+	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
+	for _, arena: CasterArena in pairs(arenas) do
+		local distance = Util.getDist(targetPosition, arena.transform.position)
+		if distance < closestArenaDistance then
+			closestArenaDistance = distance
+			closestArena = arena
+		end
+	end
+
+	return closestArena
+end
+
 function setSelectedArena(arena: CasterArena)
 	if (selectedArena and arena.name ~= selectedArena.name) or not selectedArena then -- new arena
 		resetPlayersWithBall()
@@ -1640,6 +1697,142 @@ function setSelectedArena(arena: CasterArena)
 	arena.instantUpdate = true
 	selectedArena = arena
 end
+
+function DoGoalExplosion(team: ArenaTeam)
+	local goalExplosionPosition: Vec3
+	local goalExplosionColor: LinearColor = Util.linearColorNormalized(team.color)
+
+	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
+
+	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
+		goalExplosionPosition = ball.transform.position
+	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
+		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
+	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
+		goalExplosionPosition = selectedArena.home.goal.position + goalExplosionOffset
+	end
+
+	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
+end
+
+--effects start
+function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: LinearColor)
+	for i = 1, 300 do
+		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
+		ParticleSystem:createParticle(
+			goalPosition,
+			Quat.identity,
+			0.3,
+			velocityVector,
+			particleColor,
+			ParticleSystem.Variant.Embers,
+			math.random(800, 1300)
+		)
+	end
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		0.9,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleSystem.Variant.Rings,
+		150
+	)
+
+	--rings
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		1,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleSystem.Variant.Rings,
+		200
+	)
+	ParticleSystem:createParticle(
+		goalPosition,
+		goalRotation,
+		1,
+		Vec3.zeroVector,
+		particleColor,
+		ParticleSystem.Variant.Rings,
+		400
+	)
+
+	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
+		return
+	end
+
+	--goal outline
+	local goalSpeed = 20
+	for i = 1, 3 do
+		ParticleSystem:createParticle(
+			goalPosition,
+			goalRotation,
+			1,
+			goalRotation:getForwardVector() * goalSpeed,
+			particleColor,
+			ParticleSystem.Variant.GoalRing,
+			400
+		)
+		goalSpeed /= 2
+	end
+end
+
+function GameStartEffect()
+	local particlePosition = selectedArena.centerBox.position
+
+	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
+	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
+
+	local colourAverage = LinearColor.new(
+		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
+		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
+		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,
+		1
+	)
+	ParticleSystem:createParticle(
+		particlePosition,
+		selectedArena.transform.rotation,
+		0.9,
+		Vec3.zeroVector,
+		colourAverage,
+		ParticleSystem.Variant.Rings,
+		150
+	)
+	ParticleSystem:createParticle(
+		particlePosition,
+		selectedArena.transform.rotation,
+		0.7,
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
+		colourAverage,
+		ParticleSystem.Variant.Rings,
+		600
+	)
+	ParticleSystem:createParticle(
+		particlePosition,
+		selectedArena.transform.rotation,
+		0.7,
+		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
+		colourAverage,
+		ParticleSystem.Variant.Rings,
+		400
+	)
+	local colourPallette = { normalizedHomeColor, normalizedAwayColor }
+	for i = 1, 300 do
+		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
+		ParticleSystem:createParticle(
+			particlePosition,
+			selectedArena.transform.rotation,
+			0.5,
+			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
+			colourPallette[math.random(1, 2)],
+			ParticleSystem.Variant.Embers,
+			math.random(800, 1300)
+		)
+	end
+end
+--effects end
 
 function toggleDebugMenus(toggle: boolean)
 	Arena.showDebugMenus = toggle
@@ -1997,6 +2190,11 @@ function onGui()
 	Gui.newLine()
 
 	if Gui.treeNode("Debug") then
+		if Gui.treeNode("Profiler") then
+			Profiler:controls()
+			Gui.text(`Frames: {#Profiler.frames}`)
+			Gui.treePop()
+		end
 		if Gui.treeNode("Camera") then
 			Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
 			Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
@@ -2029,10 +2227,23 @@ function onGui()
 
 			Gui.newLine()
 
+			showGamemodePositions = Gui.checkbox("Show gamemode positions", showGamemodePositions)
+			if showGamemodePositions and Gui.button("Print Closest Gamemode") then
+				print(closestDebugGamemodeId)
+			end
+
+			Gui.newLine()
+
 			if arenas and Gui.button("Print Arenas") then
 				for _, arena in arenas do
 					print(arena.slotId)
 				end
+			end
+
+			dataGamemodeName = Gui.inputText("##GamemodeData", dataGamemodeName)
+			Gui.sameLine()
+			if Gui.button("Print gamemode data") then
+				print(Util.tableToString(SpectatorGamemodes.getGamemodeData(dataGamemodeName).teams))
 			end
 
 			if selectedArena and Gui.button("Set Orientation to Arena") then
@@ -2111,7 +2322,7 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Ball") then
-			if Gui.button("Print arena ball json") then
+			if ball and Gui.button("Print arena ball json") then
 				print(ball:toJson())
 			end
 
@@ -2119,6 +2330,8 @@ function onGui()
 				local closestBall = Util.getClosestBall(selectedArena.transform.position, gameData)
 				print(closestBall:toJson())
 			end
+
+			debugBallPrediction = Gui.checkbox("show ball prediction", debugBallPrediction)
 
 			if Gui.treeNode("Print ball collision info") then
 				if Gui.treeNode("Home") then
@@ -2212,6 +2425,11 @@ function onGui()
 			end
 			Gui.treePop()
 		end
+		if Gui.treeNode("Other") then
+			Gui.text(`Luau Memory Usage: {gcinfo() / 1000}MB`)
+
+			Gui.treePop()
+		end
 		if Gui.treeNode("Debug Settings") then
 			local newShowDebugMenus = Gui.checkbox("Show Debug Menus", showDebugMenus)
 			if newShowDebugMenus ~= showDebugMenus then
@@ -2228,6 +2446,34 @@ function onGui()
 		end
 
 		Gui.treePop()
+	end
+end
+
+function debugGamemodePositions()
+	if showGamemodePositions then
+		local gamemodes = SpectatorGamemodes.listGamemodes()
+
+		local closestGamemode = {
+			distance = math.huge,
+		}
+
+		local cameraPos = camera.position
+		for _, gamemode: ModuleStateSpectatorLuaApi in gamemodes do
+			local position = gamemode.transform.position
+			local distance = cameraPos:distance(position)
+
+			WorldDraw.drawPoint(position, 1, 0, 0, 50, 0)
+
+			if distance < closestGamemode.distance then
+				closestGamemode.distance = distance
+				closestGamemode.gamemode = gamemode
+			end
+		end
+
+		closestDebugGamemodeId = closestGamemode.gamemode:getSlotId()
+		WorldDraw.drawPoint(closestGamemode.gamemode.transform.position, 0, 1, 0, 50, 0)
+	else
+		closestDebugGamemodeId = ""
 	end
 end
 
@@ -2264,32 +2510,6 @@ function onTransitionBegin(transitionInfo: Transition)
 	camera.rotationSmoothing = 0
 	setHideHead(false)
 	camera.showNameTags = true
-end
-
-function getClosestArena(targetPosition: Vec3): CasterArena
-	local closestArenaDistance = math.huge
-	local closestArena = nil
-
-	if not arenas then
-		return closestArena
-	end
-
-	for _, arena: CasterArena in pairs(arenas) do
-		if arena.box:checkPointIntersect(targetPosition) then
-			return arena
-		end
-	end
-
-	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
-	for _, arena: CasterArena in pairs(arenas) do
-		local distance = Util.getDist(targetPosition, arena.transform.position)
-		if distance < closestArenaDistance then
-			closestArenaDistance = distance
-			closestArena = arena
-		end
-	end
-
-	return closestArena
 end
 
 -- Remember: ball radius is 17.5, use an extra 10 for player contact
@@ -2345,7 +2565,42 @@ function getClosestPlayerToLineOfSight(): ReplayPlayer?
 	return closestPlayer
 end
 
-function getPlayer()
+function followPov(type: "player" | "ball")
+	povFollow = true
+	if type == "player" then
+		playerFollow = true
+	elseif type == "ball" then
+		playerFollow = false
+	end
+
+	local message: FollowPlusData = {
+		readLocation = readLocation,
+		showNameTags = true,
+		muteSelf = false,
+		isBallOutlineEnabled = ballOutline,
+		targetPlayer = currentPlayer,
+		cameraFOV = followFOV,
+		cameraMode = cameraMode,
+		radius = followRadius,
+		threshold = 5,
+		positionSmoothing = followPosititonSmoothing,
+		cameraPositionOffset = Vec3.zeroVector,
+		cameraRotationOffset = Quat.identity,
+		gestureControls = false,
+		autoBall = false,
+		autoGoalCam = false,
+		showQuests = false,
+		autoRecordReplays = false,
+		mouseSensitivity = mouseSensitivity,
+		controllerSensitivity = controllerSensitivity,
+		controllerDeadzone = deadzone,
+	}
+	toggleSmoothing(false, false)
+	sendMessage(followPlussCamera, message)
+	ui:setCamera(followPlussId)
+end
+
+function getPlayer(type: "player" | "ball")
 	if not followPlussCamera then
 		return
 	end
@@ -2368,131 +2623,13 @@ function getPlayer()
 		return
 	end
 	currentPlayerIndex = playerIndex
-	followPlayer()
+	followPov(type)
 end
-
---effects start
-function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: LinearColor)
-	for i = 1, 300 do
-		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
-		ParticleSystem:createParticle(
-			goalPosition,
-			Quat.identity,
-			0.3,
-			velocityVector,
-			particleColor,
-			ParticleSystem.Variant.Embers,
-			math.random(800, 1300)
-		)
-	end
-	ParticleSystem:createParticle(
-		goalPosition,
-		goalRotation,
-		0.9,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleSystem.Variant.Rings,
-		150
-	)
-
-	--rings
-	ParticleSystem:createParticle(
-		goalPosition,
-		goalRotation,
-		1,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleSystem.Variant.Rings,
-		200
-	)
-	ParticleSystem:createParticle(
-		goalPosition,
-		goalRotation,
-		1,
-		Vec3.zeroVector,
-		particleColor,
-		ParticleSystem.Variant.Rings,
-		400
-	)
-
-	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
-		return
-	end
-
-	--goal outline
-	local goalSpeed = 20
-	for i = 1, 3 do
-		ParticleSystem:createParticle(
-			goalPosition,
-			goalRotation,
-			1,
-			goalRotation:getForwardVector() * goalSpeed,
-			particleColor,
-			ParticleSystem.Variant.GoalRing,
-			400
-		)
-		goalSpeed /= 2
-	end
-end
-
-function GameStartEffect()
-	local particlePosition = selectedArena.centerBox.position
-
-	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
-	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
-
-	local colourAverage = LinearColor.new(
-		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
-		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
-		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,
-		1
-	)
-	ParticleSystem:createParticle(
-		particlePosition,
-		selectedArena.transform.rotation,
-		0.9,
-		Vec3.zeroVector,
-		colourAverage,
-		ParticleSystem.Variant.Rings,
-		150
-	)
-	ParticleSystem:createParticle(
-		particlePosition,
-		selectedArena.transform.rotation,
-		0.7,
-		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
-		colourAverage,
-		ParticleSystem.Variant.Rings,
-		600
-	)
-	ParticleSystem:createParticle(
-		particlePosition,
-		selectedArena.transform.rotation,
-		0.7,
-		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
-		colourAverage,
-		ParticleSystem.Variant.Rings,
-		400
-	)
-	local colourPallette = { normalizedHomeColor, normalizedAwayColor }
-	for i = 1, 300 do
-		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
-		ParticleSystem:createParticle(
-			particlePosition,
-			selectedArena.transform.rotation,
-			0.5,
-			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
-			colourPallette[math.random(1, 2)],
-			ParticleSystem.Variant.Embers,
-			math.random(800, 1300)
-		)
-	end
-end
---effects end
 
 function stopFollow()
 	toggleSmoothing(true, true)
 	ui:setCamera("")
+	povFollow = false
 	playerFollow = false
 	cameraPosition = followPlussCamera:getSmoothedPosition()
 	setGlobalCameraRotation(followPlussCamera:getSmoothedRotation())
@@ -2500,6 +2637,25 @@ function stopFollow()
 	currentPlayer = nil
 	camera.fieldOfView = cameraFOV
 	setHideHead(false)
+	followPlussTick(deltaTime, nil)
+end
+
+function setOverview(overviewNumber: number)
+	if povFollow then
+		stopFollow()
+	end
+	toggleSmoothing(false, false)
+
+	BallSim:simBallPath(ball, overviewPredictionSteps, overviewPredictionTime / overviewPredictionSteps)
+	local futureBallPosition: Vec3 = BallSim.simPath[#BallSim.simPath].position
+
+	if selectedArena:isPointOnHomeSide(futureBallPosition) then
+		cameraPosition = selectedArena.home.data.overview[overviewNumber].position
+		setGlobalCameraRotation(selectedArena.home.data.overview[overviewNumber].rotation)
+	else
+		cameraPosition = selectedArena.away.data.overview[overviewNumber].position
+		setGlobalCameraRotation(selectedArena.away.data.overview[overviewNumber].rotation)
+	end
 end
 
 function readInput()
@@ -2594,17 +2750,7 @@ function readOtherInputs()
 			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview1).down
 		)
 	then
-		if playerFollow then
-			stopFollow()
-		end
-		toggleSmoothing(false, false)
-		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.data.overview[1].position
-			setGlobalCameraRotation(selectedArena.home.data.overview[1].rotation)
-		else
-			cameraPosition = selectedArena.away.data.overview[1].position
-			setGlobalCameraRotation(selectedArena.away.data.overview[1].rotation)
-		end
+		setOverview(1)
 	end
 	if
 		ball
@@ -2613,17 +2759,7 @@ function readOtherInputs()
 			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview2).down
 		)
 	then
-		if playerFollow then
-			stopFollow()
-		end
-		toggleSmoothing(false, false)
-		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.data.overview[2].position
-			setGlobalCameraRotation(selectedArena.home.data.overview[2].rotation)
-		else
-			cameraPosition = selectedArena.away.data.overview[2].position
-			setGlobalCameraRotation(selectedArena.away.data.overview[2].rotation)
-		end
+		setOverview(2)
 	end
 	if
 		ball
@@ -2632,17 +2768,7 @@ function readOtherInputs()
 			or InputSystem.getCustomKey(InputSystem.inputs.gamepad.overview3).down
 		)
 	then
-		if playerFollow then
-			stopFollow()
-		end
-		toggleSmoothing(false, false)
-		if selectedArena:isPointOnHomeSide(ball.transform.position) then
-			cameraPosition = selectedArena.home.data.overview[3].position
-			setGlobalCameraRotation(selectedArena.home.data.overview[3].rotation)
-		else
-			cameraPosition = selectedArena.away.data.overview[3].position
-			setGlobalCameraRotation(selectedArena.away.data.overview[3].rotation)
-		end
+		setOverview(3)
 	end
 
 	if
@@ -2663,12 +2789,14 @@ function readOtherInputs()
 		InputSystem.getCustomKey(InputSystem.inputs.keyboard.thirdPerson).down
 		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.thirdPerson).down
 	then
-		if currentPlayer == nil or cameraMode == thirdPersonMode then
+		-- Get player if already in third person or in ball cam
+		-- Otherwise just switch camera mode
+		if currentPlayer == nil or cameraMode == thirdPersonMode or cameraMode == CameraMode.BallCam then
 			cameraMode = thirdPersonMode
-			getPlayer()
+			getPlayer("player")
 		else
 			cameraMode = thirdPersonMode
-			followPlayer()
+			followPov("player")
 		end
 	end
 
@@ -2676,20 +2804,30 @@ function readOtherInputs()
 		InputSystem.getCustomKey(InputSystem.inputs.keyboard.firstPerson).down
 		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.firstPerson).down
 	then
-		if currentPlayer == nil or cameraMode == CameraMode.FirstPerson then
+		-- Get player if already in third person or in ball cam
+		-- Otherwise just switch camera mode
+		if currentPlayer == nil or cameraMode == CameraMode.FirstPerson or cameraMode == CameraMode.BallCam then
 			cameraMode = CameraMode.FirstPerson
-			getPlayer()
+			getPlayer("player")
 		else
 			cameraMode = CameraMode.FirstPerson
-			followPlayer()
+			followPov("player")
 		end
+	end
+
+	if
+		InputSystem.getCustomKey(InputSystem.inputs.keyboard.ballCam).down
+		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.ballCam).down
+	then
+		cameraMode = CameraMode.BallCam
+		getPlayer("ball")
 	end
 
 	if
 		InputSystem.getCustomKey(InputSystem.inputs.keyboard.freeCam).down
 		or InputSystem.getCustomKey(InputSystem.inputs.gamepad.freeCam).down
 	then
-		if playerFollow then
+		if povFollow then
 			stopFollow()
 		end
 	end
@@ -2706,7 +2844,7 @@ function readOtherInputs()
 			currentPlayerIndex = #selectedArena.players
 		end
 		currentPlayer = selectedArena.players[currentPlayerIndex]
-		followPlayer()
+		followPov("player")
 	end
 	if
 		playerFollow
@@ -2720,7 +2858,7 @@ function readOtherInputs()
 			currentPlayerIndex = 1
 		end
 		currentPlayer = selectedArena.players[currentPlayerIndex]
-		followPlayer()
+		followPov("player")
 	end
 end
 
@@ -2889,52 +3027,6 @@ function rotateCamera()
 
 	rotEuler.y = math.clamp(rotEuler.y, -89.99, 89.99)
 	camera.rotation = gravityChaser * Quat.fromEuler(rotEuler.x, rotEuler.y, rotEuler.z)
-end
-
-function followPlayer()
-	playerFollow = true
-	local message: FollowPlusData = {
-		readLocation = readLocation,
-		showNameTags = true,
-		muteSelf = false,
-		isBallOutlineEnabled = true,
-		targetPlayer = currentPlayer,
-		cameraFOV = followFOV,
-		cameraMode = cameraMode,
-		radius = followRadius,
-		threshold = 5,
-		positionSmoothing = followPosititonSmoothing,
-		cameraPositionOffset = Vec3.zeroVector,
-		cameraRotationOffset = Quat.identity,
-		gestureControls = false,
-		autoBall = false,
-		autoGoalCam = false,
-		showQuests = false,
-		autoRecordReplays = false,
-		mouseSensitivity = mouseSensitivity,
-		controllerSensitivity = controllerSensitivity,
-		controllerDeadzone = deadzone,
-	}
-	toggleSmoothing(false, false)
-	sendMessage(followPlussCamera, message)
-	ui:setCamera(followPlussId)
-end
-
-function DoGoalExplosion(team: ArenaTeam)
-	local goalExplosionPosition: Vec3
-	local goalExplosionColor: LinearColor = Util.linearColorNormalized(team.color)
-
-	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
-
-	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
-		goalExplosionPosition = ball.transform.position
-	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
-		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
-	elseif team.teamIndex == Util.TeamIndex.AwayTeam then
-		goalExplosionPosition = selectedArena.home.goal.position + goalExplosionOffset
-	end
-
-	GoalExplosionEffect(goalExplosionPosition, team.goal.rotation * Quat.fromEuler(0, 0, 180), goalExplosionColor)
 end
 
 function checkBallContact()
@@ -3375,7 +3467,34 @@ function drawBallOutline()
 	end
 end
 
+function debugCode()
+	if showGamemodePositions then
+		debugGamemodePositions()
+	end
+
+	if arenas and boundingBoxDebug then
+		for _, arena in arenas do
+			arena.box:renderFaces(LinearColor.new(1, 0, 1, 0.5))
+			arena.centerBox:render(0, 1, 0)
+			arena.home.goal.box:render(1, 0, 0)
+			arena.away.goal.box:render(0, 0, 1)
+		end
+	end
+
+	if ball and debugBallPrediction then
+		BallSim:simBallPath(ball, overviewPredictionSteps, overviewPredictionTime / overviewPredictionSteps)
+		BallSim:renderBallPath()
+	end
+end
+
+function onExit()
+	if povFollow then
+		stopFollow()
+	end
+end
+
 function tick(dt)
+	Profiler:tick(dt)
 	if not camera.isActive and not camera.isFollowed then
 		alwaysTick = nil
 		onExit()
@@ -3412,7 +3531,7 @@ function tick(dt)
 	selectedArena:tick()
 	ball = selectedArena.ball
 
-	if #gameData.players < 1 and playerFollow then
+	if #gameData.players < 1 and povFollow then
 		stopFollow()
 	end
 
@@ -3421,7 +3540,7 @@ function tick(dt)
 		return
 	end
 
-	if playerFollow then
+	if povFollow then
 		followPlussTick(dt, camera)
 		Util.followCamera(followPlussId)
 		readOtherInputs()
@@ -3451,18 +3570,7 @@ function tick(dt)
 
 	InputSystem.readInputEnd()
 
-	if arenas and boundingBoxDebug then
-		for _, arena in arenas do
-			arena.box:renderFaces(LinearColor.new(1, 0, 1, 0.5))
-			arena.centerBox:render(0, 1, 0)
-			arena.home.goal.box:render(1, 0, 0)
-			arena.away.goal.box:render(0, 0, 1)
-		end
-	end
+	debugCode()
 end
 
-function onExit()
-	if playerFollow then
-		stopFollow()
-	end
-end
+tick = Profiler:wrapScriptTick(tick)
