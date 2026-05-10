@@ -344,7 +344,7 @@ local debugAwayScore: number = 0
 local followPlussCamera: SpectatorCamera = nil
 local followPlussId: string = "dennssen.followpluss"
 local requiredFollowPlussVersion: string = ">=1.13.0"
-local recommendedFollowPlussVersion: string = ">=1.14.0"
+local recommendedFollowPlussVersion: string = ">=1.15.0"
 local followPlussVersion: string = ""
 local followPlussWarning: string = ""
 local followPlussTick: (dt: number, followedBy: SpectatorCamera?) -> ()
