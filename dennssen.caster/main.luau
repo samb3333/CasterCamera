@@ -630,7 +630,6 @@ type Arena4v4 = CasterArena & {
 	__index: Arena4v4,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena4v4,
-	isOld4v4: (self: Arena4v4) -> boolean,
 
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
@@ -675,10 +674,6 @@ function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number):
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Arena4v4
-end
-
-function Arena4v4:isOld4v4(): boolean
-	return self.slotId:find("Jakeball") ~= nil or self.slotId:find("Driftball") ~= nil
 end
 
 function Arena4v4:isPointOnHomeSide(point: Vec3): boolean
@@ -749,10 +744,6 @@ function Arena4v4:getTeamRotation(teamIndex: number?): Quat
 		rotation = self.transform.rotation * Arena4v4.homeRotationOffset
 	elseif teamIndex == Util.TeamIndex.AwayTeam then
 		rotation = self.transform.rotation * Arena4v4.awayRotationOffset
-	end
-
-	if (self :: Arena4v4):isOld4v4() then
-		rotation *= Quat.fromEuler(0, 0, 180) -- Comp build has Home and Away side flipped
 	end
 
 	return rotation
@@ -2297,8 +2288,6 @@ function onGui()
 					Gui.treePop()
 				end
 
-				local isOld4v4 = (selectedArena :: Arena4v4).isOld4v4 ~= nil and (selectedArena :: Arena4v4):isOld4v4()
-				Gui.text(`Is Old 4v4: {isOld4v4}`)
 				Gui.text("Home Team: ")
 				Gui.indent()
 				for i, player in selectedArena.home.players do
