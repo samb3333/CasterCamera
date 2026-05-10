@@ -47,16 +47,16 @@ Util.initializeConfig({
 		},
 		_4v4 = {
 			{
-				position = Vec3.new(1055, -2600, 540),
-				rotation = Quat.fromEuler(0, -7.5, 30),
+				position = Vec3.new(680, -2632, 1315),
+				rotation = Quat.fromEuler(0, -18, 40),
 			},
 			{
-				position = Vec3.new(2935, 0, 65),
+				position = Vec3.new(2925, 0, 165),
 				rotation = Quat.fromEuler(0, 5, 0),
 			},
 			{
-				position = Vec3.new(3390, 2595, 215),
-				rotation = Quat.fromEuler(0, -7.5, -105),
+				position = Vec3.new(3565, 2670, 1305),
+				rotation = Quat.fromEuler(0, -25, -122),
 			},
 		},
 		_driftblitz = {
@@ -630,7 +630,6 @@ type Arena4v4 = CasterArena & {
 	__index: Arena4v4,
 
 	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena4v4,
-	isOld4v4: (self: Arena4v4) -> boolean,
 
 	homeRotationOffset: Quat,
 	awayRotationOffset: Quat,
@@ -647,11 +646,11 @@ setmetatable(Arena4v4, { __index = CasterArena })
 
 Arena4v4.homeRotationOffset = Quat.fromEuler(0, 0, 90)
 Arena4v4.awayRotationOffset = Quat.fromEuler(0, 0, -90)
-Arena4v4.boxSize = Vec3.new(6110, 8400, 1490)
-Arena4v4.boxOffset = Vec3.new(0, 0, 600)
-Arena4v4.centerBoxOffset = Vec3.new(0, 0, 250)
-Arena4v4.goalBoxSize = Vec3.new(220, 450, 225)
-Arena4v4.goalPositionOffset = Vec3.new(4050, 0, 175)
+Arena4v4.boxSize = Vec3.new(6715, 8400, 1490)
+Arena4v4.boxOffset = Vec3.new(0, 0, 685)
+Arena4v4.centerBoxOffset = Vec3.new(0, 0, 435)
+Arena4v4.goalBoxSize = Vec3.new(165, 450, 225)
+Arena4v4.goalPositionOffset = Vec3.new(4085, 0, 270)
 
 function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena4v4
 	local self: Arena4v4 = setmetatable(Arena.new(gamemode, frameIndex), Arena4v4) :: any
@@ -675,10 +674,6 @@ function Arena4v4.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number):
 	self:setupDimensions()
 	self:setupOverviews()
 	return self :: Arena4v4
-end
-
-function Arena4v4:isOld4v4(): boolean
-	return self.slotId:find("Jakeball") ~= nil or self.slotId:find("Driftball") ~= nil
 end
 
 function Arena4v4:isPointOnHomeSide(point: Vec3): boolean
@@ -749,10 +744,6 @@ function Arena4v4:getTeamRotation(teamIndex: number?): Quat
 		rotation = self.transform.rotation * Arena4v4.homeRotationOffset
 	elseif teamIndex == Util.TeamIndex.AwayTeam then
 		rotation = self.transform.rotation * Arena4v4.awayRotationOffset
-	end
-
-	if (self :: Arena4v4):isOld4v4() then
-		rotation *= Quat.fromEuler(0, 0, 180) -- Comp build has Home and Away side flipped
 	end
 
 	return rotation
@@ -2286,6 +2277,10 @@ function onGui()
 					)
 				end
 				if Gui.button("Print Selected Arena") then
+					print(selectedArena)
+				end
+				Gui.sameLine()
+				if Gui.button("Print Selected String Arena") then
 					print(`Selected Arena: {Util.tableToString(selectedArena)}`)
 				end
 				if Gui.treeNode("Selected Arena Dimensions") then
