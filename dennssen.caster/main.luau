@@ -299,16 +299,6 @@ local firstTransition: boolean
 local defaultPosition = Vec3.new(0, -3000, -27700)
 local defaultRotation = Quat.fromEuler(0, 0, 90)
 local rotDelta: Vec3 = Vec3.zeroVector
-local perservedGravityUp: Quat = gravity.upRotation
-
-function getGravityUp(): Quat
-	if gravity.strength > 0 then
-		perservedGravityUp = gravity.upRotation
-		return gravity.upRotation
-	else
-		return perservedGravityUp
-	end
-end
 
 local cameraPosition: Vec3 = defaultPosition
 local cameraVelocity: Vec3 = Vec3.zeroVector
@@ -567,6 +557,22 @@ local goalPlayer: ReplayPlayer? = nil
 
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
+local perservedGravityUp: Quat = gravity.upRotation
+local doFakeGravity: boolean = false
+local fakeGravity: Vec3 = Vec3.zeroVector
+
+function getGravityUp(): Quat
+	if doFakeGravity then
+		return Util.quatFromVec3(fakeGravity)
+	end
+
+	if gravity.strength > 0 then
+		perservedGravityUp = gravity.upRotation
+		return gravity.upRotation
+	else
+		return perservedGravityUp
+	end
+end
 
 -- Caster Camera
 local cameraFOV = config.cameraFOV
@@ -986,7 +992,11 @@ end
 
 function setGlobalCameraRotation(globalRotation)
 	camera.rotation = globalRotation
-	perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
+	if doFakeGravity then
+		fakeGravity = Util.getUpRotation(selectedArena.transform.rotation:getUpVector()):euler()
+	else
+		perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
+	end
 	local localRotation = getGravityUp():inverse() * globalRotation
 	rotEuler = localRotation:euler()
 end
@@ -1607,6 +1617,31 @@ function onGui()
 			Gui.text(`Hide nearest head: {camera.hideNearestHead}`)
 			Gui.treePop()
 		end
+		if Gui.treeNode("Gravity") then
+			Gui.text(`Gravity Direction: {gravity.upDirection}`)
+			Gui.text(`Gravity Rotation: {gravity.upRotation:euler()}`)
+			Gui.text(`Gravity Strenght: {gravity.strength}`)
+
+			Gui.newLine()
+
+			doFakeGravity = Gui.checkbox("Fake Gravity", doFakeGravity)
+			if doFakeGravity then
+				if Gui.button("Driftball") then
+					fakeGravity = Vec3.new(0, 0, 0)
+				end
+
+				if Gui.button("Club") then
+					fakeGravity = Vec3.new(0, 120, 0)
+				end
+
+				if Gui.button("Parkour") then
+					fakeGravity = Vec3.new(0, 240, 0)
+				end
+
+				fakeGravity = Gui.dragFloat3("Fake Gravity Up", fakeGravity, 1, 0, 360)
+			end
+			Gui.treePop()
+		end
 		if Gui.treeNode("Arena") then
 			local gamemodes = SpectatorGamemodes.listGamemodes()
 			Gui.text(`Number of Gamemodes: {#gamemodes}`)
@@ -1808,12 +1843,6 @@ function onGui()
 			end
 			Gui.text(tostring("Vertical:" .. Vertical))
 			Gui.text(tostring("Horizontal: " .. Horizontal))
-			Gui.treePop()
-		end
-		if Gui.treeNode("Gravity") then
-			Gui.text(`Gravity Direction: {gravity.upDirection}`)
-			Gui.text(`Gravity Rotation: {gravity.upRotation:euler()}`)
-			Gui.text(`Gravity Strenght: {gravity.strength}`)
 			Gui.treePop()
 		end
 		if Gui.treeNode("Freecam") then
