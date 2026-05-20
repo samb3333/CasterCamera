@@ -1065,7 +1065,7 @@ function getArenas(): { [any]: CasterArena }
 		then
 			local arena: CasterArena = Arena4v4.new(gamemode, readLocation) :: Arena4v4
 			arenas[arena.name] = arena
-		elseif slotId:find("ZDrift") then
+		elseif slotId:lower():find("zdrift") then
 			local arena: CasterArena = ZDrift.new(gamemode, readLocation) :: ZDrift
 			arenas[arena.name] = arena
 		end
