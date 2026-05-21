@@ -676,8 +676,8 @@ setmetatable(Volleyfall, { __index = CasterArena })
 
 Volleyfall.homeRotationOffset = Quat.fromEuler(0, 0, 0)
 Volleyfall.awayRotationOffset = Quat.fromEuler(0, 0, 180)
-Volleyfall.boxSize = Vec3.new(2910, 2000, 1500)
-Volleyfall.boxOffset = Vec3.new(0, 0, 750)
+Volleyfall.boxSize = Vec3.new(2910, 2000, 1800)
+Volleyfall.boxOffset = Vec3.new(0, 0, 600)
 Volleyfall.centerBoxOffset = Vec3.new(0, 0, 385)
 
 function Volleyfall.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Volleyfall
