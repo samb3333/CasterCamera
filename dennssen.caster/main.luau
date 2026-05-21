@@ -119,16 +119,20 @@ local Arena = require("arena")
 local Overlay = require("overlay")
 
 local Gamemodes = require("gamemodes")
-Gamemodes.init(Overlay)
+Gamemodes.init(Overlay, Profiler)
 type CasterArena = Gamemodes.CasterArena
 type Arena3v3 = Gamemodes.Arena3v3
 type Arena4v4 = Gamemodes.Arena4v4
 type Driftblitz = Gamemodes.Driftblitz
 type ZDrift = Gamemodes.ZDrift
+type Strike = Gamemodes.Strike
+type Volleyfall = Gamemodes.Volleyfall
 local Arena3v3 = Gamemodes.Arena3v3
 local Arena4v4 = Gamemodes.Arena4v4
 local Driftblitz = Gamemodes.Driftblitz
 local ZDrift = Gamemodes.ZDrift
+local Strike = Gamemodes.Strike
+local Volleyfall = Gamemodes.Volleyfall
 
 type ArenaTeam = Arena.ArenaTeam<Gamemodes.OverviewData>
 
@@ -438,6 +442,8 @@ local ARENA_TYPES = {
 	Arena4v4 = "4v4",
 	Driftblitz = "driftblitz",
 	ZDrift = "zdrift",
+	Strike = "strike",
+	Volleyfall = "volleyfall",
 }
 local overviewPredictionSteps: number = 2
 local overviewPredictionTime: number = 5
@@ -449,6 +455,7 @@ function getArenas(): { [any]: CasterArena }
 	local gamemodes = SpectatorGamemodes.listGamemodes()
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
+		local fieldhouseSplit = slotId:split(" ")
 		if
 			slotId:find("TKB")
 			and not slotId:find("Driftplex")
@@ -469,6 +476,35 @@ function getArenas(): { [any]: CasterArena }
 			arenas[arena.name] = arena
 		elseif slotId:lower():find("zdrift") then
 			local arena: CasterArena = ZDrift.new(gamemode, readLocation) :: ZDrift
+			arenas[arena.name] = arena
+		elseif fieldhouseSplit[1] == "FieldHouse" or slotId:find("Club HalfG") then
+			local number = tonumber(slotId:split(" ")[2])
+
+			if slotId == "Club HalfG 01" then
+				local arena: CasterArena = Strike.new(gamemode, readLocation)
+				arenas[arena.name] = arena
+				continue
+			end
+
+			if slotId == "Club HalfG 02" then
+				local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
+				arenas[arena.name] = arena
+				continue
+			end
+
+			if typeof(number) ~= "number" then
+				continue
+			end
+
+			if number == 1 then
+				local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
+				arenas[arena.name] = arena
+			elseif number >= 3 then
+				local arena: CasterArena = Strike.new(gamemode, readLocation)
+				arenas[arena.name] = arena
+			end
+		elseif slotId:find("Club Central") then
+			local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
 			arenas[arena.name] = arena
 		end
 	end
@@ -962,8 +998,6 @@ local invertControllerLookVertical: boolean = config.invertControllerLookVertica
 local controllerSensitivity: number = config.controllerSensitivity
 
 -- Gui
-local showDebugMenus: boolean = false
-
 local debugFreecam: boolean = false
 local controlsScreen: boolean = false
 local keyboardControls: boolean = true
@@ -1115,7 +1149,12 @@ function DoGoalExplosion(team: ArenaTeam)
 
 	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
 
-	if selectedArena.type == ARENA_TYPES.Driftblitz or selectedArena.type == ARENA_TYPES.ZDrift then
+	if
+		selectedArena.type == ARENA_TYPES.Driftblitz
+		or selectedArena.type == ARENA_TYPES.ZDrift
+		or selectedArena.type == ARENA_TYPES.Strike
+		or selectedArena.type == ARENA_TYPES.Volleyfall
+	then
 		goalExplosionPosition = ball.transform.position
 	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
 		goalExplosionPosition = selectedArena.away.goal.position + goalExplosionOffset
@@ -1245,10 +1284,6 @@ function GameStartEffect()
 end
 --effects end
 
-function toggleDebugMenus(toggle: boolean)
-	Arena.showDebugMenus = toggle
-end
-
 function onGui()
 	if followPlussWarning ~= "" then
 		Gui.text(followPlussWarning)
@@ -1340,6 +1375,9 @@ function onGui()
 			local _4v4Arenas: { Arena4v4 } = {}
 			local DriftblitzArenas: { Driftblitz } = {}
 			local ZDriftArenas: { ZDrift } = {}
+			local StrikeArenas: { Strike } = {}
+			local VolleyfallArenas: { Volleyfall } = {}
+
 			for _, arena: CasterArena in arenas do
 				if arena.type == ARENA_TYPES.Arena3v3 then
 					table.insert(_3v3Arenas, arena :: Arena3v3)
@@ -1349,6 +1387,10 @@ function onGui()
 					table.insert(DriftblitzArenas, arena :: Driftblitz)
 				elseif arena.type == ARENA_TYPES.ZDrift then
 					table.insert(ZDriftArenas, arena :: ZDrift)
+				elseif arena.type == ARENA_TYPES.Strike then
+					table.insert(StrikeArenas, arena :: Strike)
+				elseif arena.type == ARENA_TYPES.Volleyfall then
+					table.insert(VolleyfallArenas, arena :: Volleyfall)
 				end
 			end
 
@@ -1378,6 +1420,22 @@ function onGui()
 			end
 			if Gui.beginCombo("##ZDrift", "ZDrift Arenas...") then
 				for _, arena: CasterArena in ZDriftArenas do
+					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
+						setSelectedArena(arena)
+					end
+				end
+				Gui.endCombo()
+			end
+			if Gui.beginCombo("##Strike", "Strike Arenas...") then
+				for _, arena: CasterArena in StrikeArenas do
+					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
+						setSelectedArena(arena)
+					end
+				end
+				Gui.endCombo()
+			end
+			if Gui.beginCombo("##Volleyfall", "Volleyfall Arenas...") then
+				for _, arena: CasterArena in VolleyfallArenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
 					end
@@ -1709,7 +1767,7 @@ function onGui()
 			end
 
 			if selectedArena then
-				if ball then
+				if ball and selectedArena.home.goal then
 					Gui.text(
 						`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(
 							ball.transform.position
@@ -1859,14 +1917,6 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Debug Settings") then
-			local newShowDebugMenus = Gui.checkbox("Show Debug Menus", showDebugMenus)
-			if newShowDebugMenus ~= showDebugMenus then
-				showDebugMenus = newShowDebugMenus
-				toggleDebugMenus(showDebugMenus)
-			end
-
-			Gui.newLine()
-
 			speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 			camera.nearClippingPlane = Gui.dragFloat("Near Clipping Plane", camera.nearClippingPlane, 1, 0, 999999)
 			boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
@@ -2726,10 +2776,12 @@ function checkPotentialStatChange(homeGoalBox: BoxType, awayGoalBox: BoxType)
 end
 
 function goalScoreCheck()
-	local homeGoalBox: BoxType = selectedArena.home.goal.box
-	local awayGoalBox: BoxType = selectedArena.away.goal.box
+	if selectedArena.home.goal then
+		local homeGoalBox: BoxType = selectedArena.home.goal.box
+		local awayGoalBox: BoxType = selectedArena.away.goal.box
 
-	checkPotentialStatChange(homeGoalBox, awayGoalBox)
+		checkPotentialStatChange(homeGoalBox, awayGoalBox)
+	end
 
 	-- the ball has newely scored
 	if selectedArena.away.scoreIncrease then
