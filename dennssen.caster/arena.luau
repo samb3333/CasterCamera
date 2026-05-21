@@ -5,6 +5,35 @@ type BoxType = typeof(Box)
 
 local Util = require("util")
 
+export type SpectatorArenaPlayer = {
+	playerId: number,
+	playerName: string,
+	position: Vec3,
+}
+
+export type SpectatorArenaDataTeam = {
+	score: number,
+	roundsWon: number,
+	players: { SpectatorArenaPlayer },
+	teamColor: {
+		primary: LinearColor,
+		secondary: LinearColor,
+		teamLogoIndex: number,
+		teamName: string,
+		teamRowId: number?,
+	},
+}
+
+export type SpectatorArenaData = {
+	slotId: string,
+	timeSeconds: number,
+	secondaryTimeSeconds: number,
+	isGameRunning: boolean,
+	totalRounds: number,
+	useBestOf: boolean,
+	teams: { SpectatorArenaDataTeam },
+}
+
 export type ArenaTeam<T = {}> = {
 	teamIndex: number,
 	color: LinearColor,
@@ -26,7 +55,6 @@ export type ArenaTeam<T = {}> = {
 
 export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	__index: Arena<ArenaData, HomeData, AwayData>,
-	showDebugMenus: boolean,
 
 	type: string,
 
@@ -63,7 +91,7 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 
 	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Arena<ArenaData, HomeData, AwayData>,
 	getArenaBall: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
-	getTeamColors: (self: Arena<ArenaData, HomeData, AwayData>, gamemodeData: SpectatorGamemodeData) -> (),
+	getTeamColors: (self: Arena<ArenaData, HomeData, AwayData>, gamemodeData: SpectatorArenaData) -> (),
 	tick: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onGameStart: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
 	onRoundStart: (self: Arena<ArenaData, HomeData, AwayData>) -> (),
@@ -95,7 +123,6 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 
 local Arena: Arena = {} :: Arena
 Arena.__index = Arena
-Arena.showDebugMenus = false
 
 function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena
 	local self: Arena = setmetatable({}, Arena) :: any
@@ -180,7 +207,7 @@ function Arena:getArenaBall()
 	return closestBall
 end
 
-function Arena:getTeamColors(gamemodeData: SpectatorGamemodeData)
+function Arena:getTeamColors(gamemodeData: SpectatorArenaData)
 	local homeTeamColor = gamemodeData.teams[1].teamColor
 	local awayTeamColor = gamemodeData.teams[2].teamColor
 
@@ -195,8 +222,8 @@ end
 
 function Arena:tick()
 	self.frame = Util.getReplayFrameFromIndex(self.frameIndex)
+	local gamemodeData: SpectatorArenaData = SpectatorGamemodes.getGamemodeData(self.slotId) :: any
 
-	local gamemodeData: SpectatorGamemodeData = SpectatorGamemodes.getGamemodeData(self.slotId)
 	self:getTeamColors(gamemodeData)
 	self.ball = self:getArenaBall()
 
