@@ -10,6 +10,9 @@ local Overlay: typeof(require("overlay")) = nil :: any
 local Arena = require("arena")
 
 local centerBoxSize = Vec3.new(50, 50, 125)
+local debuging = {
+	bestOfAmount = 0,
+}
 
 export type OverviewData = {
 	overview: { { position: Vec3, rotation: Quat } },
@@ -64,7 +67,7 @@ function CasterArena:sendInfoMessage()
 
 	Overlay.setIsOvertime(self.isOvertime)
 	Overlay.setIsGracePeriod(self.isGracePeriod)
-	Overlay.setBestOf(self.bestOfAmount ~= 0 and self.bestOfAmount or 0)
+	Overlay.setBestOf(self.bestOfAmount ~= 0 and self.bestOfAmount or debuging.bestOfAmount)
 	Overlay.setMatchLengthSeconds(self.matchLengthSeconds)
 end
 
@@ -783,4 +786,5 @@ return {
 	ZDrift = ZDrift,
 	Strike = Strike,
 	Volleyfall = Volleyfall,
+	debuging = debuging,
 }

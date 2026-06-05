@@ -334,7 +334,6 @@ local getBallVariant = config.getBallVariant
 
 -- Overlay
 local sendOverlayInfo: boolean = config.sendOverlayInfo
-local debugBestOfAmount: number = 0
 local debugHomeScore: number = 0
 local debugAwayScore: number = 0
 
@@ -1883,7 +1882,7 @@ function onGui()
 			Gui.treePop()
 		end
 		if Gui.treeNode("Overlay") then
-			debugBestOfAmount = Gui.dragInt("Best Of", debugBestOfAmount, 1, 0, 99)
+			Gamemodes.debuging.bestOfAmount = Gui.dragInt("Best Of", Gamemodes.debuging.bestOfAmount, 1, 0, 99)
 			debugHomeScore = Gui.dragInt("Home Score", debugHomeScore, 1, 0, 99)
 			debugAwayScore = Gui.dragInt("Away Score", debugAwayScore, 1, 0, 99)
 			if Gui.button("Add Round") then
