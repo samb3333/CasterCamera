@@ -300,12 +300,36 @@ local deltaTime: number = 0
 local loadTime: number = 0
 local transitionTime: number
 local firstTransition: boolean
-local defaultPosition = Vec3.new(0, -3000, -27700)
-local defaultRotation = Quat.fromEuler(0, 0, 90)
+local isAres: boolean = false
+local orionPosition = Vec3.new(0, -3000, -27700)
+local orionRotation = Quat.fromEuler(0, 0, 90)
+local aresPosition = Vec3.new(2500, -6000, 300)
+local aresRotation = Quat.fromEuler(0, 0, 180)
+
 local rotDelta: Vec3 = Vec3.zeroVector
 
-local cameraPosition: Vec3 = defaultPosition
+local cameraPosition: Vec3 = orionPosition
 local cameraVelocity: Vec3 = Vec3.zeroVector
+
+function isAresGamemode(gamemodeId: string): boolean
+	return gamemodeId:find("Beta") ~= nil or gamemodeId:find("Gamma") ~= nil or gamemodeId:find("Alpha") ~= nil
+end
+
+function checkIfAres(): boolean
+	if isAres then
+		return true
+	end
+
+	local gamemodes: { string } = SpectatorGamemodes.listGamemodeIds()
+	for _, id: string in gamemodes do
+		if isAresGamemode(id) then
+			isAres = true
+			return true
+		end
+	end
+
+	return false
+end
 
 local CameraMode = {
 	FirstPerson = 1,
@@ -449,12 +473,21 @@ local overviewPredictionTime: number = 5
 
 local cachedGamemodesAmount: number = 0
 
-function getArenas(): { [any]: CasterArena }
-	local arenas: { [any]: CasterArena } = {}
+function getArenas(): { CasterArena }
+	local arenas: { CasterArena } = {}
 	local gamemodes = SpectatorGamemodes.listGamemodes()
 	for _, gamemode in gamemodes do
 		local slotId = gamemode:getSlotId()
 		local fieldhouseSplit = slotId:split(" ")
+
+		if not isAres then
+			isAres = isAresGamemode(slotId)
+
+			if isAres and os.clock() - loadTime <= 30 then
+				setGlobalCameraTransform(aresPosition, aresRotation)
+			end
+		end
+
 		if
 			slotId:find("TKB")
 			and not slotId:find("Driftplex")
@@ -462,32 +495,32 @@ function getArenas(): { [any]: CasterArena }
 			and not slotId:find("Playground")
 		then
 			local arena: CasterArena = Arena3v3.new(gamemode, readLocation) :: Arena3v3
-			arenas[arena.name] = arena
+			table.insert(arenas, arena)
 		elseif slotId:find("Soccer") then
 			local arena: CasterArena = Driftblitz.new(gamemode, readLocation) :: Driftblitz
-			arenas[arena.name] = arena
+			table.insert(arenas, arena)
 		elseif
 			(slotId:find("Jakeball") or slotId:find("Driftball"))
 			or (slotId:find("TKB") and slotId:find("Driftplex") and not slotId:find("Full"))
 			or (slotId:find("Beta") or slotId:find("Gamma") or slotId:find("Alpha"))
 		then
 			local arena: CasterArena = Arena4v4.new(gamemode, readLocation) :: Arena4v4
-			arenas[arena.name] = arena
+			table.insert(arenas, arena)
 		elseif slotId:lower():find("zdrift") then
 			local arena: CasterArena = ZDrift.new(gamemode, readLocation) :: ZDrift
-			arenas[arena.name] = arena
+			table.insert(arenas, arena)
 		elseif fieldhouseSplit[1] == "FieldHouse" or slotId:find("Club HalfG") then
 			local number = tonumber(slotId:split(" ")[2])
 
 			if slotId == "Club HalfG 01" then
 				local arena: CasterArena = Strike.new(gamemode, readLocation)
-				arenas[arena.name] = arena
+				table.insert(arenas, arena)
 				continue
 			end
 
 			if slotId == "Club HalfG 02" then
 				local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
-				arenas[arena.name] = arena
+				table.insert(arenas, arena)
 				continue
 			end
 
@@ -497,14 +530,14 @@ function getArenas(): { [any]: CasterArena }
 
 			if number == 1 then
 				local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
-				arenas[arena.name] = arena
+				table.insert(arenas, arena)
 			elseif number >= 3 then
 				local arena: CasterArena = Strike.new(gamemode, readLocation)
-				arenas[arena.name] = arena
+				table.insert(arenas, arena)
 			end
 		elseif slotId:find("Club Central") then
 			local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
-			arenas[arena.name] = arena
+			table.insert(arenas, arena)
 		end
 	end
 
@@ -512,7 +545,7 @@ function getArenas(): { [any]: CasterArena }
 end
 
 -- arena
-local arenas: { [any]: CasterArena }?
+local arenas: { CasterArena }?
 
 function updateArenaOverviews()
 	if not arenas then
@@ -1025,10 +1058,19 @@ end
 
 function setGlobalCameraRotation(globalRotation)
 	camera.rotation = globalRotation
-	if doFakeGravity then
-		fakeGravity = Util.getUpRotation(selectedArena.transform.rotation:getUpVector()):euler()
+
+	local upVector: Vec3
+
+	if selectedArena then
+		upVector = selectedArena.transform.rotation:getUpVector()
 	else
-		perservedGravityUp = Util.getUpRotation(selectedArena.transform.rotation:getUpVector())
+		upVector = Vec3.upVector
+	end
+
+	if doFakeGravity then
+		fakeGravity = Util.getUpRotation(upVector):euler()
+	elseif selectedArena then
+		perservedGravityUp = Util.getUpRotation(upVector)
 	end
 	local localRotation = getGravityUp():inverse() * globalRotation
 	rotEuler = localRotation:euler()
@@ -1041,11 +1083,14 @@ end
 
 function main()
 	loadTime = os.clock()
-	camera.position = defaultPosition
-	camera.rotation = defaultRotation
+	if checkIfAres() then
+		setGlobalCameraTransform(aresPosition, aresRotation)
+	else
+		setGlobalCameraTransform(orionPosition, orionRotation)
+	end
+
 	camera.rotationSmoothing = 0
 	camera.positionSmoothing = 0
-	rotEuler = defaultRotation:euler()
 	followPlussCamera = getCameraById(followPlussId)
 	if followPlussCamera then
 		local followSetupMessage: FollowPlusData = {
@@ -1114,14 +1159,14 @@ function getClosestArena(targetPosition: Vec3): CasterArena
 		return closestArena
 	end
 
-	for _, arena: CasterArena in pairs(arenas) do
+	for _, arena: CasterArena in arenas do
 		if arena.box:checkPointIntersect(targetPosition) then
 			return arena
 		end
 	end
 
 	-- if the camera is placed in such a way that it is not leveled with any arena we loop again without limiting height
-	for _, arena: CasterArena in pairs(arenas) do
+	for _, arena: CasterArena in arenas do
 		local distance = Util.getDist(targetPosition, arena.transform.position)
 		if distance < closestArenaDistance then
 			closestArenaDistance = distance
@@ -1972,10 +2017,17 @@ function onTransitionBegin(transitionInfo: Transition)
 	firstTransition = transitionTime <= loadTime + 1 -- Margin of 1 second
 
 	if firstTransition then
-		cameraPosition = defaultPosition
-		camera.rotation = defaultRotation
-		rotEuler = defaultRotation:euler()
-		rotEuler.x = 0
+		if checkIfAres() then
+			cameraPosition = aresPosition
+			camera.rotation = aresRotation
+			rotEuler = aresRotation:euler()
+			rotEuler.x = 0
+		else
+			cameraPosition = orionPosition
+			camera.rotation = orionRotation
+			rotEuler = orionRotation:euler()
+			rotEuler.x = 0
+		end
 	else
 		cameraPosition = transitionInfo.startPosition
 		camera.rotation = transitionInfo.startRotation
@@ -2986,8 +3038,8 @@ function tick(dt)
 
 	if cachedGamemodesAmount ~= #SpectatorGamemodes.listGamemodeIds() then
 		arenas = getArenas()
-		if Util.getDictSize(arenas) > 0 then
-			setSelectedArena(Util.getDictIndex(arenas, 1))
+		if arenas and #arenas > 0 then
+			setSelectedArena(arenas[1])
 		end
 		cachedGamemodesAmount = #SpectatorGamemodes.listGamemodeIds()
 	end
