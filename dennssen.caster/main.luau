@@ -14,7 +14,7 @@ Util.initializeConfig({
 	cameraFOV = 90,
 	deadzone = 0,
 	followFOV = 100,
-	followPosititonSmoothing = 0.1,
+	followPositionSmoothing = 0.1,
 	followRadius = 20,
 	mouseSensitivity = 1,
 	invertMouseLookHorizontal = false,
@@ -375,7 +375,7 @@ local povFollow = false
 local currentPlayer: ReplayPlayer? = nil
 local currentPlayerIndex: number = 1
 local followFOV: number = config.followFOV
-local followPosititonSmoothing: number = config.followPosititonSmoothing
+local followPositionSmoothing: number = config.followPositionSmoothing
 local followRadius: number = config.followRadius
 local thirdPersonMode: number = config.thirdPersonMode
 local THIRD_PERSON_MODES = {
@@ -625,7 +625,7 @@ local goalPlayer: ReplayPlayer? = nil
 
 -- Gravity
 local gravityChaser: Quat = gravity.upRotation
-local perservedGravityUp: Quat = gravity.upRotation
+local preservedGravityUp: Quat = gravity.upRotation
 local doFakeGravity: boolean = false
 local fakeGravity: Vec3 = Vec3.zeroVector
 
@@ -635,10 +635,10 @@ function getGravityUp(): Quat
 	end
 
 	if gravity.strength > 0 then
-		perservedGravityUp = gravity.upRotation
+		preservedGravityUp = gravity.upRotation
 		return gravity.upRotation
 	else
-		return perservedGravityUp
+		return preservedGravityUp
 	end
 end
 
@@ -910,7 +910,7 @@ InputSystem.inputs = {
 			gamepadKeybindsDeserialized["zoomOut"].modifiers
 		),
 		resetFOV = InputSystem.createCustomInput(
-			"Reser FOV",
+			"Reset FOV",
 			"Reset field of view",
 			gamepadKeybindsDeserialized["resetFOV"].primary,
 			gamepadKeybindsDeserialized["resetFOV"].modifiers
@@ -1031,9 +1031,6 @@ local controllerSensitivity: number = config.controllerSensitivity
 
 -- Gui
 local debugFreecam: boolean = false
-local controlsScreen: boolean = false
-local keyboardControls: boolean = true
-local controllerControls: boolean = false
 local boundingBoxDebug: boolean = false
 local showGamemodePositions: boolean = false
 local closestDebugGamemodeId: string = ""
@@ -1070,7 +1067,7 @@ function setGlobalCameraRotation(globalRotation)
 	if doFakeGravity then
 		fakeGravity = Util.getUpRotation(upVector):euler()
 	elseif selectedArena then
-		perservedGravityUp = Util.getUpRotation(upVector)
+		preservedGravityUp = Util.getUpRotation(upVector)
 	end
 	local localRotation = getGravityUp():inverse() * globalRotation
 	rotEuler = localRotation:euler()
@@ -1141,7 +1138,7 @@ function updateOverview(overviewKey: number, globalOverviewPosition: Vec3, globa
 	}
 	saveConfig()
 	updateArenaOverviews()
-	return `Succesfully set Overview #{overviewKey} to Camera`
+	return `Successfully set Overview #{overviewKey} to Camera`
 end
 
 function resetPlayersWithBall()
@@ -1279,7 +1276,7 @@ function GameStartEffect()
 	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
 	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
 
-	local colourAverage = LinearColor.new(
+	local colorAverage = LinearColor.new(
 		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
 		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
 		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,
@@ -1290,7 +1287,7 @@ function GameStartEffect()
 		selectedArena.transform.rotation,
 		0.9,
 		Vec3.zeroVector,
-		colourAverage,
+		colorAverage,
 		ParticleSystem.Variant.Rings,
 		150
 	)
@@ -1299,7 +1296,7 @@ function GameStartEffect()
 		selectedArena.transform.rotation,
 		0.7,
 		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 10)),
-		colourAverage,
+		colorAverage,
 		ParticleSystem.Variant.Rings,
 		600
 	)
@@ -1308,19 +1305,19 @@ function GameStartEffect()
 		selectedArena.transform.rotation,
 		0.7,
 		selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, 2)),
-		colourAverage,
+		colorAverage,
 		ParticleSystem.Variant.Rings,
 		400
 	)
-	local colourPallette = { normalizedHomeColor, normalizedAwayColor }
+	local colorPallette = { normalizedHomeColor, normalizedAwayColor }
 	for i = 1, 300 do
-		local emberVeloctiy = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
+		local emberVelocity = Vec3.new(math.random(-30, 30), math.random(-30, 30), math.random(20, 80))
 		ParticleSystem:createParticle(
 			particlePosition,
 			selectedArena.transform.rotation,
 			0.5,
-			selectedArena.transform.rotation:rotateVector(emberVeloctiy),
-			colourPallette[math.random(1, 2)],
+			selectedArena.transform.rotation:rotateVector(emberVelocity),
+			colorPallette[math.random(1, 2)],
 			ParticleSystem.Variant.Embers,
 			math.random(800, 1300)
 		)
@@ -1328,50 +1325,13 @@ function GameStartEffect()
 end
 --effects end
 
-function onGui()
+function GUI_CameraInfo()
 	if followPlussWarning ~= "" then
-		Gui.text(followPlussWarning)
+		Gui.textColored(
+			LinearColor.new(238 / 255, 210 / 255, 2 / 255, 1),
+			`{Icon.ExclamationTriangle} {followPlussWarning}`
+		)
 		Gui.newLine()
-	end
-
-	Gui.text(`Version: {version}`)
-	if Gui.button(Icon.Question) then
-		controlsScreen = not controlsScreen
-	end
-	Gui.setItemTooltip("Keybinds for the camera")
-
-	if controlsScreen then
-		if keyboardControls then
-			Gui.beginDisabled()
-		end
-		if Gui.button("Keyboard") then
-			keyboardControls = true
-			controllerControls = false
-		end
-		if keyboardControls then
-			Gui.endDisabled()
-		end
-		Gui.sameLine()
-		if controllerControls then
-			Gui.beginDisabled()
-		end
-		if Gui.button("Controller") then
-			controllerControls = true
-			keyboardControls = false
-		end
-		if controllerControls then
-			Gui.endDisabled()
-		end
-
-		if keyboardControls then
-			InputSystem.guiKeyboardInputs(inputOrder.keyboard)
-		end
-
-		if controllerControls then
-			InputSystem.guiGamepadInputs(inputOrder.gamepad)
-		end
-
-		return
 	end
 
 	Gui.text("Data Read")
@@ -1504,11 +1464,13 @@ function onGui()
 	end
 
 	Gui.text(`Get Player Method: {getBallVariant}`)
-	Gui.newLine()
+	Gui.unindent()
+end
 
-	Gui.text("Settings")
+function GUI_CameraSettings()
+	Gui.beginTabBar("SettingsBar")
 
-	if Gui.collapsingHeader("Controls") then
+	if Gui.beginTabItem("Controls") then
 		Gui.indent()
 		positionSmoothing = Gui.sliderFloat("Position Smoothing", positionSmoothing, 0, 1)
 		positionSmoothing = math.clamp(positionSmoothing, 0, 1)
@@ -1527,18 +1489,18 @@ function onGui()
 		mouseSensitivity = Gui.sliderFloat("Mouse Sensitivity", mouseSensitivity, 0.001, 2)
 		mouseSensitivity = math.clamp(mouseSensitivity, 0.001, 2)
 		Gui.unindent()
-		Gui.newLine()
+		Gui.endTabItem()
 	end
 
-	if Gui.collapsingHeader("HUD") then
+	if Gui.beginTabItem("HUD") then
 		Gui.indent()
 		ballOutline = Gui.checkbox("Ball Outline", ballOutline)
 		Gui.setItemTooltip("Toggles an outline around the arena ball that shows it's position through walls.")
 		Gui.unindent()
-		Gui.newLine()
+		Gui.endTabItem()
 	end
 
-	if Gui.collapsingHeader("Particles") then
+	if Gui.beginTabItem("Particles") then
 		Gui.indent()
 		ParticleSystem.speed = Gui.sliderFloat("Particle Speed", ParticleSystem.speed, 0.001, 1)
 		ParticleSystem.speed = math.clamp(ParticleSystem.speed, 0.001, 1)
@@ -1546,10 +1508,11 @@ function onGui()
 		ParticleSystem.vibrance = Gui.sliderInt("Color Vibrance", ParticleSystem.vibrance, 1, 20)
 		ParticleSystem.vibrance = math.clamp(ParticleSystem.vibrance, 1, 20)
 		Gui.unindent()
-		Gui.newLine()
+		Gui.endTabItem()
 	end
 
-	if Gui.collapsingHeader("Post Processing") then
+	if Gui.beginTabItem("Post Processing") then
+		Gui.indent()
 		if Gui.button("Apply Preset") then
 			postProcessSettings.bloomIntensity = bloomIntensity
 			postProcessSettings.bloomThreshold = bloomThreshold
@@ -1589,11 +1552,13 @@ function onGui()
 		chromaticAberrationIntensity =
 			Gui.sliderFloat("Chromatic Aberration Intensity", chromaticAberrationIntensity, 0, 2)
 		motionBlurAmount = Gui.sliderFloat("Motion Blur Amount", motionBlurAmount, 0, 1)
-		vignetteIntensity = Gui.sliderFloat("Vignette Intenisty", vignetteIntensity, 0, 1)
+		vignetteIntensity = Gui.sliderFloat("Vignette Intensity", vignetteIntensity, 0, 1)
 		exposureBias = Gui.sliderFloat("Exposure Bias", exposureBias, -6, 6)
+		Gui.unindent()
+		Gui.endTabItem()
 	end
 
-	if followPlussCamera and Gui.collapsingHeader("POV") then
+	if followPlussCamera and Gui.beginTabItem("POV") then
 		Gui.indent()
 		Gui.text(`Follow Pluss version: {followPlussVersion}`)
 
@@ -1601,9 +1566,9 @@ function onGui()
 		Gui.setItemTooltip("Sets the FOV for when the camera is in POV mode")
 		followFOV = math.clamp(followFOV, 1, 179)
 
-		followPosititonSmoothing = Gui.sliderFloat("Position Smoothing##2", followPosititonSmoothing, 0, 1)
+		followPositionSmoothing = Gui.sliderFloat("Position Smoothing##2", followPositionSmoothing, 0, 1)
 		Gui.setItemTooltip("Sets the smoothing for when the camera is in POV mode")
-		followPosititonSmoothing = math.clamp(followPosititonSmoothing, 0, 1)
+		followPositionSmoothing = math.clamp(followPositionSmoothing, 0, 1)
 
 		Gui.newLine()
 
@@ -1623,10 +1588,10 @@ function onGui()
 		followRadius = math.clamp(followRadius, 5, 100)
 
 		Gui.unindent()
-		Gui.newLine()
+		Gui.endTabItem()
 	end
 
-	if selectedArena and Gui.collapsingHeader("Overviews") then
+	if selectedArena and Gui.beginTabItem("Overviews") then
 		Gui.indent()
 		Gui.separatorText(`{capitalize(selectedArena.type)} Overviews`)
 
@@ -1652,77 +1617,67 @@ function onGui()
 		end
 
 		Gui.unindent()
-		Gui.newLine()
+		Gui.endTabItem()
 	end
 
-	if Gui.collapsingHeader("Overlay") then
+	if Gui.beginTabItem("Overlay") then
 		Gui.indent()
 		sendOverlayInfo = Gui.checkbox("Send Overlay Info", sendOverlayInfo)
 		Gui.setItemTooltip("Toggle this off to stop the camera from sending info to the overlay")
 		Gui.unindent()
+		Gui.endTabItem()
 	end
-	Gui.unindent()
 
-	Gui.newLine()
+	Gui.endTabBar()
+end
 
-	if Gui.button(Icon.Save .. " Save Config") then
-		config.cameraFOV = cameraFOV
-		config.deadzone = deadzone
-		config.followFOV = followFOV
-		config.followPosititonSmoothing = followPosititonSmoothing
-		config.followRadius = followRadius
-		config.invertMouseLookHorizontal = invertMouseLookHorizontal
-		config.invertMouseLookVertical = invertMouseLookVertical
-		config.mouseSensitivity = mouseSensitivity
-		config.invertControllerLookHorizontal = invertControllerLookHorizontal
-		config.invertControllerLookVertical = invertControllerLookVertical
-		config.controllerSensitivity = controllerSensitivity
-		config.positionSmoothing = positionSmoothing
-		config.lookSmoothness = lookSmoothness
-		config.particleSimSpeed = ParticleSystem.speed
-		config.ballOutline = ballOutline
-		config.vibrance = ParticleSystem.vibrance
-		config.getBallVariant = getBallVariant
-		config.sendOverlayInfo = sendOverlayInfo
-		config.thirdPersonMode = thirdPersonMode
-		config.postProcessing = {
-			bloomIntensity = bloomIntensity,
-			bloomThreshold = bloomThreshold,
-			depthOfFieldFstop = depthOfFieldFstop,
-			depthOfFieldFocalDistance = depthOfFieldFocalDistance,
-			depthOfFieldSensorWidth = depthOfFieldSensorWidth,
-			chromaticAberrationIntensity = chromaticAberrationIntensity,
-			motionBlurAmount = motionBlurAmount,
-			vignetteIntensity = vignetteIntensity,
-			exposureBias = exposureBias,
-		}
-		saveConfig()
+function GUI_CameraControls()
+	Gui.beginTabBar("ControlsBar")
+
+	if Gui.beginTabItem("Keyboard") then
+		InputSystem.guiKeyboardInputs(inputOrder.keyboard)
+		Gui.endTabItem()
 	end
-	Gui.setItemTooltip("Saves your settings!")
 
-	Gui.newLine()
+	if Gui.beginTabItem("Controller") then
+		InputSystem.guiGamepadInputs(inputOrder.gamepad)
+		Gui.endTabItem()
+	end
 
-	if Gui.treeNode("Debug") then
-		if Gui.treeNode("Profiler") then
-			Profiler:controls()
-			Gui.text(`Frames: {#Profiler.frames}`)
-			Gui.treePop()
-		end
-		if Gui.treeNode("Camera") then
-			Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
-			Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
-			Gui.text("Camera Rotation: " .. tostring(camera:getSmoothedRotation():euler()))
-			Gui.text(`Camera Position: {tostring(camera.position)}`)
-			Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
-			Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
-			Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
-			Gui.text(`Hide nearest head: {camera.hideNearestHead}`)
-			Gui.treePop()
-		end
+	Gui.endTabBar()
+end
+
+function GUI_CameraDebug()
+	Gui.beginTabBar("DebugBar")
+
+	if Gui.beginTabItem("Profiler") then
+		Gui.indent()
+
+		Profiler:controls()
+		Gui.text(`Frames: {#Profiler.frames}`)
+		Profiler:graph()
+
+		Gui.unindent()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Camera") then
+		Gui.indent()
+		Gui.text(`Camera position smoothing: {camera.positionSmoothing}`)
+		Gui.text(`Camera rotation smoothing: {camera.rotationSmoothing}`)
+		Gui.text("Camera Rotation: " .. tostring(camera:getSmoothedRotation():euler()))
+		Gui.text(`Camera Position: {tostring(camera.position)}`)
+		Gui.text("Target Speed Gear: " .. tostring(targetSpeedIndex))
+		Gui.text("Current Speed Gear: " .. tostring(currentSpeedIndex))
+		Gui.text("Gear Shift Time: " .. tostring(gearShiftTime))
+		Gui.text(`Hide nearest head: {camera.hideNearestHead}`)
+
+		Gui.newLine()
+
 		if Gui.treeNode("Gravity") then
 			Gui.text(`Gravity Direction: {gravity.upDirection}`)
 			Gui.text(`Gravity Rotation: {gravity.upRotation:euler()}`)
-			Gui.text(`Gravity Strenght: {gravity.strength}`)
+			Gui.text(`Gravity Strength: {gravity.strength}`)
 
 			Gui.newLine()
 
@@ -1744,119 +1699,131 @@ function onGui()
 			end
 			Gui.treePop()
 		end
-		if Gui.treeNode("Arena") then
-			local gamemodes = SpectatorGamemodes.listGamemodes()
-			Gui.text(`Number of Gamemodes: {#gamemodes}`)
-			if Gui.button("Print Gamemode Ids") then
-				for _, gamemode in gamemodes do
-					print(gamemode:getSlotId())
-				end
-			end
 
-			tpGamemodeName = Gui.inputText("##gamemodeName", tpGamemodeName)
-			Gui.sameLine()
-			if Gui.button("TP to Gamemode") then
-				local gamemode = getGamemodeByName(tpGamemodeName)
-				if gamemode then
-					local transform = gamemode.transform
-					setGlobalCameraTransform(transform.position, transform.rotation)
-				end
-			end
-
-			Gui.newLine()
-
-			showGamemodePositions = Gui.checkbox("Show gamemode positions", showGamemodePositions)
-			if showGamemodePositions and Gui.button("Print Closest Gamemode") then
-				print(closestDebugGamemodeId)
-			end
-
-			Gui.newLine()
-
-			if arenas and Gui.button("Print Arenas") then
-				for _, arena in arenas do
-					print(arena.slotId)
-				end
-			end
-
-			dataGamemodeName = Gui.inputText("##GamemodeData", dataGamemodeName)
-			Gui.sameLine()
-			if Gui.button("Print gamemode data") then
-				print(Util.tableToString(SpectatorGamemodes.getGamemodeData(dataGamemodeName).teams))
-			end
-
-			if selectedArena and Gui.button("Set Orientation to Arena") then
-				Gui.sameLine()
-				cameraPosition = selectedArena.transform.position
-				camera.rotation = selectedArena.transform.rotation
-				rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
-			end
-
-			if selectedArena and Gui.button("Print Relative Orientation") then
-				local RelativeLocation =
-					selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
-				local RelativeRotation = camera.rotation * selectedArena.transform.rotation:inverse()
-				print(`Relative Position ({selectedArena.name}):`)
-				print(RelativeLocation)
-				print(`Relative Rotation ({selectedArena.name}):`)
-				print(RelativeRotation:euler())
-				Gui.sameLine()
-			end
-
-			if selectedArena and Gui.button("Print Team Colors Array") then
-				Gui.sameLine()
-				for i, value in selectedArena.gamemode:getTeamColorsArray() do
-					print(i)
-					print(tostring(value))
-				end
-			end
-
-			if selectedArena then
-				if ball and selectedArena.home.goal then
-					Gui.text(
-						`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(
-							ball.transform.position
-						)}`
-					)
-					Gui.text(
-						`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(
-							ball.transform.position
-						)}`
-					)
-				end
-				if Gui.button("Print Selected Arena") then
-					print(selectedArena)
-				end
-				Gui.sameLine()
-				if Gui.button("Print Selected String Arena") then
-					print(`Selected Arena: {Util.tableToString(selectedArena)}`)
-				end
-				if Gui.treeNode("Selected Arena Dimensions") then
-					selectedArena:GUIChangeDimensions()
-					Gui.treePop()
-				end
-
-				Gui.text("Home Team: ")
-				Gui.indent()
-				for i, player in selectedArena.home.players do
-					Gui.text(i .. " " .. player.playerName)
-				end
-				Gui.unindent()
-				Gui.text("Away Team: ")
-				Gui.indent()
-				for i, player in selectedArena.away.players do
-					Gui.text(i .. " " .. player.playerName)
-				end
-				Gui.unindent()
-
-				Gui.text("All Players: ")
-				Gui.indent()
-				for i, player in selectedArena.players do
-					Gui.text(i .. " " .. player.playerName)
-				end
-				Gui.unindent()
+		if Gui.treeNode("Freecam") then
+			if Gui.button("Follow Freecam") then
+				debugFreecam = true
+				ui:setCamera("anotheraxiom.freecam")
+				camera:followCamera(getCameraById("anotheraxiom.freecam"))
 			end
 			Gui.treePop()
 		end
+
+		Gui.unindent()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Arena") then
+		Gui.indent()
+		local gamemodes = SpectatorGamemodes.listGamemodes()
+		Gui.text(`Number of Gamemodes: {#gamemodes}`)
+		if Gui.button("Print Gamemode Ids") then
+			for _, gamemode in gamemodes do
+				print(gamemode:getSlotId())
+			end
+		end
+
+		tpGamemodeName = Gui.inputText("##gamemodeName", tpGamemodeName)
+		Gui.sameLine()
+		if Gui.button("TP to Gamemode") then
+			local gamemode = getGamemodeByName(tpGamemodeName)
+			if gamemode then
+				local transform = gamemode.transform
+				setGlobalCameraTransform(transform.position, transform.rotation)
+			end
+		end
+
+		Gui.newLine()
+
+		showGamemodePositions = Gui.checkbox("Show gamemode positions", showGamemodePositions)
+		if showGamemodePositions and Gui.button("Print Closest Gamemode") then
+			print(closestDebugGamemodeId)
+		end
+
+		Gui.newLine()
+
+		if arenas and Gui.button("Print Arenas") then
+			for _, arena in arenas do
+				print(arena.slotId)
+			end
+		end
+
+		dataGamemodeName = Gui.inputText("##GamemodeData", dataGamemodeName)
+		Gui.sameLine()
+		if Gui.button("Print gamemode data") then
+			print(Util.tableToString(SpectatorGamemodes.getGamemodeData(dataGamemodeName).teams))
+		end
+
+		if selectedArena and Gui.button("Set Orientation to Arena") then
+			Gui.sameLine()
+			cameraPosition = selectedArena.transform.position
+			camera.rotation = selectedArena.transform.rotation
+			rotEuler = (selectedArena.transform.rotation * gravity.upRotation:inverse()):euler()
+		end
+
+		if selectedArena and Gui.button("Print Relative Orientation") then
+			local RelativeLocation =
+				selectedArena.transform.rotation:rotateVector(camera.position - selectedArena.transform.position)
+			local RelativeRotation = camera.rotation * selectedArena.transform.rotation:inverse()
+			print(`Relative Position ({selectedArena.name}):`)
+			print(RelativeLocation)
+			print(`Relative Rotation ({selectedArena.name}):`)
+			print(RelativeRotation:euler())
+			Gui.sameLine()
+		end
+
+		if selectedArena and Gui.button("Print Team Colors Array") then
+			Gui.sameLine()
+			for i, value in selectedArena.gamemode:getTeamColorsArray() do
+				print(i)
+				print(tostring(value))
+			end
+		end
+
+		if selectedArena then
+			if ball and selectedArena.home.goal then
+				Gui.text(
+					`Home goal ball intersect: {selectedArena.home.goal.box:checkPointIntersect(ball.transform.position)}`
+				)
+				Gui.text(
+					`Away goal ball intersect: {selectedArena.away.goal.box:checkPointIntersect(ball.transform.position)}`
+				)
+			end
+			if Gui.button("Print Selected Arena") then
+				print(selectedArena)
+			end
+			Gui.sameLine()
+			if Gui.button("Print Selected String Arena") then
+				print(`Selected Arena: {Util.tableToString(selectedArena)}`)
+			end
+			if Gui.treeNode("Selected Arena Dimensions") then
+				selectedArena:GUIChangeDimensions()
+				Gui.treePop()
+			end
+
+			Gui.text("Home Team: ")
+			Gui.indent()
+			for i, player in selectedArena.home.players do
+				Gui.text(i .. " " .. player.playerName)
+			end
+			Gui.unindent()
+			Gui.text("Away Team: ")
+			Gui.indent()
+			for i, player in selectedArena.away.players do
+				Gui.text(i .. " " .. player.playerName)
+			end
+			Gui.unindent()
+
+			Gui.text("All Players: ")
+			Gui.indent()
+			for i, player in selectedArena.players do
+				Gui.text(i .. " " .. player.playerName)
+			end
+			Gui.unindent()
+		end
+
+		Gui.newLine()
+
 		if Gui.treeNode("Ball") then
 			if ball and Gui.button("Print arena ball json") then
 				print(ball:toJson())
@@ -1912,7 +1879,28 @@ function onGui()
 			end
 			Gui.treePop()
 		end
-		if Gui.treeNode("Particles") then
+
+		Gui.unindent()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Match") then
+		Gui.indent()
+		if Gui.treeNode("Score Overlay") then
+			Gamemodes.debuging.bestOfAmount = Gui.dragInt("Best Of", Gamemodes.debuging.bestOfAmount, 1, 0, 99)
+			debugHomeScore = Gui.dragInt("Home Score", debugHomeScore, 1, 0, 99)
+			debugAwayScore = Gui.dragInt("Away Score", debugAwayScore, 1, 0, 99)
+			if Gui.button("Add Round") then
+				Overlay.addRound(debugHomeScore, debugAwayScore)
+			end
+
+			if Gui.button("Clear Rounds") then
+				Overlay.clearRounds()
+			end
+			Gui.treePop()
+		end
+
+		if Gui.treeNode("Particle Effects") then
 			if Gui.button("Home Scores") then
 				DoGoalExplosion(selectedArena.home)
 			end
@@ -1926,19 +1914,13 @@ function onGui()
 			end
 			Gui.treePop()
 		end
-		if Gui.treeNode("Overlay") then
-			Gamemodes.debuging.bestOfAmount = Gui.dragInt("Best Of", Gamemodes.debuging.bestOfAmount, 1, 0, 99)
-			debugHomeScore = Gui.dragInt("Home Score", debugHomeScore, 1, 0, 99)
-			debugAwayScore = Gui.dragInt("Away Score", debugAwayScore, 1, 0, 99)
-			if Gui.button("Add Round") then
-				Overlay.addRound(debugHomeScore, debugAwayScore)
-			end
 
-			if Gui.button("Clear Rounds") then
-				Overlay.clearRounds()
-			end
-			Gui.treePop()
-		end
+		Gui.unindent()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Settings") then
+		Gui.indent()
 		if Gui.treeNode("Inputs") then
 			if Gui.button("Print Pressed Keys") then
 				print(InputSystem.pressedInputKeys)
@@ -1947,28 +1929,87 @@ function onGui()
 			Gui.text(tostring("Horizontal: " .. Horizontal))
 			Gui.treePop()
 		end
-		if Gui.treeNode("Freecam") then
-			if Gui.button("Follow Freecam") then
-				debugFreecam = true
-				ui:setCamera("anotheraxiom.freecam")
-				camera:followCamera(getCameraById("anotheraxiom.freecam"))
-			end
-			Gui.treePop()
-		end
-		if Gui.treeNode("Other") then
-			Gui.text(`Luau Memory Usage: {gcinfo() / 1000}MB`)
 
+		if Gui.treeNode("Performance") then
+			Gui.text(`Luau Memory Usage: {gcinfo() / 1000}MB`)
 			Gui.treePop()
 		end
-		if Gui.treeNode("Debug Settings") then
+
+		if Gui.treeNode("Debug Overrides") then
 			speedGears[#speedGears] = Gui.dragInt("Last Speed Override", speedGears[#speedGears], 1, 0, 5000)
 			camera.nearClippingPlane = Gui.dragFloat("Near Clipping Plane", camera.nearClippingPlane, 1, 0, 999999)
 			boundingBoxDebug = Gui.checkbox("show boxes", boundingBoxDebug)
 			Gui.treePop()
 		end
 
-		Gui.treePop()
+		Gui.unindent()
+		Gui.endTabItem()
 	end
+
+	Gui.endTabBar()
+end
+
+function onGui()
+	Gui.text(`Version: {version}`)
+
+	Gui.beginTabBar("MainBar")
+	if Gui.beginTabItem("Info") then
+		GUI_CameraInfo()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Settings") then
+		GUI_CameraSettings()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Controls##TabItem") then
+		GUI_CameraControls()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Debug") then
+		GUI_CameraDebug()
+		Gui.endTabItem()
+	end
+	Gui.endTabBar()
+
+	Gui.newLine()
+
+	if Gui.button(Icon.Save .. " Save Config") then
+		config.cameraFOV = cameraFOV
+		config.deadzone = deadzone
+		config.followFOV = followFOV
+		config.followPositionSmoothing = followPositionSmoothing
+		config.followRadius = followRadius
+		config.invertMouseLookHorizontal = invertMouseLookHorizontal
+		config.invertMouseLookVertical = invertMouseLookVertical
+		config.mouseSensitivity = mouseSensitivity
+		config.invertControllerLookHorizontal = invertControllerLookHorizontal
+		config.invertControllerLookVertical = invertControllerLookVertical
+		config.controllerSensitivity = controllerSensitivity
+		config.positionSmoothing = positionSmoothing
+		config.lookSmoothness = lookSmoothness
+		config.particleSimSpeed = ParticleSystem.speed
+		config.ballOutline = ballOutline
+		config.vibrance = ParticleSystem.vibrance
+		config.getBallVariant = getBallVariant
+		config.sendOverlayInfo = sendOverlayInfo
+		config.thirdPersonMode = thirdPersonMode
+		config.postProcessing = {
+			bloomIntensity = bloomIntensity,
+			bloomThreshold = bloomThreshold,
+			depthOfFieldFstop = depthOfFieldFstop,
+			depthOfFieldFocalDistance = depthOfFieldFocalDistance,
+			depthOfFieldSensorWidth = depthOfFieldSensorWidth,
+			chromaticAberrationIntensity = chromaticAberrationIntensity,
+			motionBlurAmount = motionBlurAmount,
+			vignetteIntensity = vignetteIntensity,
+			exposureBias = exposureBias,
+		}
+		saveConfig()
+	end
+	Gui.setItemTooltip("Saves your settings!")
 end
 
 function debugGamemodePositions()
@@ -2112,7 +2153,7 @@ function followPov(type: "player" | "ball")
 		cameraMode = cameraMode,
 		radius = followRadius,
 		threshold = 5,
-		positionSmoothing = followPosititonSmoothing,
+		positionSmoothing = followPositionSmoothing,
 		cameraPositionOffset = Vec3.zeroVector,
 		cameraRotationOffset = Quat.identity,
 		gestureControls = false,
