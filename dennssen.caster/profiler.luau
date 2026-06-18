@@ -369,7 +369,7 @@ type GraphObject = {
 
 local graphFrames: { { [string]: GraphObject } } = {}
 
-local graphPosition: Vec2 = Vec2.new(0, 2)
+local graphPosition: Vec2 = Vec2.new(0, 20)
 local lastGraphPosition: number = graphPosition.x
 local graphLength: number = 0
 local GRAPH_UI_WIDTH: number = 600
@@ -501,7 +501,7 @@ function renderGraphObjects(
 	frameId: string,
 	position: number,
 	cursor: number,
-	zoom: number,
+	scale: number, -- pixels-per-graph-unit, NOT a raw percentage
 	parentInclusiveTime: number?,
 	graphObjects: { [string]: GraphObject }
 ): Vec2
@@ -527,7 +527,7 @@ function renderGraphObjects(
 			renderWidth -= position - cursor
 		end
 
-		renderWidth /= zoom
+		renderWidth *= scale
 
 		-- If the function is visable
 		local isVisable: boolean = renderWidth > 0
@@ -542,7 +542,7 @@ function renderGraphObjects(
 			frameId,
 			position,
 			cursorStart,
-			zoom,
+			scale,
 			graphObject.data and graphObject.data.inclusiveTime or nil,
 			graphObject.calls
 		).y + 1
@@ -599,7 +599,7 @@ function Profiler:graph()
 	Gui.setNextItemWidth(RANGE_SLIDER_WIDTH)
 	graphPosition = Gui.rangeSlider("##graphSlider", graphPosition, 0, 100, true)
 	graphPosition.x = math.max(0, graphPosition.x)
-	graphPosition.x = math.min(graphPosition.x, graphLength - (graphPosition.y - graphPosition.x))
+	graphPosition.x = math.min(graphPosition.x, 100 - (graphPosition.y - graphPosition.x))
 
 	if graphPosition.x ~= lastGraphPosition or doUpdate then
 		-- cache graph objects
@@ -613,13 +613,17 @@ function Profiler:graph()
 
 	Gui.beginHorizontal("hor")
 
+	local visiblePercent: number = graphPosition.y - graphPosition.x
+	local visibleGraphUnits: number = graphLength * (visiblePercent / 100)
+	local graphScale: number = visibleGraphUnits > 0 and ((GRAPH_UI_WIDTH - 25) / visibleGraphUnits) or 1
+
 	local totalGraphSize: Vec2 = Vec2.zeroVector
 	for i, graphFrame in graphFrames do
 		local graphSize = renderGraphObjects(
 			`root{i}`,
 			graphLength * (graphPosition.x / 100),
 			totalGraphSize.x,
-			(graphPosition.y - graphPosition.x),
+			graphScale,
 			nil,
 			graphFrame
 		)
