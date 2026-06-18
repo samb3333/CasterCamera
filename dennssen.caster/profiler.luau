@@ -7,7 +7,7 @@ type ProfiledData = {
 	exclusiveTime: number,
 	inclusiveTime: number,
 	exclusiveMemory: number,
-	calls: number,
+	timesCalled: number,
 }
 
 type ProfiledFunction = {
@@ -56,6 +56,10 @@ type Profiler = {
 
 	tick: (self: Profiler, dt: number) -> (),
 }
+
+local FONT_CHAR_WIDTH: number = 8
+local FUNC_TIME_WIDTH_MULT: number = 200
+local MAX_FRAME_AMOUNT: number = 5
 
 local Profiler: Profiler = {} :: Profiler
 Profiler.enabled = false
@@ -180,7 +184,7 @@ function Profiler:buildProfiledTree(
 
 	if targetFuncProfile.data then
 		-- previously called in the same frame, so we combine data
-		targetFuncProfile.data.calls += 1
+		targetFuncProfile.data.timesCalled += 1
 		targetFuncProfile.data.inclusiveTime += targetProfileData.inclusiveTime
 		if targetProfileData.exclusiveTime > targetFuncProfile.data.exclusiveTime then
 			targetFuncProfile.data.exclusiveTime = targetProfileData.exclusiveTime
@@ -216,7 +220,7 @@ function Profiler:wrap(f: (...any) -> any?): (...any) -> any?
 			inclusiveTime = inclusiveTime,
 			exclusiveTime = inclusiveTime,
 			exclusiveMemory = gcinfo() - startMem,
-			calls = 1,
+			timesCalled = 1,
 		}
 
 		self:buildProfiledTree(wrapper, functionId, profileData)
@@ -261,7 +265,7 @@ function Profiler:wrapScriptTick(f: (...any) -> any?): (...any) -> any?
 			inclusiveTime = inclusiveTime,
 			exclusiveTime = inclusiveTime,
 			exclusiveMemory = gcinfo() - startMem,
-			calls = 1,
+			timesCalled = 1,
 		}
 
 		self:buildProfiledTree(wrapper, functionId, profileData)
@@ -346,8 +350,8 @@ function Profiler:controls()
 			self.paused = false
 		end
 	end
-	self.maxFrameAmount = Gui.sliderInt("# Profiled Frames", self.maxFrameAmount, 1, 20)
-	self.maxFrameAmount = math.clamp(self.maxFrameAmount, 1, 20)
+	self.maxFrameAmount = Gui.sliderInt("# Profiled Frames", self.maxFrameAmount, 1, MAX_FRAME_AMOUNT)
+	self.maxFrameAmount = math.clamp(self.maxFrameAmount, 1, MAX_FRAME_AMOUNT)
 end
 
 -- Profiler End
@@ -361,16 +365,15 @@ type GraphObject = {
 	line: string,
 	file: string,
 	width: number,
-	padding: number,
-	render: string,
 }
 
 local graphFrames: { { [string]: GraphObject } } = {}
 
-local graphPosition: number = 0
-local lastGraphPosition: number = graphPosition
-local buttonJumpShift: number = 5
+local graphPosition: Vec2 = Vec2.new(0, 2)
+local lastGraphPosition: number = graphPosition.x
 local graphLength: number = 0
+local GRAPH_UI_WIDTH: number = 600
+local RANGE_SLIDER_WIDTH: number = 385
 
 local frameAverage: number = 0
 
@@ -393,13 +396,6 @@ function parseFunction(id: string): { name: string, line: string, file: string }
 	}
 end
 
-function padToSize(line: string, totalSize: number): string
-	local gap = totalSize - line:len()
-	local left = math.floor(gap / 2)
-	local right = gap - left
-	return `[{(" "):rep(left)}{line}{(" "):rep(right)}]`
-end
-
 function convertToGraphObject(funcID: string, profiledFunc: ProfiledFunction): GraphObject
 	local calls: { [string]: GraphObject } = {}
 	for childID, child in profiledFunc.calls do
@@ -409,12 +405,13 @@ function convertToGraphObject(funcID: string, profiledFunc: ProfiledFunction): G
 	local funcInfo = parseFunction(funcID)
 	local funcName = getFunctionRenderName(funcInfo.name, profiledFunc.data)
 
-	local padding: number = math.floor(profiledFunc.data and profiledFunc.data.exclusiveTime or 0)
+	local width: number = math.floor(profiledFunc.data and profiledFunc.data.exclusiveTime * FUNC_TIME_WIDTH_MULT or 10)
+	local textWidth: number = math.floor(funcName:len() * FONT_CHAR_WIDTH)
+	width = math.max(width, textWidth)
 	for _, child in calls do
-		-- the added padding is to account for the spacing added by the horizontal and vertical gui widgets
-		padding += child.width + 4
+		-- the added width is to account for the spacing added by the horizontal and vertical gui widgets
+		width += child.width + 4
 	end
-	local render = padToSize(funcName, padding)
 
 	return {
 		data = profiledFunc.data,
@@ -422,9 +419,7 @@ function convertToGraphObject(funcID: string, profiledFunc: ProfiledFunction): G
 		name = funcName,
 		line = funcInfo.line,
 		file = funcInfo.file,
-		padding = padding,
-		width = render:len(),
-		render = render,
+		width = width,
 	}
 end
 
@@ -445,13 +440,13 @@ function createTooltip(id: string, tooltip: () -> ())
 	end
 end
 
-function setTooltip(id: string, funcFile: string, funcLine: string, data: ProfiledData?, parentInclusiveTime: number?)
+function setTooltip(id: string, graphObject: GraphObject, parentInclusiveTime: number?)
 	createTooltip(id, function()
-		Gui.separatorText("data")
-		Gui.text(`Location: {funcFile}:{funcLine}`)
-		if data then
-			local isLooped: boolean = data.calls > 1
-			local selfTimeFormated: string = string.format("%.4f", data.exclusiveTime)
+		Gui.separatorText(graphObject.name)
+		Gui.text(`Location: {graphObject.file}:{graphObject.line}`)
+		if graphObject.data then
+			local isLooped: boolean = graphObject.data.timesCalled > 1
+			local selfTimeFormated: string = string.format("%.4f", graphObject.data.exclusiveTime)
 
 			if isLooped then
 				Gui.text(`Biggest Self Time: {selfTimeFormated}ms`)
@@ -461,12 +456,18 @@ function setTooltip(id: string, funcFile: string, funcLine: string, data: Profil
 
 			if parentInclusiveTime then
 				Gui.text(
-					`Percentage of parent: {string.format("%.2f", data.inclusiveTime / parentInclusiveTime * 100)}%`
+					`Percentage of parent: {string.format(
+						"%.2f",
+						graphObject.data.inclusiveTime / parentInclusiveTime * 100
+					)}%`
 				)
 			end
-			Gui.text(`Memory: {data.exclusiveMemory}MB`)
+			Gui.text(`Memory: {graphObject.data.exclusiveMemory}MB`)
 			if isLooped then
-				Gui.text(`Called Amount: {data.calls}`)
+				Gui.text(`Called Amount: {graphObject.data.timesCalled}`)
+			end
+			if Input.getKey(Input.Key.LeftAlt) then
+				Gui.text(`Width: {graphObject.width}`)
 			end
 		end
 	end)
@@ -487,7 +488,7 @@ end
 
 function isGraphObjectVisible(position: number, cursor: number, profiledFuncs: { [string]: GraphObject }): boolean
 	for funcID, profiledFunc in profiledFuncs do
-		local length: number = profiledFunc.render:len()
+		local length: number = profiledFunc.width
 		if cursor + length >= position then
 			return true
 		end
@@ -500,6 +501,7 @@ function renderGraphObjects(
 	frameId: string,
 	position: number,
 	cursor: number,
+	zoom: number,
 	parentInclusiveTime: number?,
 	graphObjects: { [string]: GraphObject }
 ): Vec2
@@ -516,33 +518,36 @@ function renderGraphObjects(
 	Gui.beginHorizontal("horizontal" .. frameId)
 	for funcID: string, graphObject: GraphObject in graphObjects do
 		local cursorStart: number = cursor
-		local renderText: string = graphObject.render
+		local renderText: string = graphObject.name
+		local renderWidth: number = graphObject.width
 
-		graphSize.x += graphObject.width
+		graphSize.x += renderWidth
 
 		if cursor < position then
-			renderText = renderText:sub(position - cursor)
+			renderWidth -= position - cursor
 		end
 
+		renderWidth /= zoom
+
 		-- If the function is visable
-		local isVisable: boolean = renderText:len() > 0
+		local isVisable: boolean = renderWidth > 0
 		if isVisable then
 			Gui.beginVertical("vertical" .. frameId .. funcID)
-			Gui.smallButton(renderText)
-			if graphObject.data then
-				setTooltip(frameId .. funcID, graphObject.file, graphObject.line, graphObject.data, parentInclusiveTime)
-			end
+			Gui.setNextItemWidth(renderWidth)
+			Gui.inputText(`##{renderText}`, renderText)
+			setTooltip(frameId .. funcID, graphObject, parentInclusiveTime)
 		end
 
 		local currentNest = renderGraphObjects(
 			frameId,
 			position,
 			cursorStart,
+			zoom,
 			graphObject.data and graphObject.data.inclusiveTime or nil,
 			graphObject.calls
 		).y + 1
 		graphSize.y = currentNest > graphSize.y and currentNest or graphSize.y
-		cursor += graphObject.render:len()
+		cursor += graphObject.width
 
 		if isVisable then
 			Gui.endVertical()
@@ -586,23 +591,17 @@ function Profiler:graph()
 		frameAverage = framesAmount ~= 0 and framesTotal / framesAmount or 0
 	end
 
+	Gui.beginChild("ProfilerBox", GRAPH_UI_WIDTH, 300, true)
 	Gui.text(`Frame Average: {string.format("%.4f", frameAverage)}ms`)
 
-	lastGraphPosition = graphPosition
+	lastGraphPosition = graphPosition.x
 
-	if Gui.button("<-") then
-		graphPosition = graphPosition - buttonJumpShift
-	end
-	Gui.sameLine()
-	graphPosition = Gui.dragInt("##Slider", graphPosition, 1, 0, graphLength)
-	Gui.sameLine()
-	if Gui.button("->") then
-		graphPosition += buttonJumpShift
-	end
-	graphPosition = math.max(0, graphPosition)
-	graphPosition = math.min(graphPosition, graphLength)
+	Gui.setNextItemWidth(RANGE_SLIDER_WIDTH)
+	graphPosition = Gui.rangeSlider("##graphSlider", graphPosition, 0, 100, true)
+	graphPosition.x = math.max(0, graphPosition.x)
+	graphPosition.x = math.min(graphPosition.x, graphLength - (graphPosition.y - graphPosition.x))
 
-	if graphPosition ~= lastGraphPosition or doUpdate then
+	if graphPosition.x ~= lastGraphPosition or doUpdate then
 		-- cache graph objects
 		graphFrames = {}
 		for i, frame in self.frames do
@@ -616,32 +615,29 @@ function Profiler:graph()
 
 	local totalGraphSize: Vec2 = Vec2.zeroVector
 	for i, graphFrame in graphFrames do
-		local graphSize = renderGraphObjects(`root{i}`, graphPosition, totalGraphSize.x, nil, graphFrame)
+		local graphSize = renderGraphObjects(
+			`root{i}`,
+			graphLength * (graphPosition.x / 100),
+			totalGraphSize.x,
+			(graphPosition.y - graphPosition.x),
+			nil,
+			graphFrame
+		)
 		totalGraphSize.x += graphSize.x
 		totalGraphSize.y = graphSize.y > totalGraphSize.y and graphSize.y or totalGraphSize.y
-
-		totalGraphSize.x += 1
-		if totalGraphSize.x >= graphPosition then
-			Gui.beginVertical(`##{i}FrameSeperator`)
-			for j = 1, graphSize.y + 1, 1 do
-				Gui.text("|")
-			end
-			Gui.endVertical()
-		end
 	end
 
 	graphLength = totalGraphSize.x
 
 	Gui.endHorizontal()
 
-	Gui.separator()
+	Gui.endChild()
 end
 
 -- Graph End
 
 function Profiler:tick(dt: number)
 	self:setDeltaTime(dt)
-	self:graph()
 	self:clearFrame()
 end
 
