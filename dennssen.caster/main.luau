@@ -1379,7 +1379,7 @@ function GUI_CameraInfo()
 				end
 			end
 
-			if Gui.beginCombo("##3v3", "3v3 Arenas...") then
+			if #_3v3Arenas > 0 and Gui.beginCombo("##3v3", "3v3 Arenas...") then
 				for _, arena: CasterArena in _3v3Arenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
@@ -1387,7 +1387,7 @@ function GUI_CameraInfo()
 				end
 				Gui.endCombo()
 			end
-			if Gui.beginCombo("##4v4", "4v4 Arenas...") then
+			if #_4v4Arenas > 0 and Gui.beginCombo("##4v4", "4v4 Arenas...") then
 				for _, arena: CasterArena in _4v4Arenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
@@ -1395,7 +1395,7 @@ function GUI_CameraInfo()
 				end
 				Gui.endCombo()
 			end
-			if Gui.beginCombo("##Driftblitz", "Driftblitz Arenas...") then
+			if #DriftblitzArenas > 0 and Gui.beginCombo("##Driftblitz", "Driftblitz Arenas...") then
 				for _, arena: CasterArena in DriftblitzArenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
@@ -1403,7 +1403,7 @@ function GUI_CameraInfo()
 				end
 				Gui.endCombo()
 			end
-			if Gui.beginCombo("##ZDrift", "ZDrift Arenas...") then
+			if #ZDriftArenas > 0 and Gui.beginCombo("##ZDrift", "ZDrift Arenas...") then
 				for _, arena: CasterArena in ZDriftArenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
@@ -1411,7 +1411,7 @@ function GUI_CameraInfo()
 				end
 				Gui.endCombo()
 			end
-			if Gui.beginCombo("##Strike", "Strike Arenas...") then
+			if #StrikeArenas > 0 and Gui.beginCombo("##Strike", "Strike Arenas...") then
 				for _, arena: CasterArena in StrikeArenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
