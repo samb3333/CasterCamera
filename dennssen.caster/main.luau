@@ -126,13 +126,11 @@ type Arena4v4 = Gamemodes.Arena4v4
 type Driftblitz = Gamemodes.Driftblitz
 type ZDrift = Gamemodes.ZDrift
 type Strike = Gamemodes.Strike
-type Volleyfall = Gamemodes.Volleyfall
 local Arena3v3 = Gamemodes.Arena3v3
 local Arena4v4 = Gamemodes.Arena4v4
 local Driftblitz = Gamemodes.Driftblitz
 local ZDrift = Gamemodes.ZDrift
 local Strike = Gamemodes.Strike
-local Volleyfall = Gamemodes.Volleyfall
 
 type ArenaTeam = Arena.ArenaTeam<Gamemodes.OverviewData>
 
@@ -466,7 +464,6 @@ local ARENA_TYPES = {
 	Driftblitz = "driftblitz",
 	ZDrift = "zdrift",
 	Strike = "strike",
-	Volleyfall = "volleyfall",
 }
 local overviewPredictionSteps: number = 2
 local overviewPredictionTime: number = 5
@@ -518,26 +515,14 @@ function getArenas(): { CasterArena }
 				continue
 			end
 
-			if slotId == "Club HalfG 02" then
-				local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
-				table.insert(arenas, arena)
-				continue
-			end
-
 			if typeof(number) ~= "number" then
 				continue
 			end
 
-			if number == 1 then
-				local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
-				table.insert(arenas, arena)
-			elseif number >= 3 then
+			if number >= 3 then
 				local arena: CasterArena = Strike.new(gamemode, readLocation)
 				table.insert(arenas, arena)
 			end
-		elseif slotId:find("Club Central") then
-			local arena: CasterArena = Volleyfall.new(gamemode, readLocation)
-			table.insert(arenas, arena)
 		end
 	end
 
@@ -1194,7 +1179,6 @@ function DoGoalExplosion(team: ArenaTeam)
 		selectedArena.type == ARENA_TYPES.Driftblitz
 		or selectedArena.type == ARENA_TYPES.ZDrift
 		or selectedArena.type == ARENA_TYPES.Strike
-		or selectedArena.type == ARENA_TYPES.Volleyfall
 	then
 		goalExplosionPosition = ball.transform.position
 	elseif team.teamIndex == Util.TeamIndex.HomeTeam then
@@ -1380,7 +1364,6 @@ function GUI_CameraInfo()
 			local DriftblitzArenas: { Driftblitz } = {}
 			local ZDriftArenas: { ZDrift } = {}
 			local StrikeArenas: { Strike } = {}
-			local VolleyfallArenas: { Volleyfall } = {}
 
 			for _, arena: CasterArena in arenas do
 				if arena.type == ARENA_TYPES.Arena3v3 then
@@ -1393,8 +1376,6 @@ function GUI_CameraInfo()
 					table.insert(ZDriftArenas, arena :: ZDrift)
 				elseif arena.type == ARENA_TYPES.Strike then
 					table.insert(StrikeArenas, arena :: Strike)
-				elseif arena.type == ARENA_TYPES.Volleyfall then
-					table.insert(VolleyfallArenas, arena :: Volleyfall)
 				end
 			end
 
@@ -1432,14 +1413,6 @@ function GUI_CameraInfo()
 			end
 			if Gui.beginCombo("##Strike", "Strike Arenas...") then
 				for _, arena: CasterArena in StrikeArenas do
-					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
-						setSelectedArena(arena)
-					end
-				end
-				Gui.endCombo()
-			end
-			if Gui.beginCombo("##Volleyfall", "Volleyfall Arenas...") then
-				for _, arena: CasterArena in VolleyfallArenas do
 					if Gui.selectable(arena.name, selectedArena.name == arena.name) then
 						setSelectedArena(arena)
 					end
