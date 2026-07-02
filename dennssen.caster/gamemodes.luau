@@ -663,115 +663,6 @@ function Strike:GUIChangeDimensions()
 	self:setupDimensions()
 end
 
-export type Volleyfall = CasterArena & {
-	__index: Volleyfall,
-	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Volleyfall,
-	homeRotationOffset: Quat,
-	awayRotationOffset: Quat,
-	boxSize: Vec3,
-	boxOffset: Vec3,
-	centerBoxOffset: Vec3,
-}
-
-local Volleyfall = {} :: Volleyfall
-Volleyfall.__index = Volleyfall
-setmetatable(Volleyfall, { __index = CasterArena })
-
-Volleyfall.homeRotationOffset = Quat.fromEuler(0, 0, 0)
-Volleyfall.awayRotationOffset = Quat.fromEuler(0, 0, 180)
-Volleyfall.boxSize = Vec3.new(2910, 2000, 1800)
-Volleyfall.boxOffset = Vec3.new(0, 0, 600)
-Volleyfall.centerBoxOffset = Vec3.new(0, 0, 385)
-
-function Volleyfall.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Volleyfall
-	local self: CasterArena = setmetatable(CasterArena.new(gamemode, frameIndex), Volleyfall) :: any
-	self.type = "volleyfall"
-	if self.slotId:find("FieldHouse") then
-		self.name = `Volleyfall FieldHouse`
-	elseif self.slotId:find("Club Central") then
-		local split = self.slotId:split(" ")
-		local number = split[3]
-		self.name = `Volleyfall Central {typeof(number) == "number" and number or split[3]}`
-	elseif self.slotId:find("HalfG") then
-		self.name = `Volleyfall HalfG`
-	else
-		self.name = self.slotId
-	end
-
-	self.home.data = { overview = {} }
-	self.away.data = { overview = {} }
-	self:setupDimensions()
-	self:setupOverviews()
-	return self :: Volleyfall
-end
-
-function Volleyfall:isPointOnHomeSide(point: Vec3): boolean
-	local homeDirection = self:getTeamRotation(Util.TeamIndex.HomeTeam):getForwardVector()
-	local ballDirection = Util.getForward(self.transform.position, point)
-	return homeDirection:dot(ballDirection) >= 0
-end
-
-function Volleyfall:setupDimensions()
-	self.box = Box.new(
-		self.transform.position + self.transform.rotation:rotateVector(Volleyfall.boxOffset),
-		Volleyfall.boxSize,
-		self.transform.rotation
-	)
-
-	self.centerBox = Box.new(
-		self.transform.position + self.transform.rotation:rotateVector(Volleyfall.centerBoxOffset),
-		centerBoxSize,
-		self.transform.rotation
-	)
-end
-
-function Volleyfall:setupOverviews()
-	self.home.data.overview = {}
-	self.away.data.overview = {}
-
-	for _, overview in config.overviewOffsets._3v3 do
-		table.insert(self.home.data.overview, {
-			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
-				:rotateVector(overview.position),
-			rotation = self:getTeamRotation(Util.TeamIndex.HomeTeam) * overview.rotation,
-		})
-		table.insert(self.away.data.overview, {
-			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.AwayTeam)
-				:rotateVector(overview.position),
-			rotation = self:getTeamRotation(Util.TeamIndex.AwayTeam) * overview.rotation,
-		})
-	end
-end
-
-function Volleyfall:getTeamRotation(teamIndex: number?): Quat
-	if teamIndex == Util.TeamIndex.HomeTeam then
-		return self.transform.rotation * Volleyfall.homeRotationOffset
-	elseif teamIndex == Util.TeamIndex.AwayTeam then
-		return self.transform.rotation * Volleyfall.awayRotationOffset
-	end
-	return Quat.identity
-end
-
-function Volleyfall:GUIChangeDimensions()
-	Volleyfall.boxSize = Gui.dragFloat3("Volleyfall Arena Size", Volleyfall.boxSize, 1, -math.huge, math.huge)
-	Volleyfall.boxOffset = Gui.dragFloat3("Volleyfall Position Offset", Volleyfall.boxOffset, 1, -math.huge, math.huge)
-	Volleyfall.centerBoxOffset = Gui.dragFloat3(
-		"Volleyfall Place Ball Box Position Offset",
-		Volleyfall.centerBoxOffset,
-		1,
-		-math.huge,
-		math.huge
-	)
-
-	if Gui.button("Print Dimensions") then
-		print(`boxSize: {Volleyfall.boxSize}`)
-		print(`boxOffset: {Volleyfall.boxOffset}`)
-		print(`centerBoxOffset: {Volleyfall.centerBoxOffset}`)
-	end
-
-	self:setupDimensions()
-end
-
 local function init(overlay: typeof(require("overlay")), profiler: typeof(require("profiler")))
 	Overlay = overlay
 	Arena.profile(profiler)
@@ -785,6 +676,5 @@ return {
 	Driftblitz = Driftblitz,
 	ZDrift = ZDrift,
 	Strike = Strike,
-	Volleyfall = Volleyfall,
 	debuging = debuging,
 }
