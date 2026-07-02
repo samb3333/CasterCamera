@@ -1171,7 +1171,7 @@ end
 
 function DoGoalExplosion(team: ArenaTeam)
 	local goalExplosionPosition: Vec3
-	local goalExplosionColor: LinearColor = Util.linearColorNormalized(team.color)
+	local goalExplosionColor: Color = Util.colorNormalized(team.color or Color.Black)
 
 	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
 
@@ -1191,7 +1191,7 @@ function DoGoalExplosion(team: ArenaTeam)
 end
 
 --effects start
-function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: LinearColor)
+function GoalExplosionEffect(goalPosition: Vec3, goalRotation: Quat, particleColor: Color)
 	for i = 1, 300 do
 		local velocityVector = Vec3.new(math.random(-100, 100), math.random(-100, 100), math.random(-100, 100))
 		ParticleSystem:createParticle(
@@ -1257,10 +1257,10 @@ end
 function GameStartEffect()
 	local particlePosition = selectedArena.centerBox.position
 
-	local normalizedHomeColor: LinearColor = Util.linearColorNormalized(selectedArena.home.color)
-	local normalizedAwayColor: LinearColor = Util.linearColorNormalized(selectedArena.away.color)
+	local normalizedHomeColor: Color = Util.colorNormalized(selectedArena.home.color or Color.Black)
+	local normalizedAwayColor: Color = Util.colorNormalized(selectedArena.away.color or Color.Black)
 
-	local colorAverage = LinearColor.new(
+	local colorAverage = Color.new(
 		(normalizedHomeColor.R + normalizedAwayColor.R) / 2,
 		(normalizedHomeColor.G + normalizedAwayColor.G) / 2,
 		(normalizedHomeColor.B + normalizedAwayColor.B) / 2,

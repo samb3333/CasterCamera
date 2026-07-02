@@ -28,7 +28,7 @@ type ParticelSystem = {
 		rotation: Quat,
 		scale: number,
 		velocity: Vec3,
-		color: LinearColor,
+		color: Color,
 		variant: string,
 		lifespan: number
 	) -> (),
@@ -54,7 +54,7 @@ function ParticleSystem:createParticle(
 	rotation: Quat,
 	scale: number,
 	velocity: Vec3,
-	color: LinearColor,
+	color: Color,
 	variant: string,
 	lifespan: number
 )
@@ -71,7 +71,7 @@ function ParticleSystem:createParticle(
 	end
 
 	-- change vibrancy of the color
-	color = LinearColor.new(color.R * self.vibrance, color.G * self.vibrance, color.B * self.vibrance, 1)
+	color = Color.new(color.R * self.vibrance, color.G * self.vibrance, color.B * self.vibrance, 1)
 
 	local newParticle: Particle = {
 		position = position,
