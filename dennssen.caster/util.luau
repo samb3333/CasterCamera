@@ -150,9 +150,14 @@ function Util.linearColorToVec3(color: LinearColor): Vec3
 	return Vec3.new(color.R, color.G, color.B)
 end
 
---- Converts color ranges from `0-255` to `0-1`
+--- Converts `LinearColor`'s color ranges from `0-255` to `0-1`
 function Util.linearColorNormalized(color: LinearColor): LinearColor
 	return LinearColor.new(color.R / 255, color.G / 255, color.B / 255, 1)
+end
+
+--- Converts `Color`'s color ranges from `0-255` to `0-1`
+function Util.colorNormalized(color: Color): Color
+	return Color.new(color.R / 255, color.G / 255, color.B / 255, 1)
 end
 
 --- Gets a players primary color using it's JSON data

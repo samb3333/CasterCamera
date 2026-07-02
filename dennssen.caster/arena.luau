@@ -7,7 +7,7 @@ local Util = require("util")
 
 export type ArenaTeam<T = {}> = {
 	teamIndex: number,
-	color: LinearColor,
+	color: Color?,
 	previousScore: number,
 	score: number,
 	scoreIncrease: boolean,
@@ -26,7 +26,6 @@ export type ArenaTeam<T = {}> = {
 
 export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	__index: Arena<ArenaData, HomeData, AwayData>,
-	showDebugMenus: boolean,
 
 	type: string,
 
@@ -95,7 +94,6 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 
 local Arena: Arena = {} :: Arena
 Arena.__index = Arena
-Arena.showDebugMenus = false
 
 function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Arena
 	local self: Arena = setmetatable({}, Arena) :: any
@@ -109,7 +107,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 
 	self.home = {
 		teamIndex = Util.TeamIndex.HomeTeam,
-		color = LinearColor.White,
+		color = nil,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -128,7 +126,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 
 	self.away = {
 		teamIndex = Util.TeamIndex.AwayTeam,
-		color = LinearColor.White,
+		color = nil,
 		previousScore = 0,
 		score = 0,
 		scoreIncrease = false,
@@ -195,8 +193,8 @@ end
 
 function Arena:tick()
 	self.frame = Util.getReplayFrameFromIndex(self.frameIndex)
-
 	local gamemodeData: SpectatorGamemodeData = SpectatorGamemodes.getGamemodeData(self.slotId)
+
 	self:getTeamColors(gamemodeData)
 	self.ball = self:getArenaBall()
 
