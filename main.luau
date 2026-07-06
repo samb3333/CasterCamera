@@ -87,6 +87,20 @@ Util.initializeConfig({
 				rotation = Quat.fromEuler(0, -8.5, -170),
 			},
 		},
+		_strike = {
+			{
+				position = Vec3.new(-660, 0, 500),
+				rotation = Quat.fromEuler(0, -35, 0),
+			},
+			{
+				position = Vec3.new(0, -920, 500),
+				rotation = Quat.fromEuler(0, -30, 90),
+			},
+			{
+				position = Vec3.new(660, 0, 500),
+				rotation = Quat.fromEuler(0, -35, 180),
+			},
+		},
 	},
 	keyboardKeybinds = "",
 	gamepadKeybinds = "",
@@ -470,6 +484,61 @@ local overviewPredictionTime: number = 5
 
 local cachedGamemodesAmount: number = 0
 
+type StrikeFleetArena = {
+	name: string,
+	transformOffset: Transform,
+}
+
+local strikeFleetArenas: { string } = {
+	"1200_Full_Weekly_Race",
+	"0800_Full_3",
+	"1200_Full_2",
+	"0800_Full_1",
+	"1200_Full_3",
+	"0800_Full_2",
+	"1200_Full_4",
+	"0800_Full_4",
+}
+
+local strikeFleetArenasInfo: { [string]: StrikeFleetArena } = {
+	["1200_Full_Weekly_Race"] = {
+		name = "Strike_Fleet 1v1 1",
+		transformOffset = Transform.new(Vec3.new(-2400, 9575, -160), Quat.fromEuler(0, 0, 90), Vec3.oneVector),
+	},
+	-- global position: (-2400, 16150, 28462.500)
+	["0800_Full_3"] = {
+		name = "Strike_Fleet 1v1 2",
+		transformOffset = Transform.new(Vec3.new(-27189.977, 16150, 42775), Quat.fromEuler(120, 0, 90), Vec3.oneVector),
+	},
+	["1200_Full_2"] = {
+		name = "Strike_Fleet 2v2 1",
+		transformOffset = Transform.new(Vec3.new(2400, 9575, -160), Quat.fromEuler(0, 0, 90), Vec3.oneVector),
+	},
+	-- global position: (2400, 12875, 28462.500)
+	["0800_Full_1"] = {
+		name = "Strike_Fleet 2v2 2",
+		transformOffset = Transform.new(Vec3.new(-22389.977, 12875, 42775), Quat.fromEuler(120, 0, 90), Vec3.oneVector),
+	},
+	["1200_Full_3"] = {
+		name = "Strike_Fleet 2v2 3",
+		transformOffset = Transform.new(Vec3.new(2400, 16150, -160), Quat.fromEuler(0, 0, 90), Vec3.oneVector),
+	},
+	-- global position: (2400, 19450, 28462.500)
+	["0800_Full_2"] = {
+		name = "Strike_Fleet 2v2 4",
+		transformOffset = Transform.new(Vec3.new(-22389.977, 19450, 42775), Quat.fromEuler(120, 0, 90), Vec3.oneVector),
+	},
+	["1200_Full_4"] = {
+		name = "Strike_Fleet 3v3 1",
+		transformOffset = Transform.new(Vec3.new(-2400, 12875, -160), Quat.fromEuler(0, 0, 90), Vec3.oneVector),
+	},
+	-- global position: (-2400, 19450, 28462.500)
+	["0800_Full_4"] = {
+		name = "Strike_Fleet 3v3 2",
+		transformOffset = Transform.new(Vec3.new(-27189.977, 19450, 42775), Quat.fromEuler(120, 0, 90), Vec3.oneVector),
+	},
+}
+
 function getArenas(): { CasterArena }
 	local arenas: { CasterArena } = {}
 	local gamemodes = SpectatorGamemodes.listGamemodes()
@@ -523,6 +592,10 @@ function getArenas(): { CasterArena }
 				local arena: CasterArena = Strike.new(gamemode, readLocation)
 				table.insert(arenas, arena)
 			end
+		elseif table.find(strikeFleetArenas, slotId) then
+			local strikeInfo = strikeFleetArenasInfo[slotId]
+			local arena: CasterArena = Strike.new(gamemode, readLocation, strikeInfo.name, strikeInfo.transformOffset)
+			table.insert(arenas, arena)
 		end
 	end
 
@@ -2947,7 +3020,7 @@ function ballInCenterCheck()
 end
 
 function drawBallOutline()
-	if not ballOutline then
+	if not ballOutline or not ball then
 		return
 	end
 

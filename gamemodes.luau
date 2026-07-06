@@ -571,7 +571,12 @@ end
 
 export type Strike = CasterArena & {
 	__index: Strike,
-	new: (gamemode: ModuleStateSpectatorLuaApi, frameIndex: number) -> Strike,
+	new: (
+		gamemode: ModuleStateSpectatorLuaApi,
+		frameIndex: number,
+		nameOverride: string?,
+		transformOffset: Transform?
+	) -> Strike,
 	boxSize: Vec3,
 	boxOffset: Vec3,
 	centerBoxOffset: Vec3,
@@ -581,23 +586,38 @@ local Strike = {} :: Strike
 Strike.__index = Strike
 setmetatable(Strike, { __index = CasterArena })
 
-Strike.boxSize = Vec3.new(2050, 2050, 1050)
+Strike.boxSize = Vec3.new(2250, 2250, 1150)
 Strike.boxOffset = Vec3.new(0, 0, 415)
 Strike.centerBoxOffset = Vec3.new(0, 0, -40)
 
-function Strike.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Strike
+function Strike.new(
+	gamemode: ModuleStateSpectatorLuaApi,
+	frameIndex: number,
+	nameOverride: string?,
+	transformOffset: Transform?
+): Strike
 	local self: CasterArena = setmetatable(CasterArena.new(gamemode, frameIndex), Strike) :: any
 	self.type = "strike"
-	if self.slotId:find("FieldHouse") then
-		local split = self.slotId:split(" ")
-		local _, number = split[1], tonumber(split[2])
-		local patchedNumber = typeof(number) == "number" and tostring(number - 2) or split[2]
 
-		self.name = `Strike {patchedNumber}`
-	elseif self.slotId:find("HalfG") then
-		self.name = `Strike HalfG`
+	if nameOverride then
+		self.name = nameOverride
 	else
-		self.name = self.slotId
+		if self.slotId:find("FieldHouse") then
+			local split = self.slotId:split(" ")
+			local _, number = split[1], tonumber(split[2])
+			local patchedNumber = typeof(number) == "number" and tostring(number - 2) or split[2]
+
+			self.name = `Strike {patchedNumber}`
+		elseif self.slotId:find("HalfG") then
+			self.name = `Strike HalfG`
+		else
+			self.name = self.slotId
+		end
+	end
+
+	if transformOffset then
+		self.transformOffset = transformOffset
+		self.transform = Util.addTransforms(self.gamemode.transform, self.transformOffset)
 	end
 
 	self.home.data = { overview = {} }
@@ -630,7 +650,7 @@ function Strike:setupOverviews()
 	self.home.data.overview = {}
 	self.away.data.overview = {}
 
-	for _, overview in config.overviewOffsets._3v3 do
+	for _, overview in config.overviewOffsets._strike do
 		table.insert(self.home.data.overview, {
 			position = self.transform.position + self:getTeamRotation(Util.TeamIndex.HomeTeam)
 				:rotateVector(overview.position),
@@ -650,9 +670,31 @@ end
 
 function Strike:GUIChangeDimensions()
 	Strike.boxSize = Gui.dragFloat3("Strike Arena Size", Strike.boxSize, 1, -math.huge, math.huge)
-	Strike.boxOffset = Gui.dragFloat3("Strike Position Offset", Strike.boxOffset, 1, -math.huge, math.huge)
+	Strike.boxOffset = Gui.dragFloat3("Strike Box Position Offset", Strike.boxOffset, 1, -math.huge, math.huge)
 	Strike.centerBoxOffset =
 		Gui.dragFloat3("Strike Place Ball Box Position Offset", Strike.centerBoxOffset, 1, -math.huge, math.huge)
+	local transformEdit: boolean = false
+	self.transformOffset.position =
+		Gui.dragFloat3("Strike Gamemode Position Offset", self.transformOffset.position, 1, -math.huge, math.huge)
+	if Gui.isItemActive() then
+		transformEdit = true
+	end
+	self.transformOffset.rotation = Util.quatFromVec3(
+		Gui.dragFloat3(
+			"Strike Gamemode Rotation Offset",
+			self.transformOffset.rotation:euler(),
+			1,
+			-math.huge,
+			math.huge
+		)
+	)
+	if Gui.isItemActive() then
+		transformEdit = true
+	end
+	if transformEdit then
+		self.transform.rotation = self.gamemode.transform.rotation * self.transformOffset.rotation
+		self.transform.position = self.gamemode.transform.position + self.transformOffset.position
+	end
 
 	if Gui.button("Print Dimensions") then
 		print(`boxSize: {Strike.boxSize}`)

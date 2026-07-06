@@ -807,6 +807,15 @@ function Util.getUpRotation(upDirection: Vec3): Quat
 	return localUpRotation * globalUpRotation:inverse()
 end
 
+function Util.addTransforms(a: Transform, b: Transform): Transform
+	local transform: Transform = Transform.identity
+	transform.position = a.position + b.position
+	transform.rotation = a.rotation * b.rotation
+	transform.scale = Vec3.oneVector + ((a.scale - Vec3.oneVector) + (b.scale - Vec3.oneVector))
+
+	return transform
+end
+
 --- @return the amount of seconds between `past` and `future`
 function Util.dateTimeDeltaSeconds(past: DateTime, future: DateTime): number
 	local ticksPast = (past.ticks / 10000000) - 62167219200

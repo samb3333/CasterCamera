@@ -35,6 +35,7 @@ export type Arena<ArenaData = {}, HomeData = {}, AwayData = {}> = {
 	gamemode: ModuleStateSpectatorLuaApi,
 	name: string,
 	transform: Transform,
+	transformOffset: Transform,
 	box: BoxType,
 	centerBox: BoxType,
 	home: ArenaTeam<HomeData>,
@@ -102,6 +103,7 @@ function Arena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: number): Ar
 
 	self.slotId = gamemode:getSlotId()
 	self.gamemode = gamemode
+	self.transformOffset = Transform.identity
 	self.transform = gamemode.transform
 	self.players = {}
 
