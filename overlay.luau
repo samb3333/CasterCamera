@@ -4,10 +4,21 @@ local Utils = require("util")
 
 local Overlay = {}
 
+type OverlayBall = {
+	transform: Transform,
+	velocity: Vec3,
+}
+
 type Stats = {
 	goals: number,
 	saves: number,
 	assists: number,
+}
+
+type OverlayPlayer = {
+	stats: Stats,
+	velocity: Vec3,
+	transform: Transform,
 }
 
 function newStats(): Stats
@@ -15,6 +26,14 @@ function newStats(): Stats
 		goals = 0,
 		saves = 0,
 		assists = 0,
+	}
+end
+
+function newPlayer(velocity: Vec3, transform: Transform): OverlayPlayer
+	return {
+		stats = newStats(),
+		velocity = Vec3.zeroVector,
+		transform = Transform.identity,
 	}
 end
 
@@ -32,7 +51,7 @@ type Round = {
 }
 
 type OverlayTeam = {
-	players: { [string]: Stats },
+	players: { [string]: OverlayPlayer },
 }
 
 type APIStructure = {
@@ -40,6 +59,8 @@ type APIStructure = {
 
 	home: OverlayTeam,
 	away: OverlayTeam,
+	arenaSize: Vec3,
+	ball: OverlayBall,
 	rounds: { Round },
 	followedPlayer: string,
 	lastShotInfo: ShotInfo,
@@ -58,7 +79,12 @@ local api: APIStructure = {
 	away = {
 		players = {},
 	},
+	arenaSize = Vec3.zeroVector,
 	rounds = {},
+	ball = {
+		transform = Transform.identity,
+		velocity = Vec3.zeroVector,
+	},
 	followedPlayer = "",
 	lastShotInfo = {
 		shooter = "",
@@ -77,7 +103,7 @@ function Overlay.setGamemodeId(gamemodeId: string)
 	api.gamemodeId = gamemodeId
 end
 
-function Overlay.setPlayers(teamIndex: number, playerNames: { string })
+function Overlay.setPlayers(teamIndex: number, players: { ReplayPlayer })
 	local team: OverlayTeam = nil
 
 	if teamIndex == Utils.TeamIndex.HomeTeam then
@@ -98,11 +124,16 @@ function Overlay.setPlayers(teamIndex: number, playerNames: { string })
 	end
 
 	-- Add new players
-	for _, playerName: string in playerNames do
-		if team.players[playerName] == nil then
-			team.players[playerName] = newStats()
+	for _, player: ReplayPlayer in players do
+		local overlayPlayer = team.players[player.playerName]
+		local playerTransform: Transform = Transform.new(player.head.position, player.head.rotation, Vec3.oneVector)
+		if overlayPlayer == nil then
+			team.players[player.playerName] = newPlayer(player.velocity, playerTransform)
 		else
-			currentPlayers[playerName] = false
+			-- update player data
+			overlayPlayer.transform = playerTransform
+			overlayPlayer.velocity = player.velocity
+			currentPlayers[player.playerName] = false
 		end
 	end
 
@@ -112,6 +143,23 @@ function Overlay.setPlayers(teamIndex: number, playerNames: { string })
 			team.players[playerName] = nil
 		end
 	end
+end
+
+function Overlay.setArenaSize(size: Vec3)
+	api.arenaSize = size
+end
+
+function Overlay.setBall(ball: ReplayBall)
+	if not ball then
+		return
+	end
+
+	local ballTransfrom: Transform = Transform.new(ball.transform.position, ball.transform.rotation, Vec3.oneVector)
+
+	api.ball = {
+		transform = ballTransfrom,
+		velocity = ball.velocity,
+	}
 end
 
 function Overlay.clearRounds()
@@ -127,11 +175,11 @@ end
 
 function Overlay.clearStats()
 	for playerName: string, _ in api.home.players do
-		api.home.players[playerName] = newStats()
+		api.home.players[playerName].stats = newStats()
 	end
 
 	for playerName: string, _ in api.away.players do
-		api.away.players[playerName] = newStats()
+		api.away.players[playerName].stats = newStats()
 	end
 end
 

@@ -99,47 +99,13 @@ end
 --- @param ball the `ReplayBall`
 --- @return `true` or `false` depending on whether the ball is an arena ball or a heartball
 function Util.isArenaBall(ball: ReplayBall): boolean
-	local json: string = ball:toJson()
-	local color1String = json:match('"color1"%s*:%s*(%b{})')
-	local color2String = json:match('"color2"%s*:%s*(%b{})')
+	local ballColor: Color = Color.new(255, 255, 255, 255)
 
-	if not color1String or not color2String then
+	local color1 = ball.color1
+	local color2 = ball.color2
+
+	if color1 ~= ballColor or color2 ~= ballColor then
 		return false
-	end
-
-	local color1 = {
-		r = 0,
-		g = 0,
-		b = 0,
-		a = 0,
-	}
-	local color2 = {
-		r = 0,
-		g = 0,
-		b = 0,
-		a = 0,
-	}
-
-	color1.r = tonumber(color1String:match('"r"%s*:%s*(%d+)')) :: number
-	color1.g = tonumber(color1String:match('"g"%s*:%s*(%d+)')) :: number
-	color1.b = tonumber(color1String:match('"b"%s*:%s*(%d+)')) :: number
-	color1.a = tonumber(color1String:match('"a"%s*:%s*(%d+)')) :: number
-
-	color2.r = tonumber(color2String:match('"r"%s*:%s*(%d+)')) :: number
-	color2.g = tonumber(color2String:match('"g"%s*:%s*(%d+)')) :: number
-	color2.b = tonumber(color2String:match('"b"%s*:%s*(%d+)')) :: number
-	color2.a = tonumber(color2String:match('"a"%s*:%s*(%d+)')) :: number
-
-	for _, value in color1 do
-		if value ~= 255 then
-			return false
-		end
-	end
-
-	for _, value in color2 do
-		if value ~= 255 then
-			return false
-		end
 	end
 
 	return true
@@ -605,11 +571,14 @@ function Util.debugPrint(s: any)
 	end
 end
 
-function Util.debugPrintToggle(s: any)
+function Util.toggleDebugPrint()
 	if Input.getKeyDown(Input.Key.N) then
+		print("toggled debug print")
 		Util.printToggle = not Util.printToggle
 	end
+end
 
+function Util.debugPrintToggle(s: any)
 	if Util.printToggle then
 		print(s)
 	end

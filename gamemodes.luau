@@ -53,17 +53,10 @@ function CasterArena:postTickHook()
 end
 
 function CasterArena:sendInfoMessage()
-	local homePlayerNames = {}
-	local awayPlayerNames = {}
-	for _, player in self.home.players do
-		table.insert(homePlayerNames, player.playerName)
-	end
-	for _, player in self.away.players do
-		table.insert(awayPlayerNames, player.playerName)
-	end
+	Overlay.setBall(self.ball)
 
-	Overlay.setPlayers(self.home.teamIndex, homePlayerNames)
-	Overlay.setPlayers(self.away.teamIndex, awayPlayerNames)
+	Overlay.setPlayers(self.home.teamIndex, self.home.players)
+	Overlay.setPlayers(self.away.teamIndex, self.away.players)
 
 	Overlay.setIsOvertime(self.isOvertime)
 	Overlay.setIsGracePeriod(self.isGracePeriod)
