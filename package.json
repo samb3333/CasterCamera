@@ -1,9 +1,8 @@
 {
-  "$schema": "https://raw.githubusercontent.com/AA-Franz/OD_SpectatorRegistry/refs/heads/main/src/package.schema.json",
   "author": "Dennssen",
   "displayName": "Caster Camera",
   "name": "dennssen.caster",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "The Caster camera is a Driftball focused caster tool that let's you access everything from freecam, first person pov, third person pov, 3 different configurable overviews, a cool particle system for goal explosions, and MANY confgurable preferences.",
   "keywords": [
     "casting",
@@ -14,6 +13,5 @@
     "driftblitz"
   ],
   "defaultKeybind": "",
-  "main": "main.luau",
-  "url": "https://github.com/dennssen/CasterCamera.git"
+  "main": "main.luau"
 }
