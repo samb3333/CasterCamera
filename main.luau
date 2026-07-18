@@ -1245,7 +1245,8 @@ end
 
 function DoGoalExplosion(team: ArenaTeam)
 	local goalExplosionPosition: Vec3
-	local goalExplosionColor: Color = Util.colorNormalized(team.color or Color.Black)
+	local teamColor: Color = team.color or Color.Black
+	local goalExplosionColor: Color = Util.colorNormalized(teamColor)
 
 	local goalExplosionOffset: Vec3 = selectedArena.transform.rotation:rotateVector(Vec3.new(0, 0, -60))
 

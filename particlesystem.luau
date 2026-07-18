@@ -71,7 +71,9 @@ function ParticleSystem:createParticle(
 	end
 
 	-- change vibrancy of the color
-	color = Color.new(color.R * self.vibrance, color.G * self.vibrance, color.B * self.vibrance, 1)
+	color.R *= self.vibrance
+	color.G *= self.vibrance
+	color.B *= self.vibrance
 
 	local newParticle: Particle = {
 		position = position,

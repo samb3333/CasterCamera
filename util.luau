@@ -123,7 +123,12 @@ end
 
 --- Converts `Color`'s color ranges from `0-255` to `0-1`
 function Util.colorNormalized(color: Color): Color
-	return Color.new(color.R / 255, color.G / 255, color.B / 255, 1)
+	local normalized = Color.Black
+	normalized.R = color.R / 255
+	normalized.G = color.G / 255
+	normalized.B = color.B / 255
+
+	return normalized
 end
 
 --- Gets a players primary color using it's JSON data
