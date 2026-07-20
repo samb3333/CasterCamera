@@ -125,6 +125,7 @@ type CustomInput = InputSystem.CustomInput
 type InputSystem = InputSystem.InputSystem
 
 local BallSim = require("ballsim")
+local Possession = require("possession")
 
 local Box = require("box")
 type BoxType = typeof(Box)
@@ -1238,6 +1239,7 @@ function setSelectedArena(arena: CasterArena)
 		Overlay.setGamemodeId(arena.slotId)
 		Overlay.setArenaSize(arena.box.size)
 		Overlay.clearRounds()
+		Possession:reset()
 	end
 	arena.instantUpdate = true
 	selectedArena = arena
@@ -2018,6 +2020,11 @@ function onGui()
 
 	if Gui.beginTabItem("Debug") then
 		GUI_CameraDebug()
+		Gui.endTabItem()
+	end
+
+	if Gui.beginTabItem("Possession") then
+		Possession:gui()
 		Gui.endTabItem()
 	end
 	Gui.endTabBar()
@@ -3153,6 +3160,9 @@ function tick(dt)
 	selectedArena:tick()
 	ball = selectedArena.ball
 
+	Possession.arena = selectedArena
+	Possession:tick(dt)
+
 	if #gameData.players < 1 and povFollow then
 		stopFollow()
 	end
@@ -3187,6 +3197,10 @@ function tick(dt)
 	end
 
 	if sendOverlayInfo then
+		Overlay.setPossession({
+			possessionSeconds = Possession.possessionSeconds,
+			possessionSecondsByPlayer = Possession.possessionSecondsByPlayer,
+		})
 		Overlay.tick()
 	end
 
