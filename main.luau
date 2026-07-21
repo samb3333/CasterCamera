@@ -1239,6 +1239,7 @@ function setSelectedArena(arena: CasterArena)
 		Overlay.setGamemodeId(arena.slotId)
 		Overlay.setArenaSize(arena.box.size)
 		Overlay.clearRounds()
+		Possession:setArena(arena)
 	end
 	arena.instantUpdate = true
 	selectedArena = arena
@@ -3158,6 +3159,8 @@ function tick(dt)
 
 	selectedArena:tick()
 	ball = selectedArena.ball
+
+	Possession:tick(dt)
 
 	if #gameData.players < 1 and povFollow then
 		stopFollow()

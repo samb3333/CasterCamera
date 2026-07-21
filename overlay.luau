@@ -63,11 +63,6 @@ export type PossessionData = {
 	possessionSecondsByPlayer: { [number]: Possession.PlayerPossessionStats },
 }
 
-export type PossessionData = {
-	possessionSeconds: { home: number, away: number, loose: number },
-	possessionSecondsByPlayer: { [number]: Possession.PlayerPossessionStats },
-}
-
 type APIStructure = {
 	gamemodeId: string,
 
@@ -82,7 +77,6 @@ type APIStructure = {
 	isOvertime: boolean,
 	bestOf: number,
 	matchLengthSeconds: number,
-	possession: PossessionData,
 }
 
 local api: APIStructure = {
@@ -114,10 +108,6 @@ local api: APIStructure = {
 	isOvertime = false,
 	bestOf = 0,
 	matchLengthSeconds = 0,
-	possession = {
-		possessionSeconds = { home = 0, away = 0, loose = 0 },
-		possessionSecondsByPlayer = {},
-	},
 }
 
 function Overlay.setPossession(data: PossessionData)
