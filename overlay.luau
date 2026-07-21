@@ -1,6 +1,7 @@
 --!strict
 
 local Utils = require("util")
+local Possession = require("possession")
 
 local Overlay = {}
 
@@ -13,6 +14,7 @@ type Stats = {
 	goals: number,
 	saves: number,
 	assists: number,
+	possession: number,
 }
 
 type OverlayPlayer = {
@@ -26,6 +28,7 @@ function newStats(): Stats
 		goals = 0,
 		saves = 0,
 		assists = 0,
+		possession = 0,
 	}
 end
 
@@ -52,6 +55,12 @@ type Round = {
 
 type OverlayTeam = {
 	players: { [string]: OverlayPlayer },
+	possession: number,
+}
+
+export type PossessionData = {
+	possessionSeconds: { home: number, away: number, loose: number },
+	possessionSecondsByPlayer: { [number]: Possession.PlayerPossessionStats },
 }
 
 type APIStructure = {
@@ -75,9 +84,11 @@ local api: APIStructure = {
 
 	home = {
 		players = {},
+		possession = 0,
 	},
 	away = {
 		players = {},
+		possession = 0,
 	},
 	arenaSize = Vec3.zeroVector,
 	rounds = {},
@@ -98,6 +109,28 @@ local api: APIStructure = {
 	bestOf = 0,
 	matchLengthSeconds = 0,
 }
+
+function Overlay.setPossession(data: PossessionData)
+	local totalPossession = data.possessionSeconds.home + data.possessionSeconds.away + data.possessionSeconds.loose
+	if totalPossession > 0 then
+		api.home.possession = data.possessionSeconds.home / totalPossession * 100
+		api.away.possession = data.possessionSeconds.away / totalPossession * 100
+
+		for playerId: number, playerStats: Possession.PlayerPossessionStats in data.possessionSecondsByPlayer do
+			local playerName = playerStats.name
+			local playerPossession = playerStats.seconds / totalPossession
+
+			if api.home.players[playerName] then
+				api.home.players[playerName].stats.possession = playerPossession * 100
+			elseif api.away.players[playerName] then
+				api.away.players[playerName].stats.possession = playerPossession * 100
+			end
+		end
+	else
+		api.home.possession = 0
+		api.away.possession = 0
+	end
+end
 
 function Overlay.setGamemodeId(gamemodeId: string)
 	api.gamemodeId = gamemodeId
