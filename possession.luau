@@ -105,7 +105,7 @@ function Possession:tick(dt: number)
 	local previousPossessionId = self.possessionHolder and self.possessionHolder.playerId or nil
 
 	if arena.ball then
-		self.currentToucher = Util.isDriftballHeld(arena.ball, 30, arena.players)
+		self.currentToucher = Util.isDriftballHeld(arena.ball, Possession.contactDistance, arena.players)
 		if self.currentToucher then
 			self.lastToucher = self.currentToucher
 			self.lastTouchTime = os.clock()
@@ -161,16 +161,7 @@ end
 
 function Possession:gui()
 	Gui.separatorText("Possession Tracker")
-
-	--Gui.text(`Selected Arena: {self.arena and self.arena.name or "None"}`)
-
 	self.possessionTimeout = Gui.sliderFloat("Possession Timeout (sec)", self.possessionTimeout, 0.5, 15)
-	self.debug = Gui.checkbox("Debug", self.debug)
-
-	-- Gui.newLine()
-	-- Gui.text(`Currently On Ball: {self.currentToucher and self.currentToucher.playerName or "No one"}`)
-	-- Gui.text(`Possession: {self.possessionHolder and self.possessionHolder.playerName or "Loose"}`)
-	-- Gui.text(`Last Touched By: {self.lastToucher and self.lastToucher.playerName or "No one yet"}`)
 end
 
 return Possession

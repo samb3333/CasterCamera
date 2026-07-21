@@ -1886,6 +1886,8 @@ function GUI_CameraDebug()
 
 			debugBallPrediction = Gui.checkbox("show ball prediction", debugBallPrediction)
 
+			Possession.debug = Gui.checkbox("Possession Debug", Possession.debug)
+
 			if Gui.treeNode("Print ball collision info") then
 				if Gui.treeNode("Home") then
 					if Gui.treeNode("Current##Home") then
