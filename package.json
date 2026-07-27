@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/AA-Franz/OD_SpectatorRegistry/refs/heads/main/src/package.schema.json",
   "author": "Dennssen",
   "displayName": "Caster Camera",
   "name": "dennssen.caster",
@@ -13,5 +14,6 @@
     "driftblitz"
   ],
   "defaultKeybind": "",
-  "main": "main.luau"
+  "main": "main.luau",
+  "url": "https://github.com/dennssen/CasterCamera.git"
 }
