@@ -11,6 +11,7 @@ type Arena = Arena.Arena
 export type PlayerPossessionStats = {
 	name: string,
 	seconds: number,
+	dribbleMeters: number,
 }
 
 type Possession = {
@@ -24,6 +25,10 @@ type Possession = {
 	lastToucher: ReplayPlayer?,
 	lastTouchTime: number,
 	possessionHolder: ReplayPlayer?,
+
+	-- used to measure distance carried by the current possession holder, cleared whenever possession changes hands or goes loose
+	lastPossessionHolderId: number?,
+	lastPossessionHolderPosition: Vec3?,
 
 	possessionSeconds: { home: number, away: number, loose: number },
 	possessionSecondsByPlayer: { [number]: PlayerPossessionStats },
@@ -48,6 +53,9 @@ Possession.lastToucher = nil
 Possession.lastTouchTime = -math.huge
 Possession.possessionHolder = nil
 
+Possession.lastPossessionHolderId = nil
+Possession.lastPossessionHolderPosition = nil
+
 Possession.possessionSeconds = { home = 0, away = 0, loose = 0 }
 Possession.possessionSecondsByPlayer = {}
 
@@ -61,6 +69,8 @@ function Possession:reset()
 	self.lastToucher = nil
 	self.lastTouchTime = -math.huge
 	self.possessionHolder = nil
+	self.lastPossessionHolderId = nil
+	self.lastPossessionHolderPosition = nil
 	self.possessionSeconds = { home = 0, away = 0, loose = 0 }
 	self.possessionSecondsByPlayer = {}
 end
@@ -137,10 +147,17 @@ function Possession:tick(dt: number)
 		if self.possessionHolder then
 			local playerStats = self.possessionSecondsByPlayer[self.possessionHolder.playerId]
 			if not playerStats then
-				playerStats = { name = self.possessionHolder.playerName, seconds = 0 }
+				playerStats = { name = self.possessionHolder.playerName, seconds = 0, dribbleMeters = 0 }
 				self.possessionSecondsByPlayer[self.possessionHolder.playerId] = playerStats
 			end
 			playerStats.seconds += dt
+
+			local holderPosition = self.possessionHolder.root.position
+			if self.lastPossessionHolderId == self.possessionHolder.playerId and self.lastPossessionHolderPosition then
+				playerStats.dribbleMeters += Util.getDist(self.lastPossessionHolderPosition, holderPosition) / 100
+			end
+			self.lastPossessionHolderId = self.possessionHolder.playerId
+			self.lastPossessionHolderPosition = holderPosition
 
 			if self.possessionHolder.teamIndex == Util.TeamIndex.HomeTeam then
 				self.possessionSeconds.home += dt
@@ -151,6 +168,8 @@ function Possession:tick(dt: number)
 			end
 		else
 			self.possessionSeconds.loose += dt
+			self.lastPossessionHolderId = nil
+			self.lastPossessionHolderPosition = nil
 		end
 	end
 
