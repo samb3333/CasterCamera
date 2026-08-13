@@ -108,10 +108,6 @@ function Possession:tick(dt: number)
 		return
 	end
 
-	if arena.isGameActive and not arena.lastIsGameActive then
-		self:reset()
-	end
-
 	local previousPossessionId = self.possessionHolder and self.possessionHolder.playerId or nil
 
 	if arena.ball then
