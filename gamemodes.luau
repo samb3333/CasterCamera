@@ -8,6 +8,7 @@ local Util = require("util")
 -- Call Gamemodes.init(overlay) from main after requiring both modules.
 local Overlay: typeof(require("overlay")) = nil :: any
 local Arena = require("arena")
+local Possession = require("possession")
 
 local centerBoxSize = Vec3.new(50, 50, 125)
 local debuging = {
@@ -54,6 +55,7 @@ function CasterArena.new(gamemode: ModuleStateSpectatorLuaApi, frameIndex: numbe
 end
 
 function CasterArena:onGameStartHook()
+	Possession:reset()
 	Overlay.clearStats()
 	Overlay.clearRounds()
 end
