@@ -145,7 +145,7 @@ local Arena = require("arena")
 local Overlay = require("overlay")
 
 local Gamemodes = require("gamemodes")
-Gamemodes.init(Overlay, Profiler)
+Gamemodes.init(Overlay, Profiler, Possession)
 type CasterArena = Gamemodes.CasterArena
 type Arena3v3 = Gamemodes.Arena3v3
 type Arena4v4 = Gamemodes.Arena4v4
